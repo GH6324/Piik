@@ -30,9 +30,13 @@ Pages also open directly from the filesystem (no fetch calls).
 | Param | Effect |
 | --- | --- |
 | `?scene=NAME` | Initial scene (see the bottom bar for names per page) |
-| `&lang=en` / `&lang=zh` | Copy language |
-| `&viewers=N` | Roster size (0-8) |
+| `&mode=text` / `&mode=vis` | Language mode: zh/en text, or pure visual (default) |
+| `&lang=en` / `&lang=zh` | Copy language for text modes and tooltips |
+| `&theme=dark` / `&theme=light` | Theme (default: stored or system preference) |
+| `&viewers=N` | Roster size (0-24; 20 shows the crowded couch) |
 | `&chrome=0` | Hide the scene bar (used for screenshots) |
-| `&details=1` | Start with connection details expanded |
-| `&advanced=1` | Host: start with advanced settings expanded |
-| `&room=7316` | Room code shown |
+| `&details=1` / `&topology=1` / `&advanced=1` | Start with those panels expanded |
+| `&relay=1` | Viewer relays to two downstream children |
+| `&pawn=NAME` / `&metrics=1` | Pre-open a viewer detail row / its secondary metrics |
+| `&policy=private` / `&password=1` | Host admission state |
+| `&room=7316` / `&code=7316` | Room code shown / join dials prefilled |

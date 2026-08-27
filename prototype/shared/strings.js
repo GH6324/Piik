@@ -88,6 +88,8 @@ window.SCREENER_COPY = {
     "host.invite.copy": "复制邀请链接",
     "host.invite.rotate": "更新邀请链接",
     "host.invite.revoke": "撤销邀请链接",
+    "host.invite.rotateShort": "更新链接",
+    "host.invite.revokeShort": "撤销链接",
     "host.invite.updated": "邀请链接已更新",
     "host.invite.revoked": "邀请链接已撤销",
     "host.invite.emptyOpen": "暂无邀请链接，仍可凭房间号加入",
@@ -224,6 +226,8 @@ window.SCREENER_COPY = {
 
     "theme.dark": "切换到暗色模式",
     "theme.light": "切换到浅色模式",
+    "theme.dark.short": "暗色",
+    "theme.light.short": "浅色",
 
     "story.room": "找到房间",
     "story.link": "建立连接",
@@ -316,6 +320,8 @@ window.SCREENER_COPY = {
     "host.invite.copy": "Copy invite link",
     "host.invite.rotate": "Rotate invite link",
     "host.invite.revoke": "Revoke invite link",
+    "host.invite.rotateShort": "Rotate link",
+    "host.invite.revokeShort": "Revoke link",
     "host.invite.updated": "Invite link rotated",
     "host.invite.revoked": "Invite link revoked",
     "host.invite.emptyOpen": "No invite link; the room code still works",
@@ -452,6 +458,8 @@ window.SCREENER_COPY = {
 
     "theme.dark": "Switch to dark mode",
     "theme.light": "Switch to light mode",
+    "theme.dark.short": "Dark",
+    "theme.light.short": "Light",
 
     "story.room": "Room found",
     "story.link": "Linking up",

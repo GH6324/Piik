@@ -39,7 +39,7 @@
     const inner = `
       ${pawnSvg(color)}
       ${opts.hideLed ? "" : `<i class="b-pawn-led ${waiting ? "is-wait" : ""}"></i>`}
-      ${D.vis || opts.child || opts.crowded ? "" : `<span class="b-pawn-name">${esc(viewer.name)}</span>`}`;
+      ${D.vis || opts.crowded ? "" : `<span class="b-pawn-name ${opts.child ? "is-mini" : ""}">${esc(viewer.name)}</span>`}`;
     if (opts.static) {
       return `<span class="b-pawn is-static ${opts.child ? "is-child" : ""}" style="${motion}" title="${esc(label)}">${inner}</span>`;
     }
@@ -108,7 +108,7 @@
   }
 
   function ledStrip(state, label) {
-    return `<span class="b-leds" data-state="${state}" title="${esc(label)}" aria-label="${esc(label)}" role="status"><i></i><i></i><i></i></span>`;
+    return `<span class="b-leds" data-state="${state}" title="${esc(label)}" aria-label="${esc(label)}" role="status"><i></i><i></i><i></i>${D.vis ? "" : `<span class="b-leds-label">${esc(label)}</span>`}</span>`;
   }
 
   function story(step) {
@@ -277,9 +277,9 @@
       <span class="b-lang" role="group" aria-label="${esc(t("mode.language"))}">
         ${modeBtn("zh", "中", "mode.zh")}
         ${modeBtn("en", "EN", "mode.en")}
-        ${modeBtn("vis", I("sparkles", 15), "mode.vis")}
+        ${modeBtn("vis", D.vis ? I("sparkles", 15) : "视", "mode.vis")}
       </span>
-      <button type="button" class="b-btn" data-settheme style="min-width:40px;height:40px;border-radius:999px" title="${esc(t(D.theme === "dark" ? "theme.light" : "theme.dark"))}" aria-label="${esc(t(D.theme === "dark" ? "theme.light" : "theme.dark"))}">${I(D.theme === "dark" ? "sun" : "moon", 16)}</button>`;
+      <button type="button" class="b-btn" data-settheme style="min-width:40px;height:40px;border-radius:999px" title="${esc(t(D.theme === "dark" ? "theme.light" : "theme.dark"))}" aria-label="${esc(t(D.theme === "dark" ? "theme.light" : "theme.dark"))}">${I(D.theme === "dark" ? "sun" : "moon", 16)}${D.vis ? "" : `<span class="b-cap">${esc(t(D.theme === "dark" ? "theme.light.short" : "theme.dark.short"))}</span>`}</button>`;
   }
 
   function bindHeaderControls(renderFn) {
@@ -387,8 +387,8 @@
       return `<div class="b-row" role="group" aria-label="${esc(t("host.invite"))}">
         <div class="b-row-group b-group-actions">
           <button class="b-btn ${H.invite ? "is-primary" : ""}" data-act="copy-invite" title="${esc(t("host.invite.copy"))}" aria-label="${esc(t("host.invite.copy"))}" ${H.invite ? "" : "disabled"}>${I("link", 19)}${cap("common.copy")}</button>
-          <button class="b-btn" data-act="rotate-invite" title="${esc(t("host.invite.rotate"))}" aria-label="${esc(t("host.invite.rotate"))}">${I("refresh", 18)}${cap("host.invite.rotate")}</button>
-          <button class="b-btn is-danger" data-act="revoke-invite" title="${esc(t("host.invite.revoke"))}" aria-label="${esc(t("host.invite.revoke"))}" ${H.invite ? "" : "disabled"}>${I("linkOff", 19)}${cap("host.invite.revoke")}</button>
+          <button class="b-btn" data-act="rotate-invite" title="${esc(t("host.invite.rotate"))}" aria-label="${esc(t("host.invite.rotate"))}">${I("refresh", 18)}${cap("host.invite.rotateShort")}</button>
+          <button class="b-btn is-danger" data-act="revoke-invite" title="${esc(t("host.invite.revoke"))}" aria-label="${esc(t("host.invite.revoke"))}" ${H.invite ? "" : "disabled"}>${I("linkOff", 19)}${cap("host.invite.revokeShort")}</button>
         </div>
         <span class="b-divider"></span>
         <div class="b-row-group">
@@ -397,7 +397,7 @@
             <button type="button" data-act="policy" data-v="private" class="${H.policy === "private" ? "is-selected" : ""}" title="${esc(t("host.policy.private"))} · ${esc(t("host.policy.privateHint"))}" aria-label="${esc(t("host.policy.private"))}" aria-pressed="${H.policy === "private"}">${I("lock", 19)}${cap("host.policy.private")}</button>
           </span>
           ${H.policy === "private" ? `
-          <button class="b-btn ${H.hasPassword ? "is-on" : ""}" data-act="password-toggle" title="${esc(t(H.hasPassword ? "host.password.set" : "host.password.unset"))}" aria-label="${esc(t("host.password.setAction"))}" aria-expanded="${H.passwordOpen}">${I("key", 19)}${cap("join.password")}</button>` : ""}
+          <button class="b-btn" data-act="password-toggle" title="${esc(t(H.hasPassword ? "host.password.set" : "host.password.unset"))}" aria-label="${esc(t("host.password.setAction"))}" aria-expanded="${H.passwordOpen}">${I("key", 19)}${H.hasPassword ? '<i class="b-chip-dot"></i>' : ""}${cap("join.password")}</button>` : ""}
         </div>
         ${H.policy === "private" && H.passwordOpen ? `
         <div class="b-row-group">
@@ -419,7 +419,7 @@
       ];
       const glyph = (density) => {
         const lines = [2, 3, 4][density];
-        const wave = density === 2 ? `<path d="M7 34c1.4 0 1.4-2 2.8-2s1.4 2 2.8 2 1.4-2 2.8-2 1.4 2 2.8 2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>` : "";
+        const wave = density === 2 ? `<path d="M7 25.5c1.4 0 1.4-2 2.8-2s1.4 2 2.8 2 1.4-2 2.8-2 1.4 2 2.8 2" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round"/>` : "";
         const bars = Array.from({ length: lines }, (_, i) => `<path d="M6 ${13 + i * 6}h16" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" opacity="${0.45 + i * 0.2}"/>`).join("");
         return `<svg width="28" height="38" viewBox="0 0 28 38" fill="none" aria-hidden="true"><rect x="2" y="3" width="24" height="26" rx="4" stroke="currentColor" stroke-width="2.2"/>${bars}${wave}</svg>`;
       };
@@ -531,7 +531,7 @@
       root.innerHTML = `
       <div class="b-scene">
         <div class="b-tv">
-          <div class="b-tv-screen ${crt ? "is-on" : ""}" id="tv">
+          <div class="b-tv-screen ${crt ? "is-on" : ""} ${["idle", "ended", "error"].includes(H.scene) ? "has-entry" : ""}" id="tv">
             ${isLive() ? `<div data-feed ${H.scene === "paused" ? 'data-state="frozen"' : ""}></div>` : ""}
             ${H.switching ? `<div class="b-tv-static"></div>` : ""}
             ${tvHtml()}
@@ -561,7 +561,7 @@
             `) : ""}
           </div>
           ${phaseText ? `<div class="b-row-group b-group-status">${phaseText}${H.noAudio && isLive() ? pill("speaker", "", t("host.noAudio")) : ""}${H.notice ?? ""}</div>` : H.noAudio && isLive() ? `<div class="b-row-group b-group-status">${pill("speaker", "", t("host.noAudio"))}</div>` : H.notice ? `<div class="b-row-group b-group-status">${H.notice}</div>` : ""}
-          <span class="b-spacer"></span>
+          ${hasRoom() ? '<span class="b-spacer"></span>' : ""}
           <div class="b-row-group b-group-name">${nameHtml()}</div>
           <div class="b-row-group b-group-actions">${controlsHtml()}</div>
         </div>
@@ -865,9 +865,12 @@
 
     function pawnDetailHtml(children) {
       if (V.selectedPawn === "you") {
+        const selfName = [V.name, t("common.you")].includes("你") && V.name === t("common.you")
+          ? V.name
+          : `${V.name} · ${t("common.you")}`;
         return detailRow({
           color: YOU,
-          name: `${V.name} · ${t("common.you")}`,
+          name: selfName,
           route: V.route,
           metrics: viewerMetrics(V.name),
           expanded: V.metricsMore,
@@ -936,14 +939,14 @@
   if (page === "join") {
     const SCENES = ["form", "invalid", "joining", "denied", "notfound", "full", "gate"];
     const root = document.getElementById("join-root");
-    const J = { scene: D.scene || "form", code: "" };
+    const J = { scene: D.scene || "form", code: D.param("code", "") };
 
     function dialsHtml() {
       return `<div class="b-dials-wrap">
         <div class="b-dials" id="dials">
-          ${[0, 1, 2, 3].map((i) => `<span class="b-dial ${i === 0 ? "is-active" : ""}"></span>`).join("")}
+          ${[0, 1, 2, 3].map((i) => `<span class="b-dial ${J.code[i] ? "is-filled" : i === J.code.length ? "is-active" : ""}">${J.code[i] ?? ""}</span>`).join("")}
         </div>
-        <input inputmode="numeric" autocomplete="off" maxlength="4" aria-label="${esc(t("join.field"))}" data-dials-input ${J.scene === "invalid" ? 'value="12ab"' : ""}>
+        <input inputmode="numeric" autocomplete="off" maxlength="4" aria-label="${esc(t("join.field"))}" data-dials-input value="${J.scene === "invalid" ? "12ab" : J.code}">
       </div>`;
     }
 
@@ -1002,7 +1005,7 @@
         ${dialsHtml()}
         ${J.scene === "invalid" ? `<span class="b-join-error" role="alert" title="${esc(t("join.invalid"))}" aria-label="${esc(t("join.invalid"))}">${I("x", 24)}</span>` : ""}
         ${J.scene === "invalid" && !D.vis ? `<span class="b-cap" style="color:var(--danger)">${esc(t("join.invalid"))}</span>` : ""}
-        <button class="b-join-go" type="submit" title="${esc(t("join.submit"))}" aria-label="${esc(t("join.submit"))}" disabled>${I("arrowRight", 26)}</button>
+        <button class="b-join-go" type="submit" title="${esc(t("join.submit"))}" aria-label="${esc(t("join.submit"))}" ${J.code.length === 4 ? "" : "disabled"}>${I("arrowRight", 26)}</button>
         ${cap("join.submit")}
       </form></div>`;
       const input = root.querySelector("[data-dials-input]");
