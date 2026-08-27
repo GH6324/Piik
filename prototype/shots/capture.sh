@@ -24,9 +24,9 @@ shot a-join.png         "$BASE/a-text/join.html?scene=form&chrome=0&theme=light"
 shot a-host-advanced.png "$BASE/a-text/host.html?scene=ended&advanced=1&policy=private&password=1&details=1&topology=1&chrome=0&theme=light" 1440,1100
 
 # --- Direction A mobile (via fixed-width frame) ---
-shot a-host-live-m.png    "$BASE/shots/frame.html?src=a-text/host.html%3Fscene%3Dlive%26viewers%3D3%26chrome%3D0%26theme%3Dlight" 430,932
-shot a-viewer-playing-m.png "$BASE/shots/frame.html?src=a-text/viewer.html%3Fscene%3Dplaying%26chrome%3D0%26theme%3Dlight" 430,932
-shot a-join-m.png         "$BASE/shots/frame.html?src=a-text/join.html%3Fscene%3Dform%26chrome%3D0%26theme%3Dlight" 430,932
+shot a-host-live-m.png    "$BASE/frame.html?src=a-text/host.html%3Fscene%3Dlive%26viewers%3D3%26chrome%3D0%26theme%3Dlight" 430,932
+shot a-viewer-playing-m.png "$BASE/frame.html?src=a-text/viewer.html%3Fscene%3Dplaying%26chrome%3D0%26theme%3Dlight" 430,932
+shot a-join-m.png         "$BASE/frame.html?src=a-text/join.html%3Fscene%3Dform%26chrome%3D0%26theme%3Dlight" 430,932
 
 # --- Direction B (visual) desktop ---
 shot b-host-idle.png    "$BASE/b-visual/host.html?scene=idle&chrome=0&theme=light"    1440,900
@@ -49,7 +49,13 @@ shot b-host-live-dark.png "$BASE/b-visual/host.html?scene=live&viewers=4&theme=d
 shot b-viewer-playing-dark.png "$BASE/b-visual/viewer.html?scene=playing&theme=dark&chrome=0" 1440,900
 shot b-join-dark.png      "$BASE/b-visual/join.html?scene=form&theme=dark&chrome=0" 1440,900
 
+# --- Direction B large roster (20 viewers) ---
+shot b-host-crowded.png   "$BASE/b-visual/host.html?scene=live&viewers=20&chrome=0&theme=light" 1440,900
+shot b-host-crowded-zh.png "$BASE/b-visual/host.html?scene=live&viewers=20&mode=text&lang=zh&chrome=0&theme=light" 1440,900
+shot b-viewer-crowded.png "$BASE/b-visual/viewer.html?scene=playing&viewers=19&chrome=0&theme=light" 1440,900
+shot b-host-pawn.png      "$BASE/b-visual/host.html?scene=live&viewers=4&pawn=%E8%98%91%E8%8F%87&mode=text&lang=zh&chrome=0&theme=light" 1440,900
+
 # --- Direction B mobile ---
-shot b-host-live-m.png    "$BASE/shots/frame.html?src=b-visual/host.html%3Fscene%3Dlive%26viewers%3D3%26chrome%3D0%26theme%3Dlight" 430,932
-shot b-viewer-playing-m.png "$BASE/shots/frame.html?src=b-visual/viewer.html%3Fscene%3Dplaying%26chrome%3D0%26theme%3Dlight" 430,932
-shot b-join-m.png         "$BASE/shots/frame.html?src=b-visual/join.html%3Fscene%3Dform%26chrome%3D0%26theme%3Dlight" 430,932
+shot b-host-live-m.png    "$BASE/frame.html?src=b-visual/host.html%3Fscene%3Dlive%26viewers%3D3%26chrome%3D0%26theme%3Dlight" 430,932
+shot b-viewer-playing-m.png "$BASE/frame.html?src=b-visual/viewer.html%3Fscene%3Dplaying%26chrome%3D0%26theme%3Dlight" 430,932
+shot b-join-m.png         "$BASE/frame.html?src=b-visual/join.html%3Fscene%3Dform%26chrome%3D0%26theme%3Dlight" 430,932

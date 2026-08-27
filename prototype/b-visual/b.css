@@ -110,7 +110,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 /* ---------- room scene ---------- */
 
 .b-room {
-  width: min(1080px, 100%);
+  width: min(1180px, 100%);
   margin: 0 auto;
   padding: 8px clamp(14px, 3.5vw, 40px) 64px;
 }
@@ -119,7 +119,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 
 .b-tv {
   position: relative;
-  width: min(760px, 100%);
+  width: min(880px, 100%);
   margin: 0 auto;
   padding: 12px 12px 0;
   border: 3px solid var(--frame);
@@ -152,7 +152,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 .b-tv-chin i.is-busy { background: var(--action); animation: b-blink .8s infinite; }
 
 .b-shelf {
-  width: min(560px, 84%);
+  width: min(640px, 84%);
   height: 10px;
   margin: 14px auto 0;
   border: 3px solid var(--ink);
@@ -163,7 +163,7 @@ ul { margin: 0; padding: 0; list-style: none; }
 /* couch + pawns */
 .b-couch {
   position: relative;
-  width: min(640px, 96%);
+  width: min(720px, 96%);
   margin: 22px auto 0;
 }
 .b-couch > svg { display: block; width: 100%; height: auto; }
@@ -189,8 +189,42 @@ ul { margin: 0; padding: 0; list-style: none; }
   transition: transform 150ms ease;
 }
 .b-pawn:hover { transform: translateY(-5px); }
+.b-pawn.is-static { cursor: default; }
+.b-pawn.is-static:hover { transform: none; }
+.b-pawn.is-selected { transform: translateY(-5px); }
+.b-pawn.is-selected::before {
+  content: "";
+  position: absolute;
+  inset: -5px -7px;
+  border: 2.5px solid var(--action);
+  border-radius: 13px;
+}
+
+/* per-viewer detail row */
+.b-pawn-detail { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.b-pawn-detail .b-pawn-mini { display: grid; place-items: center; }
+.b-pawn-detail .b-pawn-mini svg { width: 28px; height: 34px; display: block; }
+.b-pawn-detail-name { font-size: 14px; font-weight: 800; }
+.b-pawn-detail-close {
+  margin-left: auto;
+  display: grid;
+  width: 34px; height: 34px;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ink);
+  opacity: .6;
+}
+.b-pawn-detail-close:hover { opacity: 1; background: rgba(0, 0, 0, .06); }
 .b-pawn.is-child { width: 34px; margin-left: -8px; align-self: end; }
 .b-pawn.is-child svg { width: 30px; height: 36px; }
+
+/* crowded couch: 10+ viewers — smaller pawns, no name tags */
+.b-pawns.is-crowded { gap: 0 3px; }
+.b-pawns.is-crowded .b-pawn { width: 33px; }
+.b-pawns.is-crowded .b-pawn svg { width: 29px; height: 35px; }
+.b-pawns.is-crowded .b-pawn-led { width: 8px; height: 8px; }
 .b-pawn svg { width: 40px; height: 48px; display: block; }
 .b-pawn .b-pawn-led {
   position: absolute;
@@ -312,7 +346,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   flex-wrap: wrap;
   align-items: center;
   gap: 12px;
-  padding: 14px 16px;
+  padding: 15px 18px;
   border: 2.5px solid var(--ink);
   border-radius: var(--radius);
   background: var(--paper);
@@ -649,7 +683,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   color: inherit;
   white-space: nowrap;
 }
-.b-btn .b-cap { margin-left: 2px; }
+.b-btn .b-cap { margin-left: 8px; }
 
 .b-tv-msg {
   font-size: 14.5px;
@@ -696,6 +730,11 @@ ul { margin: 0; padding: 0; list-style: none; }
 .b-meter-tag .b-cap { margin-left: 6px; font-size: 12px; }
 .b-toggle .b-cap { margin-left: 5px; font-size: 12px; }
 .b-toggle button { width: auto; min-width: 44px; padding: 0 10px; }
+.b-chip .b-cap { margin-left: 6px; font-size: 12px; }
+.b-chip small { margin-left: 5px; font-family: var(--mono); font-size: 10.5px; opacity: .6; }
+.b-switch-item { display: inline-flex; align-items: center; gap: 9px; }
+.b-field-cap { opacity: .55; font-size: 12px; font-weight: 600; }
+.b-route text { fill: var(--ink); font-size: 11px; font-weight: 600; opacity: .72; }
 
 .b-access-text {
   display: grid;

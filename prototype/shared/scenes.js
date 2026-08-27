@@ -67,7 +67,11 @@
 
   applyTheme(resolveTheme());
 
-  const NAMES = ["阿茶", "老白", "蘑菇", "Kite", "夜风", "麦子", "豆腐", "Rex"];
+  const NAMES = [
+    "阿茶", "老白", "蘑菇", "Kite", "夜风", "麦子", "豆腐", "Rex",
+    "小七", "洛洛", "阿岚", "Momo", "青山", "柚子", "Bolt", "阿灿",
+    "天天", "Nora", "小雨", "CC", "南风", "阿栋", "米粒", "Zed",
+  ];
 
   const ROUTES = ["p2p", "p2p", "sfu", "p2p", "sfu", "p2p", "p2p", "sfu"];
   const PEER_STATES = [
@@ -157,6 +161,13 @@
       window.location.reload();
     });
     bar.append(langButton);
+    const phone = document.createElement("a");
+    const pagePath = window.location.pathname.split("/").slice(-2).join("/");
+    phone.href = `../frame.html?src=${encodeURIComponent(pagePath + window.location.search)}`;
+    phone.target = "_blank";
+    phone.textContent = "📱";
+    phone.title = "Open in phone frame";
+    bar.append(phone);
     const home = document.createElement("a");
     home.href = `../../index.html?lang=${state.lang}`;
     home.textContent = "↩";

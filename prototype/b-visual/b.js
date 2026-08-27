@@ -36,11 +36,39 @@
     const motion = opts.animate === false
       ? "animation:none;"
       : `animation-delay:${index * 70}ms`;
-    return `<button type="button" class="b-pawn ${opts.you ? "is-you" : ""} ${opts.child ? "is-child" : ""}" style="${motion}" title="${esc(label)}" aria-label="${esc(label)}">
+    const inner = `
       ${pawnSvg(color)}
       ${opts.hideLed ? "" : `<i class="b-pawn-led ${waiting ? "is-wait" : ""}"></i>`}
-      ${D.vis || opts.child ? "" : `<span class="b-pawn-name">${esc(viewer.name)}</span>`}
-    </button>`;
+      ${D.vis || opts.child || opts.crowded ? "" : `<span class="b-pawn-name">${esc(viewer.name)}</span>`}`;
+    if (opts.static) {
+      return `<span class="b-pawn is-static ${opts.child ? "is-child" : ""}" style="${motion}" title="${esc(label)}">${inner}</span>`;
+    }
+    return `<button type="button" class="b-pawn ${opts.you ? "is-you" : ""} ${opts.child ? "is-child" : ""} ${opts.selected ? "is-selected" : ""}" style="${motion}" title="${esc(label)}" aria-label="${esc(label)}" aria-pressed="${opts.selected ? "true" : "false"}" data-act="pawn" data-name="${esc(opts.key ?? viewer.name)}">${inner}</button>`;
+  }
+
+  // Deterministic per-viewer fake metrics, varied from the name.
+  function viewerStats(name) {
+    const hash = [...name].reduce((sum, c) => sum + c.charCodeAt(0), 0);
+    return [
+      ["expand", D.STATS.resolution, t("stats.resolution")],
+      ["wave", `${60 - (hash % 2) * 5} fps`, t("stats.fps")],
+      ["gauge", `${(5.2 + (hash % 18) / 10).toFixed(1)} Mbps`, t("stats.bitrate")],
+      ["drop", `${(0.2 + (hash % 9) / 10).toFixed(1)}%`, t("stats.loss")],
+      ["clock", `${18 + (hash % 21)} ms`, t("stats.rtt")],
+    ];
+  }
+
+  function detailRow({ color, name, tag, route, stats }) {
+    return `<div class="b-row is-sub b-fade b-pawn-detail" role="group" aria-label="${esc(name)}">
+      <span class="b-pawn-mini">${pawnSvg(color)}</span>
+      <span class="b-pawn-detail-name">${esc(name)}</span>
+      ${tag ? `<span class="b-meter-cell">${I(tag.icon, 16)}<b>${esc(tag.text)}</b></span>` : ""}
+      ${route ? `<span class="b-meter-cell" title="${esc(t(route === "sfu" ? "state.route.sfu" : "state.route.p2p"))}">${routeGlyph(route)}<b>${route === "sfu" ? "SFU" : "P2P"}</b></span>` : ""}
+      <div class="b-meter">
+        ${stats.map(([icon, value, label]) => `<span class="b-meter-cell" title="${esc(label)}">${I(icon, 16)}<b>${esc(value)}</b></span>`).join("")}
+      </div>
+      <button type="button" class="b-pawn-detail-close" data-act="pawn-close" title="${esc(t("common.close"))}" aria-label="${esc(t("common.close"))}">${I("x", 16)}</button>
+    </div>`;
   }
 
   function couchSvg() {
@@ -91,7 +119,7 @@
     const S = D.STATS;
     const cells = [
       ["expand", S.resolution, t("stats.resolution")],
-      ["wave", `${S.fps}`, t("stats.fps")],
+      ["wave", `${S.fps} fps`, t("stats.fps")],
       ["gauge", S.bitrate, t("stats.bitrate")],
       ["drop", S.loss, t("stats.loss")],
       ["clock", S.rtt, t("stats.rtt")],
@@ -114,8 +142,9 @@
     if (self) column.push({ name: self.name, route: self.route, state: "connected", isSelf: true });
     for (const v of viewers) column.push({ ...v, isSelf: false });
     const children = self?.children ?? [];
+    const spacing = column.length > 10 ? 34 : 40;
     const w = children.length ? 736 : 640;
-    const h = Math.max(150, 60 + column.length * 40);
+    const h = Math.max(150, 60 + column.length * spacing);
     const midY = h / 2;
     const hostX = 30;
     const colX = children.length ? 560 : 570;
@@ -123,19 +152,21 @@
     const sfuX = 300;
     const lines = [];
     const nodes = [];
+    const nameText = (name, x, y) =>
+      D.vis ? "" : `<text x="${x}" y="${y}" text-anchor="middle">${esc(name)}</text>`;
     column.forEach((node, i) => {
-      const y = 40 + i * 40;
+      const y = 40 + i * spacing;
       const color = node.isSelf ? YOU : PAWN_COLORS[(i - (self ? 1 : 0)) % PAWN_COLORS.length];
       const ok = node.state === "connected";
       const stroke = node.route === "sfu" ? "#8ea3b8" : ok ? "#2fa66a" : "#d98e04";
       const fromX = node.route === "sfu" ? sfuX + 20 : hostX + 24;
       lines.push(`<path d="M ${fromX} ${midY} Q ${(fromX + colX) / 2} ${midY + (y - midY) * 0.7}, ${colX - 24} ${y}" fill="none" stroke="${stroke}" stroke-width="2.5" class="${flow ? "flow" : ""}"/>`);
-      nodes.push(`<g transform="translate(${colX - 14}, ${y - 15}) scale(0.72)"><title>${esc(node.name)}${node.isSelf ? ` · ${esc(t("common.you"))}` : ""}</title>${pawnSvg(color)}${node.isSelf ? `<circle cx="20" cy="24" r="22" fill="none" stroke="${YOU}" stroke-width="3"/>` : ""}</g>`);
+      nodes.push(`<g transform="translate(${colX - 14}, ${y - 15}) scale(0.72)"><title>${esc(node.name)}${node.isSelf ? ` · ${esc(t("common.you"))}` : ""}</title>${pawnSvg(color)}${node.isSelf ? `<circle cx="20" cy="24" r="22" fill="none" stroke="${YOU}" stroke-width="3"/>` : ""}</g>${nameText(node.isSelf ? `${node.name}` : node.name, colX + 4, y + 26)}`);
     });
     children.forEach((name, i) => {
       const y = 40 + i * 34;
       lines.push(`<path d="M ${colX + 12} 40 Q ${(colX + childX) / 2} ${40 + (y - 40) * 0.5}, ${childX - 16} ${y}" fill="none" stroke="#2fa66a" stroke-width="2.5" class="${flow ? "flow" : ""}"/>`);
-      nodes.push(`<g transform="translate(${childX - 12}, ${y - 12}) scale(0.5)"><title>${esc(name)}</title>${pawnSvg(PAWN_COLORS[(i + 4) % PAWN_COLORS.length])}</g>`);
+      nodes.push(`<g transform="translate(${childX - 12}, ${y - 12}) scale(0.5)"><title>${esc(name)}</title>${pawnSvg(PAWN_COLORS[(i + 4) % PAWN_COLORS.length])}</g>${nameText(name, childX + 2, y + 22)}`);
     });
     const hasSfu = column.some((n) => n.route === "sfu");
     if (hasSfu) {
@@ -146,7 +177,8 @@
         <title>${esc(t("host.topology"))}</title>
         ${lines.join("")}
         <g transform="translate(${hostX - 4}, ${midY - 20}) scale(0.85)">${pawnSvg("#e4572e")}<title>${esc(hostLabel)} · ${esc(t("common.host"))}</title></g>
-        ${hasSfu ? `<g transform="translate(${sfuX - 20}, ${midY - 16})"><title>${esc(t("host.sfu"))}</title><rect width="40" height="32" rx="7" fill="none" stroke="#8ea3b8" stroke-width="2.5"/><path d="M8 12h24M8 20h24" stroke="#8ea3b8" stroke-width="2.5" stroke-linecap="round"/></g>` : ""}
+        ${nameText(hostLabel, hostX + 14, midY + 30)}
+        ${hasSfu ? `<g transform="translate(${sfuX - 20}, ${midY - 16})"><title>${esc(t("host.sfu"))}</title><rect width="40" height="32" rx="7" fill="none" stroke="#8ea3b8" stroke-width="2.5"/><path d="M8 12h24M8 20h24" stroke="#8ea3b8" stroke-width="2.5" stroke-linecap="round"/></g>${nameText(t("host.sfu"), sfuX, midY + 32)}` : ""}
         ${nodes.join("")}
       </svg>
     </div>`;
@@ -229,6 +261,7 @@
       invite: true,
       noAudio: D.boolParam("noaudio"),
       editingName: false,
+      selectedPawn: D.param("pawn", null),
       preset: 1,
       notice: null,
       timer: null,
@@ -243,9 +276,15 @@
       if (["idle", "ended", "error"].includes(H.scene)) {
         return `<div class="b-tv-overlay b-fade">
           ${D.vis ? "" : `<div class="b-entry-text"><h2>${esc(t("host.idle.heading"))}</h2><p>${esc(t("host.idle.hint"))}</p></div>`}
-          <div class="b-row-actions" style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center">
-            <button type="button" class="b-tv-big is-action is-ripple" data-act="start" title="${esc(t("host.start"))}" aria-label="${esc(t("host.start"))}">${I("cast", 34)}</button>
-            <button type="button" class="b-tv-big" data-act="toggle-join" title="${esc(t("host.join"))}" aria-label="${esc(t("host.join"))}">${I("door", 30)}</button>
+          <div class="b-row-actions" style="display:flex;gap:18px;flex-wrap:wrap;justify-content:center">
+            <span style="display:grid;justify-items:center;gap:8px">
+              <button type="button" class="b-tv-big is-action is-ripple" data-act="start" title="${esc(t("host.start"))}" aria-label="${esc(t("host.start"))}">${I("cast", 34)}</button>
+              ${tvMsg("host.start")}
+            </span>
+            <span style="display:grid;justify-items:center;gap:8px;align-content:start">
+              <button type="button" class="b-tv-big" data-act="toggle-join" title="${esc(t("host.join"))}" aria-label="${esc(t("host.join"))}">${I("door", 30)}</button>
+              ${tvMsg("host.join")}
+            </span>
           </div>
           <div class="b-dials-wrap" id="join-inline" hidden>
             <div class="b-dials" style="--dial-bg:#101a2c">
@@ -354,24 +393,30 @@
         <div class="b-door-group">
           <span class="b-door-glyph" title="${esc(t("host.advanced.preference"))}">${I("mountain", 19)}${cap("host.advanced.preference")}</span>
           <div class="b-chips" role="group" aria-label="${esc(t("host.advanced.preference"))}">
-            <button class="b-chip" title="${esc(t("host.advanced.preference.resolution"))} · ${esc(t("host.advanced.preference.resolutionHint"))}" ${prefLocked ? "disabled" : ""}>${I("mountain", 18)}</button>
-            <button class="b-chip is-selected" title="${esc(t("host.advanced.preference.balanced"))} · ${esc(t("host.advanced.preference.balancedHint"))}" ${prefLocked ? "disabled" : ""}>${I("balance", 18)}</button>
-            <button class="b-chip" title="${esc(t("host.advanced.preference.framerate"))} · ${esc(t("host.advanced.preference.framerateHint"))}" ${prefLocked ? "disabled" : ""}>${I("zap", 18)}</button>
+            <button class="b-chip" title="${esc(t("host.advanced.preference.resolution"))} · ${esc(t("host.advanced.preference.resolutionHint"))}" ${prefLocked ? "disabled" : ""}>${I("mountain", 18)}${cap("host.advanced.preference.resolution")}</button>
+            <button class="b-chip is-selected" title="${esc(t("host.advanced.preference.balanced"))} · ${esc(t("host.advanced.preference.balancedHint"))}" ${prefLocked ? "disabled" : ""}>${I("balance", 18)}${cap("host.advanced.preference.balanced")}</button>
+            <button class="b-chip" title="${esc(t("host.advanced.preference.framerate"))} · ${esc(t("host.advanced.preference.framerateHint"))}" ${prefLocked ? "disabled" : ""}>${I("zap", 18)}${cap("host.advanced.preference.framerate")}</button>
           </div>
         </div>
         <div class="b-door-group">
           <span class="b-door-glyph" title="${esc(t("host.advanced.audio"))}">${I("speaker", 19)}${cap("host.advanced.audio")}</span>
           <div class="b-chips" role="group" aria-label="${esc(t("host.advanced.audio"))}">
-            <button class="b-chip" title="${esc(t("host.advanced.audio.saver"))} · 64 kbps" ${capsLocked ? "disabled" : ""}>64</button>
-            <button class="b-chip is-selected" title="${esc(t("host.advanced.audio.music"))} · 128 kbps" ${capsLocked ? "disabled" : ""}>128</button>
-            <button class="b-chip" title="${esc(t("host.advanced.audio.veryHigh"))} · 192 kbps" ${capsLocked ? "disabled" : ""}>192</button>
+            <button class="b-chip" title="${esc(t("host.advanced.audio.saver"))} · 64 kbps" ${capsLocked ? "disabled" : ""}>${D.vis ? "64" : `${esc(t("host.advanced.audio.saver"))}<small>64</small>`}</button>
+            <button class="b-chip is-selected" title="${esc(t("host.advanced.audio.music"))} · 128 kbps" ${capsLocked ? "disabled" : ""}>${D.vis ? "128" : `${esc(t("host.advanced.audio.music"))}<small>128</small>`}</button>
+            <button class="b-chip" title="${esc(t("host.advanced.audio.veryHigh"))} · 192 kbps" ${capsLocked ? "disabled" : ""}>${D.vis ? "192" : `${esc(t("host.advanced.audio.veryHigh"))}<small>192</small>`}</button>
           </div>
         </div>
         <div class="b-door-group">
           <span class="b-door-glyph" title="${esc(t("host.advanced.route"))}">${I("branch", 19)}${cap("host.advanced.route")}</span>
           <div class="b-chips">
-            <button class="b-switch" role="switch" aria-checked="false" data-act="switch-toggle" title="${esc(t("host.advanced.route.topo"))} · ${esc(t("host.advanced.route.topoHint"))}" aria-label="${esc(t("host.advanced.route.topo"))}" ${routeCodecLocked ? "disabled" : ""}></button>
-            <button class="b-switch" role="switch" aria-checked="false" data-act="switch-toggle" title="${esc(t("host.advanced.route.peerOnly"))} · ${esc(t("host.advanced.route.peerOnlyHint"))}" aria-label="${esc(t("host.advanced.route.peerOnly"))}" ${routeCodecLocked ? "disabled" : ""}></button>
+            <span class="b-switch-item">
+              <button class="b-switch" role="switch" aria-checked="false" data-act="switch-toggle" title="${esc(t("host.advanced.route.topo"))} · ${esc(t("host.advanced.route.topoHint"))}" aria-label="${esc(t("host.advanced.route.topo"))}" ${routeCodecLocked ? "disabled" : ""}></button>
+              ${cap("host.advanced.route.topo")}
+            </span>
+            <span class="b-switch-item">
+              <button class="b-switch" role="switch" aria-checked="false" data-act="switch-toggle" title="${esc(t("host.advanced.route.peerOnly"))} · ${esc(t("host.advanced.route.peerOnlyHint"))}" aria-label="${esc(t("host.advanced.route.peerOnly"))}" ${routeCodecLocked ? "disabled" : ""}></button>
+              ${cap("host.advanced.route.peerOnly")}
+            </span>
           </div>
         </div>
         <div class="b-door-group">
@@ -394,11 +439,12 @@
         <button class="b-btn" data-act="name-cancel" title="${esc(t("host.nameCancel"))}" aria-label="${esc(t("host.nameCancel"))}">${I("x", 17)}</button>`;
       }
       return `<span class="b-name-tag" title="${esc(t("host.name"))}"><i></i>${esc(H.name)}</span>
-        <button class="b-btn" data-act="name-edit" title="${esc(t("host.nameEdit"))}" aria-label="${esc(t("host.nameEdit"))}" style="min-width:44px;height:44px">${I("pencil", 16)}</button>`;
+        <button class="b-btn" data-act="name-edit" title="${esc(t("host.nameEdit"))}" aria-label="${esc(t("host.nameEdit"))}" style="min-width:44px;height:44px">${I("pencil", 16)}${cap("common.edit")}</button>`;
     }
 
     function render() {
       const list = viewers();
+      const crowded = list.length > 10;
       const crt = H.scene === "live" && prevScene !== "live";
       const led = H.scene === "live" ? ["live", t("state.signal.connected")]
         : H.scene === "starting" ? ["busy", t("host.starting")]
@@ -430,14 +476,16 @@
         <div class="b-shelf"></div>
         <div class="b-couch">
           ${couchSvg()}
-          <div class="b-pawns" role="group" aria-label="${esc(t("common.viewers"))}">
-            ${list.map((v, i) => pawn(v, i, { animate: !prevPawnKeys.has(v.name) })).join("")}
+          <div class="b-pawns ${crowded ? "is-crowded" : ""}" role="group" aria-label="${esc(t("common.viewers"))}">
+            ${list.map((v, i) => pawn(v, i, { animate: !prevPawnKeys.has(v.name), crowded, selected: H.selectedPawn === v.name })).join("")}
           </div>
           ${list.length === 0 ? `<div class="b-couch-empty" title="${esc(t(H.scene === "live" ? "host.viewers.waiting" : "host.viewers.empty"))}">${I("users", 22)}</div>` : ""}
         </div>
       </div>
       <div class="b-deck">
+        ${pawnDetailHtml()}
         <div class="b-row">
+          ${!D.vis && hasRoom() ? `<span class="b-field-cap">${esc(t("common.roomCode"))}</span>` : ""}
           ${hasRoom() ? lcd(H.code) : ""}
           ${hasRoom() ? (H.replacing ? `
             <button class="b-btn" data-act="replace-confirm" title="${esc(t("host.roomReplaceConfirm"))}" aria-label="${esc(t("host.roomReplaceConfirm"))}">${I("check", 18)}</button>
@@ -471,6 +519,19 @@
       if (H.scene === "starting") {
         H.timer = window.setTimeout(() => setScene("live"), 2600);
       }
+    }
+
+    function pawnDetailHtml() {
+      const index = viewers().findIndex((v) => v.name === H.selectedPawn);
+      if (index < 0) return "";
+      const v = viewers()[index];
+      return detailRow({
+        color: PAWN_COLORS[index % PAWN_COLORS.length],
+        name: v.name,
+        route: v.state === "connected" ? v.route : null,
+        tag: v.state === "connected" ? null : { icon: "loader", text: t("state.peer.connecting") },
+        stats: viewerStats(v.name),
+      });
     }
 
     function setScene(scene) {
@@ -516,6 +577,12 @@
       if (act === "password-save") { H.hasPassword = true; H.passwordOpen = false; H.notice = pill("key", "good", t("host.password.saved")); render(); }
       if (act === "password-remove") { H.hasPassword = false; H.notice = pill("linkOff", "bad", t("host.password.removed")); render(); }
       if (act === "preset") { H.preset = Number(target.dataset.v); render(); }
+      if (act === "pawn") {
+        const name = target.dataset.name;
+        H.selectedPawn = H.selectedPawn === name ? null : name;
+        render();
+      }
+      if (act === "pawn-close") { H.selectedPawn = null; render(); }
       if (act === "advanced") { H.advanced = !H.advanced; render(); }
       if (act === "details") { H.details = !H.details; render(); }
       if (act === "topology") { H.topology = !H.topology; render(); }
@@ -572,6 +639,7 @@
       details: D.boolParam("details"),
       topology: D.boolParam("topology"),
       editingName: false,
+      selectedPawn: D.param("pawn", null),
       timer: null,
     };
     let prevScene = null;
@@ -631,6 +699,7 @@
     function roomView() {
       const list = D.roster(D.intParam("viewers", 4));
       const children = V.relay ? ["豆腐", "Rex"] : [];
+      const crowded = 1 + children.length + list.length > 10;
       const self = { name: V.name, state: V.scene === "playing" ? "connected" : "connecting" };
       const ledState = V.scene === "playing" ? ["live", t("viewer.msg.playing")]
         : V.scene === "paused" ? ["warn", t("viewer.msg.hostPaused")]
@@ -641,6 +710,7 @@
         : ["busy", t("viewer.msg.preparingP2p")];
       document.getElementById("header-leds").innerHTML = ledStrip(ledState[0], ledState[1]);
       const crt = V.scene === "playing" && prevScene !== "playing";
+      const onlineCount = list.length + 1;
 
       return `
       <div class="b-scene">
@@ -664,17 +734,19 @@
         <div class="b-shelf"></div>
         <div class="b-couch">
           ${couchSvg()}
-          <div class="b-pawns" role="group" aria-label="${esc(t("common.viewers"))}">
-            ${pawn(self, 0, { you: true, animate: !prevPawnKeys.has("you") })}
-            ${children.map((name, i) => pawn({ name, state: "connected" }, i + 4, { child: true, animate: !prevPawnKeys.has(`child:${name}`) })).join("")}
-            ${list.map((v, i) => pawn(v, i, { animate: !prevPawnKeys.has(v.name) })).join("")}
+          <div class="b-pawns ${crowded ? "is-crowded" : ""}" role="group" aria-label="${esc(t("common.viewers"))}">
+            ${pawn(self, 0, { you: true, animate: !prevPawnKeys.has("you"), crowded, key: "you", selected: V.selectedPawn === "you" })}
+            ${children.map((name, i) => pawn({ name, state: "connected" }, i + 4, { child: true, animate: !prevPawnKeys.has(`child:${name}`), key: name, selected: V.selectedPawn === name })).join("")}
+            ${list.map((v, i) => pawn(v, i, { animate: !prevPawnKeys.has(v.name), crowded, static: true })).join("")}
           </div>
         </div>
       </div>
       <div class="b-deck">
+        ${pawnDetailHtml(children)}
         <div class="b-row">
+          ${!D.vis ? `<span class="b-field-cap">${esc(t("common.roomCode"))}</span>` : ""}
           ${lcd(D.roomCode())}
-          ${D.vis ? "" : `<span class="b-status-text">${esc(ledState[1])}</span>`}
+          ${D.vis ? "" : `<span class="b-status-text">${esc(ledState[1])} · ${onlineCount} ${esc(t("common.online"))}</span>`}
           <span class="b-spacer"></span>
           ${V.editingName ? `
             <span class="b-input" style="min-width:140px"><input data-name-input value="${esc(V.name)}" maxlength="48" aria-label="${esc(t("host.name"))}"></span>
@@ -682,7 +754,7 @@
             <button class="b-btn" data-act="name-cancel" title="${esc(t("host.nameCancel"))}" aria-label="${esc(t("host.nameCancel"))}" style="min-width:44px;height:44px">${I("x", 16)}</button>
           ` : `
             <span class="b-name-tag" title="${esc(t("host.name"))}"><i></i>${esc(V.name)}</span>
-            <button class="b-btn" data-act="name-edit" title="${esc(t("host.nameEdit"))}" aria-label="${esc(t("host.nameEdit"))}" style="min-width:44px;height:44px">${I("pencil", 15)}</button>
+            <button class="b-btn" data-act="name-edit" title="${esc(t("host.nameEdit"))}" aria-label="${esc(t("host.nameEdit"))}" style="min-width:44px;height:44px">${I("pencil", 15)}${cap("common.edit")}</button>
           `}
           <button class="b-btn ${V.topology ? "is-on" : ""}" data-act="topology" title="${esc(t(V.topology ? "host.topology.hide" : "host.topology.show"))}" aria-label="${esc(t("host.topology"))}" aria-expanded="${V.topology}">${I("network", 19)}${cap("host.topology")}</button>
           <button class="b-btn" data-act="reconnect" title="${esc(t("viewer.reconnect"))}" aria-label="${esc(t("viewer.reconnect"))}" ${["playing", "recovering", "failed", "hostoffline", "paused"].includes(V.scene) ? "" : "disabled"}>${I("refresh", 19)}${cap("viewer.reconnect")}</button>
@@ -715,6 +787,27 @@
       ]);
     }
 
+    function pawnDetailHtml(children) {
+      if (V.selectedPawn === "you") {
+        return detailRow({
+          color: YOU,
+          name: `${V.name} · ${t("common.you")}`,
+          route: V.route,
+          stats: viewerStats(V.name),
+        });
+      }
+      if (V.selectedPawn && children.includes(V.selectedPawn)) {
+        const index = children.indexOf(V.selectedPawn);
+        return detailRow({
+          color: PAWN_COLORS[(index + 4) % PAWN_COLORS.length],
+          name: V.selectedPawn,
+          tag: { icon: "arrowUp", text: t("stats.downstream") },
+          stats: viewerStats(V.selectedPawn),
+        });
+      }
+      return "";
+    }
+
     function setScene(scene) {
       window.clearTimeout(V.timer);
       V.scene = scene;
@@ -727,6 +820,12 @@
       const act = target.dataset.act;
       if (act === "play") setScene("playing");
       if (act === "reconnect") { setScene("recovering"); V.timer = window.setTimeout(() => setScene("playing"), 2200); }
+      if (act === "pawn") {
+        const name = target.dataset.name;
+        V.selectedPawn = V.selectedPawn === name ? null : name;
+        render();
+      }
+      if (act === "pawn-close") { V.selectedPawn = null; render(); }
       if (act === "topology") { V.topology = !V.topology; render(); }
       if (act === "details") { V.details = !V.details; render(); }
       if (act === "copy-room") { if (await copyText(D.roomCode())) flashCheck(target); }
