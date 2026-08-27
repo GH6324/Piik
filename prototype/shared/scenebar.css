@@ -1,0 +1,57 @@
+/* Prototype scene switcher chrome (not part of product UI). */
+.scene-bar {
+  position: fixed;
+  z-index: 999;
+  right: 12px;
+  bottom: 12px;
+  left: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  width: fit-content;
+  max-width: calc(100% - 24px);
+  margin: 0 auto;
+  padding: 8px 10px;
+  border: 1px dashed #9a9484;
+  border-radius: 10px;
+  background: rgba(250, 248, 243, 0.94);
+  box-shadow: 0 6px 24px rgba(32, 36, 47, 0.12);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 11px;
+  backdrop-filter: blur(6px);
+}
+.scene-bar-label {
+  margin-right: 2px;
+  color: #8a8471;
+  letter-spacing: 0.06em;
+}
+.scene-bar button,
+.scene-bar a {
+  padding: 4px 9px;
+  border: 1px solid #d8d2c2;
+  border-radius: 999px;
+  color: #55503f;
+  background: #fff;
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+}
+.scene-bar button:hover,
+.scene-bar a:hover {
+  border-color: #55503f;
+}
+.scene-bar button.is-active {
+  border-color: #20242f;
+  color: #fff;
+  background: #20242f;
+}
+.scene-bar-lang {
+  font-weight: 700;
+}
+body {
+  padding-bottom: 64px;
+}
+body.no-chrome {
+  padding-bottom: 0;
+}
