@@ -41,22 +41,22 @@
   <p class="sub" id="sub">两个方向的交互原型，覆盖 Host / Viewer / Join 的桌面与手机视图。页面为响应式，缩小窗口或用手机即可查看移动布局；底部「原型场景」条可切换全部关键状态。</p>
 
   <section class="direction">
-    <h2>A · 文字模式 <small>白纸黑字 · 票面房间号 · 对话式短文案</small></h2>
-    <p id="a-desc">浅色纸面世界：简短清楚的文字与常规控件直接完成任务，图标仅辅助。信息分区靠留白与细线，不套卡片。</p>
-    <div class="links">
-      <a href="a-text/host.html">Host <span>分享端</span></a>
-      <a href="a-text/viewer.html">Viewer <span>观看端</span></a>
-      <a href="a-text/join.html">Join <span>加入房间</span></a>
-    </div>
-  </section>
-
-  <section class="direction">
-    <h2>B · 纯视觉模式 <small>客厅共观 · 沙发即名单 · 分镜即状态</small></h2>
-    <p id="b-desc">小场景世界：电视是舞台、沙发是朋友、连线是分镜；图标与动效承担说明，文字退到悬浮提示与无障碍标签。</p>
+    <h2>B · 纯视觉模式 <small>已选定 · 客厅共观 · 沙发即名单 · 分镜即状态</small></h2>
+    <p id="b-desc">小场景世界：电视是舞台、沙发是朋友、连线是分镜；图标与动效承担说明，文字退到悬浮提示与无障碍标签。已选定为生产方向，持续打磨中。</p>
     <div class="links">
       <a href="b-visual/host.html">Host <span>分享端</span></a>
       <a href="b-visual/viewer.html">Viewer <span>观看端</span></a>
       <a href="b-visual/join.html">Join <span>加入房间</span></a>
+    </div>
+  </section>
+
+  <section class="direction">
+    <h2>A · 文字模式 <small>存档 · 白纸黑字 · 票面房间号 · 对话式短文案</small></h2>
+    <p id="a-desc">浅色纸面世界：简短清楚的文字与常规控件直接完成任务。作为对照方向存档保留，不再继续打磨。</p>
+    <div class="links">
+      <a href="a-text/host.html">Host <span>分享端</span></a>
+      <a href="a-text/viewer.html">Viewer <span>观看端</span></a>
+      <a href="a-text/join.html">Join <span>加入房间</span></a>
     </div>
   </section>
 
@@ -71,8 +71,8 @@
     document.documentElement.lang = "en";
     document.querySelector("h1").textContent = "Screener UI prototypes · Phase 1";
     document.getElementById("sub").textContent = "Two interactive directions covering Host / Viewer / Join on desktop and mobile. Pages are responsive; use the scene bar at the bottom to flip through key states.";
-    document.querySelector("#a-desc").textContent = "Daylight paper world: short clear copy and conventional controls do the work; icons only assist. Sections are separated by space and hairlines, never cards-in-cards.";
-    document.querySelector("#b-desc").textContent = "Tiny-scene world: the TV is the stage, the couch is the roster, the route is a storyboard. Glyphs and motion carry meaning; words live in tooltips and aria labels.";
+    document.querySelector("#a-desc").textContent = "Daylight paper world: short clear copy and conventional controls. Archived as the comparison direction; no longer being polished.";
+    document.querySelector("#b-desc").textContent = "Tiny-scene world: the TV is the stage, the couch is the roster, the route is a storyboard. Glyphs and motion carry meaning; words live in tooltips and aria labels. Selected as the production direction and being polished.";
     document.getElementById("note").innerHTML = "Preview: <code>node prototype/serve.mjs</code> then open <code>http://localhost:4173/</code>.<br>Params: <code>?scene=…</code> switch scene, <code>&lang=zh</code> 中文, <code>&viewers=5</code> viewer count, <code>&chrome=0</code> hide the scene bar.";
     for (const a of document.querySelectorAll(".links a")) {
       const url = new URL(a.href); url.searchParams.set("lang", "en"); a.href = url;

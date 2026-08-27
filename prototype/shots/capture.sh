@@ -37,6 +37,8 @@ shot b-viewer-needsplay.png "$BASE/b-visual/viewer.html?scene=needsplay&chrome=0
 shot b-viewer-waiting.png "$BASE/b-visual/viewer.html?scene=waiting&chrome=0" 1440,900
 shot b-join.png         "$BASE/b-visual/join.html?scene=form&chrome=0"    1440,900
 shot b-host-advanced.png "$BASE/b-visual/host.html?scene=live&viewers=4&advanced=1&topology=1&policy=private&password=1&chrome=0" 1440,1200
+shot b-host-topology.png "$BASE/b-visual/host.html?scene=live&viewers=4&details=1&topology=1&chrome=0" 1440,1000
+shot b-viewer-relay.png "$BASE/b-visual/viewer.html?scene=playing&details=1&topology=1&relay=1&chrome=0" 1440,1250
 
 # --- Direction B mobile ---
 shot b-host-live-m.png    "$BASE/shots/frame.html?src=b-visual/host.html%3Fscene%3Dlive%26viewers%3D3%26chrome%3D0" 430,932

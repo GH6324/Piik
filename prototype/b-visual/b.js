@@ -33,7 +33,10 @@
     const label = opts.you
       ? `${viewer.name} · ${t("common.you")}`
       : `${viewer.name}${waiting ? ` · ${t("state.peer.connecting")}` : ` · ${t("state.peer.connected")}`}`;
-    return `<button type="button" class="b-pawn ${opts.you ? "is-you" : ""}" style="animation-delay:${index * 70}ms" title="${esc(label)}" aria-label="${esc(label)}">
+    const motion = opts.animate === false
+      ? "animation:none;"
+      : `animation-delay:${index * 70}ms`;
+    return `<button type="button" class="b-pawn ${opts.you ? "is-you" : ""} ${opts.child ? "is-child" : ""}" style="${motion}" title="${esc(label)}" aria-label="${esc(label)}">
       ${pawnSvg(color)}
       ${opts.hideLed ? "" : `<i class="b-pawn-led ${waiting ? "is-wait" : ""}"></i>`}
     </button>`;
@@ -73,7 +76,14 @@
     </div>`;
   }
 
-  function meterStrip() {
+  function routeGlyph(route) {
+    if (route === "sfu") {
+      return `<svg width="36" height="16" viewBox="0 0 36 16" fill="none" stroke="#53676a" stroke-width="2" aria-hidden="true"><circle cx="4" cy="8" r="3" fill="#53676a" stroke="none"/><rect x="14" y="3" width="8" height="10" rx="2"/><circle cx="32" cy="8" r="3" fill="#53676a" stroke="none"/><path d="M7 8h7M22 8h7"/></svg>`;
+    }
+    return `<svg width="36" height="16" viewBox="0 0 36 16" fill="none" stroke="#53676a" stroke-width="2" aria-hidden="true"><circle cx="4" cy="8" r="3" fill="#53676a" stroke="none"/><circle cx="32" cy="8" r="3" fill="#53676a" stroke="none"/><path d="M7 8h22"/></svg>`;
+  }
+
+  function meterStrip(route) {
     const S = D.STATS;
     const cells = [
       ["expand", S.resolution, t("stats.resolution")],
@@ -85,39 +95,53 @@
       ["speaker", S.audio, t("stats.audio")],
     ];
     return `<div class="b-meter" role="group" aria-label="${esc(t("stats.title"))}">
+      ${route ? `<span class="b-meter-cell" title="${esc(t(route === "sfu" ? "state.route.sfu" : "state.route.p2p"))}">${routeGlyph(route)}<b>${route === "sfu" ? "SFU" : "P2P"}</b></span>` : ""}
       ${cells.map(([icon, value, label]) => `
         <span class="b-meter-cell" title="${esc(label)}">${I(icon, 17)}<b>${esc(value)}</b></span>`).join("")}
     </div>`;
   }
 
-  function routePath({ viewers, selfName, hostLabel, flow }) {
-    const h = Math.max(150, 60 + viewers.length * 40);
+  function meterTag(icon, label) {
+    return `<span class="b-meter-tag" title="${esc(label)}" aria-label="${esc(label)}">${I(icon, 17)}</span>`;
+  }
+
+  function routePath({ viewers, self, hostLabel, flow }) {
+    const column = [];
+    if (self) column.push({ name: self.name, route: self.route, state: "connected", isSelf: true });
+    for (const v of viewers) column.push({ ...v, isSelf: false });
+    const children = self?.children ?? [];
+    const w = children.length ? 736 : 640;
+    const h = Math.max(150, 60 + column.length * 40);
     const midY = h / 2;
     const hostX = 30;
-    const selfX = 300;
+    const colX = children.length ? 560 : 570;
+    const childX = 668;
     const sfuX = 300;
-    const viewerX = 570;
     const lines = [];
     const nodes = [];
-    viewers.forEach((v, i) => {
+    column.forEach((node, i) => {
       const y = 40 + i * 40;
-      const color = PAWN_COLORS[i % PAWN_COLORS.length];
-      if (v.route === "sfu") {
-        lines.push(`<path d="M ${sfuX + 20} ${midY} Q ${(sfuX + viewerX) / 2} ${midY + (y - midY) * 0.7}, ${viewerX - 24} ${y}" fill="none" stroke="#8ea3b8" stroke-width="2.5" class="${flow ? "flow" : ""}"/>`);
-      } else {
-        lines.push(`<path d="M ${hostX + 24} ${midY} Q ${(hostX + viewerX) / 2} ${midY + (y - midY) * 0.7}, ${viewerX - 24} ${y}" fill="none" stroke="${v.state === "connected" ? "#2fa66a" : "#d98e04"}" stroke-width="2.5" class="${flow ? "flow" : ""}"/>`);
-      }
-      nodes.push(`<g transform="translate(${viewerX - 14}, ${y - 15}) scale(0.72)"><title>${esc(v.name)}</title>${pawnSvg(color)}</g>`);
+      const color = node.isSelf ? YOU : PAWN_COLORS[(i - (self ? 1 : 0)) % PAWN_COLORS.length];
+      const ok = node.state === "connected";
+      const stroke = node.route === "sfu" ? "#8ea3b8" : ok ? "#2fa66a" : "#d98e04";
+      const fromX = node.route === "sfu" ? sfuX + 20 : hostX + 24;
+      lines.push(`<path d="M ${fromX} ${midY} Q ${(fromX + colX) / 2} ${midY + (y - midY) * 0.7}, ${colX - 24} ${y}" fill="none" stroke="${stroke}" stroke-width="2.5" class="${flow ? "flow" : ""}"/>`);
+      nodes.push(`<g transform="translate(${colX - 14}, ${y - 15}) scale(0.72)"><title>${esc(node.name)}${node.isSelf ? ` · ${esc(t("common.you"))}` : ""}</title>${pawnSvg(color)}${node.isSelf ? `<circle cx="20" cy="24" r="22" fill="none" stroke="${YOU}" stroke-width="3"/>` : ""}</g>`);
     });
-    const hasSfu = viewers.some((v) => v.route === "sfu");
+    children.forEach((name, i) => {
+      const y = 40 + i * 34;
+      lines.push(`<path d="M ${colX + 12} 40 Q ${(colX + childX) / 2} ${40 + (y - 40) * 0.5}, ${childX - 16} ${y}" fill="none" stroke="#2fa66a" stroke-width="2.5" class="${flow ? "flow" : ""}"/>`);
+      nodes.push(`<g transform="translate(${childX - 12}, ${y - 12}) scale(0.5)"><title>${esc(name)}</title>${pawnSvg(PAWN_COLORS[(i + 4) % PAWN_COLORS.length])}</g>`);
+    });
+    const hasSfu = column.some((n) => n.route === "sfu");
     if (hasSfu) {
-      lines.push(`<path d="M ${hostX + 24} ${midY} L ${selfX - 20} ${midY}" fill="none" stroke="#8ea3b8" stroke-width="2.5" class="${flow ? "flow" : ""}"/>`);
+      lines.push(`<path d="M ${hostX + 24} ${midY} L ${sfuX - 20} ${midY}" fill="none" stroke="#8ea3b8" stroke-width="2.5" class="${flow ? "flow" : ""}"/>`);
     }
     return `<div class="b-route" role="img" aria-label="${esc(t("host.topology"))}">
-      <svg viewBox="0 0 640 ${h}">
+      <svg viewBox="0 0 ${w} ${h}">
         <title>${esc(t("host.topology"))}</title>
         ${lines.join("")}
-        <g transform="translate(${hostX - 6}, ${midY - 24})">${pawnSvg("#e4572e")}<title>${esc(hostLabel)} · ${esc(t("common.host"))}</title></g>
+        <g transform="translate(${hostX - 4}, ${midY - 20}) scale(0.85)">${pawnSvg("#e4572e")}<title>${esc(hostLabel)} · ${esc(t("common.host"))}</title></g>
         ${hasSfu ? `<g transform="translate(${sfuX - 20}, ${midY - 16})"><title>${esc(t("host.sfu"))}</title><rect width="40" height="32" rx="7" fill="none" stroke="#8ea3b8" stroke-width="2.5"/><path d="M8 12h24M8 20h24" stroke="#8ea3b8" stroke-width="2.5" stroke-linecap="round"/></g>` : ""}
         ${nodes.join("")}
       </svg>
@@ -143,6 +167,9 @@
     const H = {
       scene: D.scene || "idle",
       name: D.hostName(),
+      code: D.roomCode(),
+      replacing: false,
+      switching: false,
       details: D.boolParam("details"),
       advanced: D.boolParam("advanced"),
       topology: D.boolParam("topology"),
@@ -156,6 +183,8 @@
       notice: null,
       timer: null,
     };
+    let prevScene = null;
+    let prevPawnKeys = new Set();
     const hasRoom = () => !["idle", "error"].includes(H.scene);
     const isLive = () => H.scene === "live" || H.scene === "paused";
     const viewers = () => D.roster(isLive() ? D.intParam("viewers", 4) : 0);
@@ -188,14 +217,15 @@
     }
 
     function controlsHtml() {
+      const busy = H.switching ? "disabled" : "";
       if (H.scene === "starting") {
         return `<button class="b-btn is-danger" data-act="cancel-start" title="${esc(t("host.cancelStart"))}" aria-label="${esc(t("host.cancelStart"))}">${I("x", 20)}</button>`;
       }
       if (!isLive()) return "";
       return `
-        <button class="b-btn" data-act="pause" title="${esc(t(H.scene === "paused" ? "host.resume" : "host.pause"))}" aria-label="${esc(t(H.scene === "paused" ? "host.resume" : "host.pause"))}">${I(H.scene === "paused" ? "play" : "pause", 18)}</button>
-        <button class="b-btn" data-act="switch" title="${esc(t("host.switchSource"))}" aria-label="${esc(t("host.switchSource"))}">${I("refresh", 19)}</button>
-        <button class="b-btn is-danger" data-act="stop" title="${esc(t("host.stop"))}" aria-label="${esc(t("host.stop"))}">${I("stop", 17)}</button>`;
+        <button class="b-btn" data-act="pause" title="${esc(t(H.scene === "paused" ? "host.resume" : "host.pause"))}" aria-label="${esc(t(H.scene === "paused" ? "host.resume" : "host.pause"))}" ${busy}>${I(H.scene === "paused" ? "play" : "pause", 18)}</button>
+        <button class="b-btn" data-act="switch" title="${esc(t("host.switchSource"))}" aria-label="${esc(t("host.switchSource"))}" ${busy}>${I("refresh", 19)}</button>
+        <button class="b-btn is-danger" data-act="stop" title="${esc(t("host.stop"))}" aria-label="${esc(t("host.stop"))}" ${busy}>${I("stop", 17)}</button>`;
     }
 
     function inviteRowHtml() {
@@ -238,7 +268,7 @@
       return `<div class="b-row" role="group" aria-label="${esc(t("host.quality"))}">
         <div class="b-tiles">
           ${tiles.map((tile, i) => `
-            <button type="button" class="b-tile ${H.preset === i ? "is-selected" : ""}" data-act="preset" data-v="${i}" title="${esc(tile.label)}" aria-label="${esc(tile.label)}" aria-pressed="${H.preset === i}" ${H.scene === "starting" ? "disabled" : ""}>
+            <button type="button" class="b-tile ${H.preset === i ? "is-selected" : ""}" data-act="preset" data-v="${i}" title="${esc(tile.label)}" aria-label="${esc(tile.label)}" aria-pressed="${H.preset === i}" ${H.scene === "starting" || H.switching ? "disabled" : ""}>
               ${glyph(tile.density)}<small>${tile.caption}</small>
             </button>`).join("")}
         </div>
@@ -249,51 +279,53 @@
     }
 
     function advancedHtml() {
-      const locked = isLive() || H.scene === "starting";
+      const capsLocked = H.scene === "starting" || H.switching;
+      const prefLocked = !isLive() || H.switching;
+      const routeCodecLocked = isLive() || H.scene === "starting";
       return `<div class="b-door-body b-fade" role="group" aria-label="${esc(t("host.advanced"))}">
         <div class="b-door-group">
           <span class="b-door-glyph" title="${esc(t("host.advanced.resolution"))}">${I("expand", 19)}</span>
           <div class="b-chips" role="group" aria-label="${esc(t("host.advanced.resolution"))}">
-            ${["480p", "720p", "1080p", "1440p"].map((r, i) => `<button class="b-chip ${i === 2 ? "is-selected" : ""}" ${H.scene === "starting" ? "disabled" : ""}>${r}</button>`).join("")}
+            ${["480p", "720p", "1080p", "1440p"].map((r, i) => `<button class="b-chip ${i === 2 ? "is-selected" : ""}" ${capsLocked ? "disabled" : ""}>${r}</button>`).join("")}
           </div>
         </div>
         <div class="b-door-group">
           <span class="b-door-glyph" title="${esc(t("host.advanced.framerate"))}">${I("wave", 19)}</span>
-          <span class="b-slider"><input type="range" min="15" max="60" step="5" value="30" data-range="fps" aria-label="${esc(t("host.advanced.framerate"))}" ${H.scene === "starting" ? "disabled" : ""}><output>30</output></span>
+          <span class="b-slider"><input type="range" min="15" max="60" step="5" value="30" data-range="fps" aria-label="${esc(t("host.advanced.framerate"))}" ${capsLocked ? "disabled" : ""}><output>30</output></span>
         </div>
         <div class="b-door-group">
           <span class="b-door-glyph" title="${esc(t("host.advanced.bitrate"))}">${I("gauge", 19)}</span>
-          <span class="b-slider"><input type="range" min="2" max="12" step="0.5" value="5" data-range="mbps" aria-label="${esc(t("host.advanced.bitrate"))}" ${H.scene === "starting" ? "disabled" : ""}><output>5.0</output></span>
+          <span class="b-slider"><input type="range" min="2" max="12" step="0.5" value="5" data-range="mbps" aria-label="${esc(t("host.advanced.bitrate"))}" ${capsLocked ? "disabled" : ""}><output>5.0</output></span>
         </div>
         <div class="b-door-group">
           <span class="b-door-glyph" title="${esc(t("host.advanced.preference"))}">${I("mountain", 19)}</span>
           <div class="b-chips" role="group" aria-label="${esc(t("host.advanced.preference"))}">
-            <button class="b-chip" title="${esc(t("host.advanced.preference.resolution"))} · ${esc(t("host.advanced.preference.resolutionHint"))}" ${locked ? "disabled" : ""}>${I("mountain", 18)}</button>
-            <button class="b-chip is-selected" title="${esc(t("host.advanced.preference.balanced"))} · ${esc(t("host.advanced.preference.balancedHint"))}" ${locked ? "disabled" : ""}>${I("balance", 18)}</button>
-            <button class="b-chip" title="${esc(t("host.advanced.preference.framerate"))} · ${esc(t("host.advanced.preference.framerateHint"))}" ${locked ? "disabled" : ""}>${I("zap", 18)}</button>
+            <button class="b-chip" title="${esc(t("host.advanced.preference.resolution"))} · ${esc(t("host.advanced.preference.resolutionHint"))}" ${prefLocked ? "disabled" : ""}>${I("mountain", 18)}</button>
+            <button class="b-chip is-selected" title="${esc(t("host.advanced.preference.balanced"))} · ${esc(t("host.advanced.preference.balancedHint"))}" ${prefLocked ? "disabled" : ""}>${I("balance", 18)}</button>
+            <button class="b-chip" title="${esc(t("host.advanced.preference.framerate"))} · ${esc(t("host.advanced.preference.framerateHint"))}" ${prefLocked ? "disabled" : ""}>${I("zap", 18)}</button>
           </div>
         </div>
         <div class="b-door-group">
           <span class="b-door-glyph" title="${esc(t("host.advanced.audio"))}">${I("speaker", 19)}</span>
           <div class="b-chips" role="group" aria-label="${esc(t("host.advanced.audio"))}">
-            <button class="b-chip" title="${esc(t("host.advanced.audio.saver"))} · 64 kbps" ${H.scene === "starting" ? "disabled" : ""}>64</button>
-            <button class="b-chip is-selected" title="${esc(t("host.advanced.audio.music"))} · 128 kbps" ${H.scene === "starting" ? "disabled" : ""}>128</button>
-            <button class="b-chip" title="${esc(t("host.advanced.audio.veryHigh"))} · 192 kbps" ${H.scene === "starting" ? "disabled" : ""}>192</button>
+            <button class="b-chip" title="${esc(t("host.advanced.audio.saver"))} · 64 kbps" ${capsLocked ? "disabled" : ""}>64</button>
+            <button class="b-chip is-selected" title="${esc(t("host.advanced.audio.music"))} · 128 kbps" ${capsLocked ? "disabled" : ""}>128</button>
+            <button class="b-chip" title="${esc(t("host.advanced.audio.veryHigh"))} · 192 kbps" ${capsLocked ? "disabled" : ""}>192</button>
           </div>
         </div>
         <div class="b-door-group">
           <span class="b-door-glyph" title="${esc(t("host.advanced.route"))}">${I("branch", 19)}</span>
           <div class="b-chips">
-            <button class="b-switch" role="switch" aria-checked="false" data-act="switch-toggle" title="${esc(t("host.advanced.route.topo"))} · ${esc(t("host.advanced.route.topoHint"))}" aria-label="${esc(t("host.advanced.route.topo"))}" ${locked ? "disabled" : ""}></button>
-            <button class="b-switch" role="switch" aria-checked="false" data-act="switch-toggle" title="${esc(t("host.advanced.route.peerOnly"))} · ${esc(t("host.advanced.route.peerOnlyHint"))}" aria-label="${esc(t("host.advanced.route.peerOnly"))}" ${locked ? "disabled" : ""}></button>
+            <button class="b-switch" role="switch" aria-checked="false" data-act="switch-toggle" title="${esc(t("host.advanced.route.topo"))} · ${esc(t("host.advanced.route.topoHint"))}" aria-label="${esc(t("host.advanced.route.topo"))}" ${routeCodecLocked ? "disabled" : ""}></button>
+            <button class="b-switch" role="switch" aria-checked="false" data-act="switch-toggle" title="${esc(t("host.advanced.route.peerOnly"))} · ${esc(t("host.advanced.route.peerOnlyHint"))}" aria-label="${esc(t("host.advanced.route.peerOnly"))}" ${routeCodecLocked ? "disabled" : ""}></button>
           </div>
         </div>
         <div class="b-door-group">
           <span class="b-door-glyph" title="${esc(t("host.advanced.codec"))}">${I("cpu", 19)}</span>
           <div class="b-chips" role="group" aria-label="${esc(t("host.advanced.codec"))}">
-            <button class="b-chip" title="VP8 · ${esc(t("host.advanced.codec.vp8Hint"))}" ${locked ? "disabled" : ""}>VP8</button>
-            <button class="b-chip is-selected" title="${esc(t("host.advanced.codec.auto"))} · ${esc(t("host.advanced.codec.autoHint"))}" ${locked ? "disabled" : ""}>AUTO</button>
-            <button class="b-chip" title="H264 · ${esc(t("host.advanced.codec.h264Hint"))}" ${locked ? "disabled" : ""}>H264</button>
+            <button class="b-chip" title="VP8 · ${esc(t("host.advanced.codec.vp8Hint"))}" ${routeCodecLocked ? "disabled" : ""}>VP8</button>
+            <button class="b-chip is-selected" title="${isLive() ? "AUTO · H264" : `${esc(t("host.advanced.codec.auto"))} · ${esc(t("host.advanced.codec.autoHint"))}`}" ${routeCodecLocked ? "disabled" : ""}>AUTO${isLive() ? '<i class="b-chip-dot" title="H264"></i>' : ""}</button>
+            <button class="b-chip" title="H264 · ${esc(t("host.advanced.codec.h264Hint"))}" ${routeCodecLocked ? "disabled" : ""}>H264</button>
           </div>
         </div>
       </div>`;
@@ -313,6 +345,7 @@
 
     function render() {
       const list = viewers();
+      const crt = H.scene === "live" && prevScene !== "live";
       const led = H.scene === "live" ? ["live", t("state.signal.connected")]
         : H.scene === "starting" ? ["busy", t("host.starting")]
         : H.scene === "paused" ? ["warn", t("host.paused")]
@@ -322,8 +355,9 @@
       root.innerHTML = `
       <div class="b-scene">
         <div class="b-tv">
-          <div class="b-tv-screen ${H.scene === "live" ? "is-on" : ""}" id="tv">
+          <div class="b-tv-screen ${crt ? "is-on" : ""}" id="tv">
             ${isLive() ? `<div data-feed ${H.scene === "paused" ? 'data-state="frozen"' : ""}></div>` : ""}
+            ${H.switching ? `<div class="b-tv-static"></div>` : ""}
             ${tvHtml()}
           </div>
           <div class="b-tv-chin"><i class="${H.scene === "live" ? "is-on" : H.scene === "paused" ? "is-warn" : H.scene === "starting" ? "is-busy" : ""}"></i></div>
@@ -332,14 +366,20 @@
         <div class="b-couch">
           ${couchSvg()}
           <div class="b-pawns" role="group" aria-label="${esc(t("common.viewers"))}">
-            ${list.map((v, i) => pawn(v, i)).join("")}
+            ${list.map((v, i) => pawn(v, i, { animate: !prevPawnKeys.has(v.name) })).join("")}
           </div>
           ${list.length === 0 ? `<div class="b-couch-empty" title="${esc(t(H.scene === "live" ? "host.viewers.waiting" : "host.viewers.empty"))}">${I("users", 22)}</div>` : ""}
         </div>
       </div>
       <div class="b-deck">
         <div class="b-row">
-          ${hasRoom() ? lcd(D.roomCode()) : ""}
+          ${hasRoom() ? lcd(H.code) : ""}
+          ${hasRoom() ? (H.replacing ? `
+            <button class="b-btn" data-act="replace-confirm" title="${esc(t("host.roomReplaceConfirm"))}" aria-label="${esc(t("host.roomReplaceConfirm"))}">${I("check", 18)}</button>
+            <button class="b-btn" data-act="replace-cancel" title="${esc(t("common.cancel"))}" aria-label="${esc(t("common.cancel"))}">${I("x", 18)}</button>
+          ` : `
+            <button class="b-btn" data-act="replace-room" title="${esc(t("host.roomReplace"))}" aria-label="${esc(t("host.roomReplace"))}" ${H.scene === "starting" ? "disabled" : ""}>${I("refresh", 18)}</button>
+          `) : ""}
           <span class="b-spacer"></span>
           ${H.noAudio && isLive() ? pill("speaker", "", t("host.noAudio")) : ""}
           ${H.notice ?? ""}
@@ -352,7 +392,7 @@
           <button class="b-btn ${H.details ? "is-on" : ""}" data-act="details" title="${esc(t(H.details ? "host.details.hide" : "host.details"))}" aria-label="${esc(t("host.details"))}" aria-expanded="${H.details}">${I("gauge", 20)}</button>
           <button class="b-btn ${H.topology ? "is-on" : ""}" data-act="topology" title="${esc(t(H.topology ? "host.topology.hide" : "host.topology.show"))}" aria-label="${esc(t("host.topology"))}" aria-expanded="${H.topology}">${I("network", 20)}</button>
         </div>
-        ${H.details ? `<div class="b-row is-sub b-fade">${meterStrip()}</div>` : ""}
+        ${H.details ? `<div class="b-row is-sub b-fade">${meterTag("arrowUp", t("stats.title"))}${meterStrip()}</div>` : ""}
         ${H.topology ? `<div class="b-row is-sub b-fade">${routePath({ viewers: list, hostLabel: H.name, flow: H.scene === "starting" })}</div>` : ""}
       </div>`;
 
@@ -360,6 +400,8 @@
       if (feedHolder) {
         window.ScreenerFeed.mount(feedHolder, feedHolder.dataset.state === "frozen" ? "frozen" : "live");
       }
+      prevScene = H.scene;
+      prevPawnKeys = new Set(list.map((v) => v.name));
       if (H.scene === "starting") {
         H.timer = window.setTimeout(() => setScene("live"), 2600);
       }
@@ -381,14 +423,26 @@
       if (act === "cancel-start") setScene("idle");
       if (act === "pause") setScene(H.scene === "paused" ? "live" : "paused");
       if (act === "stop") setScene("ended");
-      if (act === "switch") { /* simulated source switch: brief static flash */ }
+      if (act === "switch" && !H.switching) {
+        H.switching = true;
+        render();
+        window.setTimeout(() => { H.switching = false; render(); }, 900);
+      }
       if (act === "toggle-join") {
         const box = root.querySelector("#join-inline");
         box.hidden = !box.hidden;
         if (!box.hidden) box.querySelector("input").focus();
       }
-      if (act === "copy-room") { if (await copyText(D.roomCode())) flashCheck(target); }
-      if (act === "copy-invite") { if (await copyText(`https://share.example/${D.roomCode()}#v=Kx9Qm4LwTz2Ab8Cd3EfGh1`)) flashCheck(target); }
+      if (act === "copy-room") { if (await copyText(H.code)) flashCheck(target); }
+      if (act === "copy-invite") { if (await copyText(`https://share.example/${H.code}#v=Kx9Qm4LwTz2Ab8Cd3EfGh1`)) flashCheck(target); }
+      if (act === "replace-room") { H.replacing = true; render(); }
+      if (act === "replace-cancel") { H.replacing = false; render(); }
+      if (act === "replace-confirm") {
+        H.code = String(Math.floor(1000 + Math.random() * 9000));
+        H.replacing = false;
+        H.notice = pill("check", "good", t("host.roomReplaced"));
+        if (isLive()) { setScene("ended"); } else { render(); }
+      }
       if (act === "rotate-invite") { H.invite = true; H.notice = pill("refresh", "good", t("host.invite.updated")); render(); }
       if (act === "revoke-invite") { H.invite = false; H.notice = pill("linkOff", "bad", t("host.invite.revoked")); render(); }
       if (act === "policy") { H.policy = target.dataset.v; render(); }
@@ -446,12 +500,15 @@
     const V = {
       scene: D.scene || "playing",
       route: D.param("route", "p2p"),
+      relay: D.boolParam("relay"),
       name: D.lang === "en" ? "You" : "你",
       details: D.boolParam("details"),
       topology: D.boolParam("topology"),
       editingName: false,
       timer: null,
     };
+    let prevScene = null;
+    let prevPawnKeys = new Set();
     const inRoom = () => !["denied", "notfound", "full"].includes(V.scene);
     const hasFeed = () => ["playing", "needsplay", "paused", "recovering", "failed", "hostoffline"].includes(V.scene);
     const frozen = () => ["needsplay", "paused", "failed", "hostoffline"].includes(V.scene);
@@ -499,6 +556,7 @@
 
     function roomView() {
       const list = D.roster(D.intParam("viewers", 4));
+      const children = V.relay ? ["豆腐", "Rex"] : [];
       const self = { name: V.name, state: V.scene === "playing" ? "connected" : "connecting" };
       const ledState = V.scene === "playing" ? ["live", t("viewer.msg.playing")]
         : V.scene === "paused" ? ["warn", t("viewer.msg.hostPaused")]
@@ -508,11 +566,12 @@
         : V.scene === "waiting" ? ["", t("viewer.msg.waitingHost")]
         : ["busy", t("viewer.msg.preparingP2p")];
       document.getElementById("header-leds").innerHTML = ledStrip(ledState[0], ledState[1]);
+      const crt = V.scene === "playing" && prevScene !== "playing";
 
       return `
       <div class="b-scene">
         <div class="b-tv">
-          <div class="b-tv-screen ${V.scene === "playing" ? "is-on" : ""}" id="tv">
+          <div class="b-tv-screen ${crt ? "is-on" : ""}" id="tv">
             ${hasFeed() ? `<div data-feed ${frozen() ? 'data-state="frozen"' : ""}></div>` : ""}
             ${tvOverlay()}
             ${V.scene === "needsplay" ? `
@@ -530,8 +589,9 @@
         <div class="b-couch">
           ${couchSvg()}
           <div class="b-pawns" role="group" aria-label="${esc(t("common.viewers"))}">
-            ${pawn(self, 0, { you: true })}
-            ${list.map((v, i) => pawn(v, i)).join("")}
+            ${pawn(self, 0, { you: true, animate: !prevPawnKeys.has("you") })}
+            ${children.map((name, i) => pawn({ name, state: "connected" }, i + 4, { child: true, animate: !prevPawnKeys.has(`child:${name}`) })).join("")}
+            ${list.map((v, i) => pawn(v, i, { animate: !prevPawnKeys.has(v.name) })).join("")}
           </div>
         </div>
       </div>
@@ -551,8 +611,9 @@
           <button class="b-btn" data-act="reconnect" title="${esc(t("viewer.reconnect"))}" aria-label="${esc(t("viewer.reconnect"))}" ${["playing", "recovering", "failed", "hostoffline", "paused"].includes(V.scene) ? "" : "disabled"}>${I("refresh", 19)}</button>
           <button class="b-btn ${V.details ? "is-on" : ""}" data-act="details" title="${esc(t(V.details ? "host.details.hide" : "host.details"))}" aria-label="${esc(t("host.details"))}" aria-expanded="${V.details}">${I("gauge", 19)}</button>
         </div>
-        ${V.details ? `<div class="b-row is-sub b-fade">${meterStrip()}</div>` : ""}
-        ${V.topology ? `<div class="b-row is-sub b-fade">${routePath({ viewers: [...list], hostLabel: D.hostName(), flow: ["connecting", "recovering"].includes(V.scene) })}</div>` : ""}
+        ${V.details ? `<div class="b-row is-sub b-fade">${meterTag("arrowDown", t("stats.title"))}${meterStrip(V.route)}</div>` : ""}
+        ${V.details && V.relay ? `<div class="b-row is-sub b-fade">${meterTag("arrowUp", t("stats.relay"))}${meterStrip()}</div>` : ""}
+        ${V.topology ? `<div class="b-row is-sub b-fade">${routePath({ viewers: list, self: { name: V.name, route: V.route, children }, hostLabel: D.hostName(), flow: ["connecting", "recovering"].includes(V.scene) })}</div>` : ""}
       </div>`;
     }
 
@@ -569,6 +630,12 @@
       if (feedHolder) {
         window.ScreenerFeed.mount(feedHolder, feedHolder.dataset.state === "frozen" ? "frozen" : "live");
       }
+      prevScene = V.scene;
+      prevPawnKeys = new Set([
+        "you",
+        ...(V.relay ? ["child:豆腐", "child:Rex"] : []),
+        ...D.roster(D.intParam("viewers", 4)).map((v) => v.name),
+      ]);
     }
 
     function setScene(scene) {

@@ -93,6 +93,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   width: 9px; height: 9px;
   border-radius: 50%;
   background: #b7c6bf;
+  transition: background 300ms ease;
 }
 .b-leds[data-state="live"] i:first-child { background: var(--live); }
 .b-leds[data-state="live"] i { background: var(--live); opacity: .35; }
@@ -142,6 +143,7 @@ ul { margin: 0; padding: 0; list-style: none; }
   width: 8px; height: 8px;
   border-radius: 50%;
   background: #57697f;
+  transition: background 300ms ease;
 }
 .b-tv-chin i.is-on { background: var(--live); }
 .b-tv-chin i.is-warn { background: var(--warn); animation: b-blink 1.1s infinite; }
@@ -182,8 +184,12 @@ ul { margin: 0; padding: 0; list-style: none; }
   padding: 0;
   border: 0;
   background: transparent;
-  animation: b-hop .55s cubic-bezier(.3, 1.5, .5, 1) both;
+  animation: b-hop .55s cubic-bezier(.3, 1.5, .5, 1) backwards;
+  transition: transform 150ms ease;
 }
+.b-pawn:hover { transform: translateY(-5px); }
+.b-pawn.is-child { width: 34px; margin-left: -8px; align-self: end; }
+.b-pawn.is-child svg { width: 30px; height: 36px; }
 .b-pawn svg { width: 40px; height: 48px; display: block; }
 .b-pawn .b-pawn-led {
   position: absolute;
@@ -467,6 +473,14 @@ ul { margin: 0; padding: 0; list-style: none; }
   letter-spacing: .1em;
 }
 .b-chip.is-selected { background: var(--ink); color: #fff; }
+.b-chip-dot {
+  display: inline-block;
+  width: 7px; height: 7px;
+  margin-left: 7px;
+  border-radius: 50%;
+  background: var(--live);
+  vertical-align: 1px;
+}
 
 /* meter strip */
 .b-meter { display: flex; flex-wrap: wrap; gap: 10px; }
@@ -481,6 +495,12 @@ ul { margin: 0; padding: 0; list-style: none; }
 }
 .b-meter-cell b { font-family: var(--mono); font-size: 13px; font-weight: 700; letter-spacing: .02em; }
 .b-meter-cell svg { color: #53676a; }
+.b-meter-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 2px 9px 0;
+  color: #53676a;
+}
 
 /* route path */
 .b-route { overflow-x: auto; padding: 6px 2px; }
@@ -548,7 +568,8 @@ ul { margin: 0; padding: 0; list-style: none; }
   transition: border-color 120ms ease, transform 120ms ease;
 }
 .b-dial.is-active { border-color: var(--action); transform: translateY(-4px); box-shadow: 0 6px 0 -2px #2f6fed33; }
-.b-dial.is-filled { background: var(--ink); color: #fff; }
+.b-dial.is-filled { background: var(--ink); color: #fff; animation: b-pop .18s ease; }
+@keyframes b-pop { 50% { transform: scale(1.08); } }
 .b-dials-wrap { position: relative; }
 .b-dials-wrap input {
   position: absolute;

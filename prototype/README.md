@@ -5,11 +5,11 @@ Phase 1 compares two functionally equivalent directions before production UI
 work begins. No protocol, routing, or product behavior is changed; all state
 is simulated in the page.
 
-- `a-text/` — text-first direction ("白纸黑字"): short copy and conventional
-  controls carry every workflow; icons only assist.
-- `b-visual/` — pure-visual direction ("客厅"): glyphs, small SVG scenes,
-  storyboards, and state motion carry guidance; copy lives in tooltips and
-  aria labels.
+- `b-visual/` — pure-visual direction ("客厅"), selected for production:
+  glyphs, small SVG scenes, storyboards, and state motion carry guidance;
+  copy lives in tooltips and aria labels.
+- `a-text/` — text-first direction ("白纸黑字"), archived as the comparison
+  direction and no longer being polished.
 - `shared/strings.js` — one zh/en copy catalog used by both directions; the
   visual direction is the third presentation mode of the same keys.
 - `shared/scenes.js` — URL-driven scene engine plus the bottom scene bar.

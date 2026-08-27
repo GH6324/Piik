@@ -72,6 +72,8 @@ window.SCREENER_COPY = {
     "host.stopNotice": "已停止分享",
     "host.roomReplaced": "房间号已更换",
     "host.roomInvalid": "房间已失效，再次点击将创建新房",
+    "host.roomReplace": "更换房间号",
+    "host.roomReplaceConfirm": "确认更换房间号",
     "host.captureError": "无法开始屏幕采集，请检查浏览器权限后重试",
 
     "host.name": "昵称",
@@ -286,6 +288,8 @@ window.SCREENER_COPY = {
     "host.stopNotice": "Sharing stopped",
     "host.roomReplaced": "Room code replaced",
     "host.roomInvalid": "Room expired; press again to create a new one",
+    "host.roomReplace": "Replace room code",
+    "host.roomReplaceConfirm": "Confirm replacing the room code",
     "host.captureError": "Screen capture unavailable; check browser permission and retry",
 
     "host.name": "Display name",

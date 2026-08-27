@@ -52,6 +52,8 @@
     zap: stroke('<path d="M13 2 4 14h6l-1 8 9-12h-6l1-8Z"/>'),
     sparkles: stroke('<path d="m12 4 1.6 4.4L18 10l-4.4 1.6L12 16l-1.6-4.4L6 10l4.4-1.6L12 4Z"/><path d="m18.5 15.5.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8.8-2.2Z"/>'),
     cast: stroke('<path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9.95 9.95 0 0 1 9.95 20M2 8a14 14 0 0 1 14 14"/><circle cx="3" cy="20" r="1.2" fill="currentColor" stroke="none"/><rect x="2" y="4" width="20" height="15" rx="2"/>'),
+    arrowUp: stroke('<path d="M12 20V4m-6.5 6.5L12 4l6.5 6.5"/>'),
+    arrowDown: stroke('<path d="M12 4v16m-6.5-6.5L12 20l6.5-6.5"/>'),
   };
 
   function icon(name, size) {
