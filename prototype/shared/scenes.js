@@ -2,11 +2,14 @@
 // fake roster/stats data, resolves copy, and mounts the scene switcher bar.
 (function () {
   const params = new URLSearchParams(window.location.search);
-  const lang = params.get("lang") === "en" ? "en" : "zh";
-  const copy = window.SCREENER_COPY[lang];
+  const state = {
+    lang: params.get("lang") === "en" ? "en" : "zh",
+    vis: params.get("mode") ? params.get("mode") === "vis" : true,
+    theme: null,
+  };
 
   function t(key, vars) {
-    let value = copy[key] ?? key;
+    let value = window.SCREENER_COPY[state.lang][key] ?? key;
     if (vars) {
       for (const [name, replacement] of Object.entries(vars)) {
         value = value.replace(`{${name}}`, replacement);
@@ -29,6 +32,40 @@
     const value = Number.parseInt(params.get(name) ?? "", 10);
     return Number.isFinite(value) ? value : fallback;
   }
+
+  function setLangMode(lang, vis) {
+    state.lang = lang;
+    state.vis = vis;
+    const next = new URL(window.location.href);
+    next.searchParams.set("lang", lang);
+    next.searchParams.set("mode", vis ? "vis" : "text");
+    window.history.replaceState(null, "", next);
+  }
+
+  function resolveTheme() {
+    const fromUrl = params.get("theme");
+    if (fromUrl === "dark" || fromUrl === "light") return fromUrl;
+    try {
+      const stored = window.localStorage.getItem("screener-proto-theme");
+      if (stored === "dark" || stored === "light") return stored;
+    } catch { /* private mode */ }
+    return window.matchMedia?.("(prefers-color-scheme: dark)").matches
+      ? "dark"
+      : "light";
+  }
+
+  function applyTheme(theme) {
+    state.theme = theme;
+    document.documentElement.dataset.theme = theme;
+    try {
+      window.localStorage.setItem("screener-proto-theme", theme);
+    } catch { /* private mode */ }
+    const next = new URL(window.location.href);
+    next.searchParams.set("theme", theme);
+    window.history.replaceState(null, "", next);
+  }
+
+  applyTheme(resolveTheme());
 
   const NAMES = ["阿茶", "老白", "蘑菇", "Kite", "夜风", "麦子", "豆腐", "Rex"];
 
@@ -74,7 +111,7 @@
   }
 
   function hostName() {
-    return param("host", lang === "en" ? "A-Zhou" : "阿舟");
+    return param("host", state.lang === "en" ? "A-Zhou" : "阿舟");
   }
 
   // Scene switcher bar: prototype chrome, hidden with ?chrome=0.
@@ -88,7 +125,7 @@
     bar.setAttribute("aria-label", "Prototype scenes");
     const label = document.createElement("span");
     label.className = "scene-bar-label";
-    label.textContent = lang === "en" ? "scenes" : "原型场景";
+    label.textContent = state.lang === "en" ? "scenes" : "原型场景";
     bar.append(label);
     for (const scene of scenes) {
       const button = document.createElement("button");
@@ -109,15 +146,19 @@
     const langButton = document.createElement("button");
     langButton.type = "button";
     langButton.className = "scene-bar-lang";
-    langButton.textContent = lang === "en" ? "中文" : "EN";
+    const modeLabel = () =>
+      state.vis ? "视觉" : state.lang === "en" ? "EN" : "中";
+    langButton.textContent = modeLabel();
+    langButton.title = "language / mode";
     langButton.addEventListener("click", () => {
-      const next = new URL(window.location.href);
-      next.searchParams.set("lang", lang === "en" ? "zh" : "en");
-      window.location.assign(next);
+      if (!state.vis && state.lang === "zh") setLangMode("en", false);
+      else if (!state.vis && state.lang === "en") setLangMode("zh", true);
+      else setLangMode("zh", false);
+      window.location.reload();
     });
     bar.append(langButton);
     const home = document.createElement("a");
-    home.href = `../../index.html?lang=${lang}`;
+    home.href = `../../index.html?lang=${state.lang}`;
     home.textContent = "↩";
     home.title = "Prototype index";
     bar.append(home);
@@ -125,7 +166,9 @@
   }
 
   window.ScreenerDemo = {
-    lang,
+    get lang() { return state.lang; },
+    get vis() { return state.vis; },
+    get theme() { return state.theme; },
     t,
     param,
     boolParam,
@@ -135,6 +178,8 @@
     roomCode,
     hostName,
     mountSceneBar,
+    setLangMode,
+    setTheme: applyTheme,
     scene: param("scene", ""),
   };
 })();

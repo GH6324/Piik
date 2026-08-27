@@ -54,6 +54,7 @@
     cast: stroke('<path d="M2 16.1A5 5 0 0 1 5.9 20M2 12.05A9.95 9.95 0 0 1 9.95 20M2 8a14 14 0 0 1 14 14"/><circle cx="3" cy="20" r="1.2" fill="currentColor" stroke="none"/><rect x="2" y="4" width="20" height="15" rx="2"/>'),
     arrowUp: stroke('<path d="M12 20V4m-6.5 6.5L12 4l6.5 6.5"/>'),
     arrowDown: stroke('<path d="M12 4v16m-6.5-6.5L12 20l6.5-6.5"/>'),
+    sun: stroke('<circle cx="12" cy="12" r="4"/><path d="M12 2v2m0 16v2M4.9 4.9l1.4 1.4m11.4 11.4 1.4 1.4M2 12h2m16 0h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/>'),
   };
 
   function icon(name, size) {

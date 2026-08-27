@@ -39,6 +39,7 @@
     return `<button type="button" class="b-pawn ${opts.you ? "is-you" : ""} ${opts.child ? "is-child" : ""}" style="${motion}" title="${esc(label)}" aria-label="${esc(label)}">
       ${pawnSvg(color)}
       ${opts.hideLed ? "" : `<i class="b-pawn-led ${waiting ? "is-wait" : ""}"></i>`}
+      ${D.vis || opts.child ? "" : `<span class="b-pawn-name">${esc(viewer.name)}</span>`}
     </button>`;
   }
 
@@ -66,12 +67,15 @@
   }
 
   function story(step) {
-    const panels = ["door", "plug", "tv"];
+    const panels = [["door", "story.room"], ["plug", "story.link"], ["tv", "story.show"]];
     return `<div class="b-story" role="status" aria-label="${esc(t("host.starting"))}">
-      ${panels.map((p, i) => `
+      ${panels.map(([p, key], i) => `
         ${i > 0 ? `<span class="b-story-link ${step > i - 1 ? "is-done" : ""}"></span>` : ""}
-        <span class="b-story-panel ${step > i ? "is-done" : step === i ? "is-now" : ""}">
-          ${step > i ? I("check", 22) : I(p, 22)}
+        <span class="b-story-item ${step > i ? "is-done" : step === i ? "is-now" : ""}">
+          <span class="b-story-panel ${step > i ? "is-done" : step === i ? "is-now" : ""}">
+            ${step > i ? I("check", 22) : I(p, 22)}
+          </span>
+          ${D.vis ? "" : `<span class="b-story-cap">${esc(t(key))}</span>`}
         </span>`).join("")}
     </div>`;
   }
@@ -102,7 +106,7 @@
   }
 
   function meterTag(icon, label) {
-    return `<span class="b-meter-tag" title="${esc(label)}" aria-label="${esc(label)}">${I(icon, 17)}</span>`;
+    return `<span class="b-meter-tag" title="${esc(label)}" aria-label="${esc(label)}">${I(icon, 17)}${D.vis ? "" : `<span class="b-cap">${esc(label)}</span>`}</span>`;
   }
 
   function routePath({ viewers, self, hostLabel, flow }) {
@@ -155,7 +159,53 @@
   }
 
   function pill(icon, tone, label) {
-    return `<span class="b-pill ${tone ? `is-${tone}` : ""}" role="status" title="${esc(label)}">${I(icon, 16)}<span class="visually-hidden">${esc(label)}</span></span>`;
+    return `<span class="b-pill ${tone ? `is-${tone}` : ""}" role="status" title="${esc(label)}">${I(icon, 16)}${D.vis ? `<span class="visually-hidden">${esc(label)}</span>` : `<span>${esc(label)}</span>`}</span>`;
+  }
+
+  /* ---------- language mode helpers ---------- */
+
+  // Visible caption rendered only in text modes (zh/en); in visual mode the
+  // same string stays available through title/aria on the control itself.
+  function cap(key) {
+    return D.vis ? "" : `<span class="b-cap">${esc(t(key))}</span>`;
+  }
+
+  function tvMsg(key) {
+    return D.vis ? "" : `<span class="b-tv-msg">${esc(t(key))}</span>`;
+  }
+
+  function renderHeaderControls() {
+    const holder = document.getElementById("header-mode");
+    if (!holder) return;
+    const modeBtn = (mode, label, tipKey) => {
+      const active = mode === "vis" ? D.vis : !D.vis && D.lang === mode;
+      return `<button type="button" data-setmode="${mode}" class="${active ? "is-selected" : ""}" title="${esc(t(tipKey))}" aria-label="${esc(t(tipKey))}" aria-pressed="${active}">${label}</button>`;
+    };
+    holder.innerHTML = `
+      <span class="b-lang" role="group" aria-label="${esc(t("mode.language"))}">
+        ${modeBtn("zh", "中", "mode.zh")}
+        ${modeBtn("en", "EN", "mode.en")}
+        ${modeBtn("vis", I("sparkles", 15), "mode.vis")}
+      </span>
+      <button type="button" class="b-btn" data-settheme style="min-width:40px;height:40px;border-radius:999px" title="${esc(t(D.theme === "dark" ? "theme.light" : "theme.dark"))}" aria-label="${esc(t(D.theme === "dark" ? "theme.light" : "theme.dark"))}">${I(D.theme === "dark" ? "sun" : "moon", 16)}</button>`;
+  }
+
+  function bindHeaderControls(renderFn) {
+    renderHeaderControls();
+    document.addEventListener("click", (event) => {
+      const modeTarget = event.target.closest("[data-setmode]");
+      if (modeTarget) {
+        const mode = modeTarget.dataset.setmode;
+        D.setLangMode(mode === "vis" ? D.lang : mode, mode === "vis");
+        renderHeaderControls();
+        renderFn();
+        return;
+      }
+      if (event.target.closest("[data-settheme]")) {
+        D.setTheme(D.theme === "dark" ? "light" : "dark");
+        renderHeaderControls();
+      }
+    });
   }
 
   /* ================================================================
@@ -192,8 +242,11 @@
     function tvHtml() {
       if (["idle", "ended", "error"].includes(H.scene)) {
         return `<div class="b-tv-overlay b-fade">
-          <button type="button" class="b-tv-big is-action is-ripple" data-act="start" title="${esc(t("host.start"))}" aria-label="${esc(t("host.start"))}">${I("cast", 34)}</button>
-          <button type="button" class="b-tv-big" data-act="toggle-join" title="${esc(t("host.join"))}" aria-label="${esc(t("host.join"))}">${I("door", 30)}</button>
+          ${D.vis ? "" : `<div class="b-entry-text"><h2>${esc(t("host.idle.heading"))}</h2><p>${esc(t("host.idle.hint"))}</p></div>`}
+          <div class="b-row-actions" style="display:flex;gap:14px;flex-wrap:wrap;justify-content:center">
+            <button type="button" class="b-tv-big is-action is-ripple" data-act="start" title="${esc(t("host.start"))}" aria-label="${esc(t("host.start"))}">${I("cast", 34)}</button>
+            <button type="button" class="b-tv-big" data-act="toggle-join" title="${esc(t("host.join"))}" aria-label="${esc(t("host.join"))}">${I("door", 30)}</button>
+          </div>
           <div class="b-dials-wrap" id="join-inline" hidden>
             <div class="b-dials" style="--dial-bg:#101a2c">
               ${[0, 1, 2, 3].map(() => `<span class="b-dial" style="width:46px;height:56px;font-size:24px;background:#1b2940;border-color:#3a4a66;color:#dfe8f2"></span>`).join("")}
@@ -211,6 +264,7 @@
       if (H.scene === "paused") {
         return `<div class="b-tv-overlay is-dim" role="status" aria-label="${esc(t("host.paused"))}">
           <span class="b-tv-big">${I("pause", 30)}</span>
+          ${tvMsg("host.paused")}
         </div>`;
       }
       return "";
@@ -223,24 +277,24 @@
       }
       if (!isLive()) return "";
       return `
-        <button class="b-btn" data-act="pause" title="${esc(t(H.scene === "paused" ? "host.resume" : "host.pause"))}" aria-label="${esc(t(H.scene === "paused" ? "host.resume" : "host.pause"))}" ${busy}>${I(H.scene === "paused" ? "play" : "pause", 18)}</button>
-        <button class="b-btn" data-act="switch" title="${esc(t("host.switchSource"))}" aria-label="${esc(t("host.switchSource"))}" ${busy}>${I("refresh", 19)}</button>
-        <button class="b-btn is-danger" data-act="stop" title="${esc(t("host.stop"))}" aria-label="${esc(t("host.stop"))}" ${busy}>${I("stop", 17)}</button>`;
+        <button class="b-btn" data-act="pause" title="${esc(t(H.scene === "paused" ? "host.resume" : "host.pause"))}" aria-label="${esc(t(H.scene === "paused" ? "host.resume" : "host.pause"))}" ${busy}>${I(H.scene === "paused" ? "play" : "pause", 18)}${cap(H.scene === "paused" ? "host.resume" : "host.pause")}</button>
+        <button class="b-btn" data-act="switch" title="${esc(t("host.switchSource"))}" aria-label="${esc(t("host.switchSource"))}" ${busy}>${I("refresh", 19)}${cap("host.switchSource")}</button>
+        <button class="b-btn is-danger" data-act="stop" title="${esc(t("host.stop"))}" aria-label="${esc(t("host.stop"))}" ${busy}>${I("stop", 17)}${cap("host.stop")}</button>`;
     }
 
     function inviteRowHtml() {
       if (!hasRoom()) return "";
       return `<div class="b-row" role="group" aria-label="${esc(t("host.invite"))}">
-        <button class="b-btn ${H.invite ? "is-primary" : ""}" data-act="copy-invite" title="${esc(t("host.invite.copy"))}" aria-label="${esc(t("host.invite.copy"))}" ${H.invite ? "" : "disabled"}>${I("link", 19)}</button>
-        <button class="b-btn" data-act="rotate-invite" title="${esc(t("host.invite.rotate"))}" aria-label="${esc(t("host.invite.rotate"))}">${I("refresh", 18)}</button>
-        <button class="b-btn is-danger" data-act="revoke-invite" title="${esc(t("host.invite.revoke"))}" aria-label="${esc(t("host.invite.revoke"))}" ${H.invite ? "" : "disabled"}>${I("linkOff", 19)}</button>
+        <button class="b-btn ${H.invite ? "is-primary" : ""}" data-act="copy-invite" title="${esc(t("host.invite.copy"))}" aria-label="${esc(t("host.invite.copy"))}" ${H.invite ? "" : "disabled"}>${I("link", 19)}${cap("common.copy")}</button>
+        <button class="b-btn" data-act="rotate-invite" title="${esc(t("host.invite.rotate"))}" aria-label="${esc(t("host.invite.rotate"))}">${I("refresh", 18)}${cap("host.invite.rotate")}</button>
+        <button class="b-btn is-danger" data-act="revoke-invite" title="${esc(t("host.invite.revoke"))}" aria-label="${esc(t("host.invite.revoke"))}" ${H.invite ? "" : "disabled"}>${I("linkOff", 19)}${cap("host.invite.revoke")}</button>
         <span class="b-divider"></span>
         <span class="b-toggle" role="group" aria-label="${esc(t("host.policy"))}">
-          <button type="button" data-act="policy" data-v="open" class="${H.policy === "open" ? "is-selected" : ""}" title="${esc(t("host.policy.open"))} · ${esc(t("host.policy.openHint"))}" aria-label="${esc(t("host.policy.open"))}" aria-pressed="${H.policy === "open"}">${I("globe", 19)}</button>
-          <button type="button" data-act="policy" data-v="private" class="${H.policy === "private" ? "is-selected" : ""}" title="${esc(t("host.policy.private"))} · ${esc(t("host.policy.privateHint"))}" aria-label="${esc(t("host.policy.private"))}" aria-pressed="${H.policy === "private"}">${I("lock", 19)}</button>
+          <button type="button" data-act="policy" data-v="open" class="${H.policy === "open" ? "is-selected" : ""}" title="${esc(t("host.policy.open"))} · ${esc(t("host.policy.openHint"))}" aria-label="${esc(t("host.policy.open"))}" aria-pressed="${H.policy === "open"}">${I("globe", 19)}${cap("host.policy.open")}</button>
+          <button type="button" data-act="policy" data-v="private" class="${H.policy === "private" ? "is-selected" : ""}" title="${esc(t("host.policy.private"))} · ${esc(t("host.policy.privateHint"))}" aria-label="${esc(t("host.policy.private"))}" aria-pressed="${H.policy === "private"}">${I("lock", 19)}${cap("host.policy.private")}</button>
         </span>
         ${H.policy === "private" ? `
-        <button class="b-btn ${H.hasPassword ? "is-on" : ""}" data-act="password-toggle" title="${esc(t(H.hasPassword ? "host.password.set" : "host.password.unset"))}" aria-label="${esc(t("host.password.setAction"))}" aria-expanded="${H.passwordOpen}">${I("key", 19)}</button>
+        <button class="b-btn ${H.hasPassword ? "is-on" : ""}" data-act="password-toggle" title="${esc(t(H.hasPassword ? "host.password.set" : "host.password.unset"))}" aria-label="${esc(t("host.password.setAction"))}" aria-expanded="${H.passwordOpen}">${I("key", 19)}${cap("join.password")}</button>
         ${H.passwordOpen ? `
           <span class="b-input" style="flex:1;min-width:180px">
             ${I("key", 17)}
@@ -255,9 +309,9 @@
 
     function qualityRowHtml() {
       const tiles = [
-        { caption: "720·30", density: 0, label: t("host.quality.720p30") },
-        { caption: "1080·30", density: 1, label: t("host.quality.1080p30") },
-        { caption: "1080·60", density: 2, label: t("host.quality.1080p60") },
+        { caption: "720·30", key: "host.quality.720p30", density: 0 },
+        { caption: "1080·30", key: "host.quality.1080p30", density: 1 },
+        { caption: "1080·60", key: "host.quality.1080p60", density: 2 },
       ];
       const glyph = (density) => {
         const lines = [2, 3, 4][density];
@@ -268,12 +322,12 @@
       return `<div class="b-row" role="group" aria-label="${esc(t("host.quality"))}">
         <div class="b-tiles">
           ${tiles.map((tile, i) => `
-            <button type="button" class="b-tile ${H.preset === i ? "is-selected" : ""}" data-act="preset" data-v="${i}" title="${esc(tile.label)}" aria-label="${esc(tile.label)}" aria-pressed="${H.preset === i}" ${H.scene === "starting" || H.switching ? "disabled" : ""}>
-              ${glyph(tile.density)}<small>${tile.caption}</small>
+            <button type="button" class="b-tile ${H.preset === i ? "is-selected" : ""}" data-act="preset" data-v="${i}" title="${esc(t(tile.key))}" aria-label="${esc(t(tile.key))}" aria-pressed="${H.preset === i}" ${H.scene === "starting" || H.switching ? "disabled" : ""}>
+              ${glyph(tile.density)}<small>${D.vis ? tile.caption : esc(t(tile.key))}</small>
             </button>`).join("")}
         </div>
         <span class="b-spacer"></span>
-        <button class="b-btn ${H.advanced ? "is-on" : ""}" data-act="advanced" title="${esc(t("host.advanced"))}" aria-label="${esc(t("host.advanced"))}" aria-expanded="${H.advanced}">${I("sliders", 20)}</button>
+        <button class="b-btn ${H.advanced ? "is-on" : ""}" data-act="advanced" title="${esc(t("host.advanced"))}" aria-label="${esc(t("host.advanced"))}" aria-expanded="${H.advanced}">${I("sliders", 20)}${cap("host.advanced")}</button>
       </div>
       ${H.advanced ? advancedHtml() : ""}`;
     }
@@ -284,21 +338,21 @@
       const routeCodecLocked = isLive() || H.scene === "starting";
       return `<div class="b-door-body b-fade" role="group" aria-label="${esc(t("host.advanced"))}">
         <div class="b-door-group">
-          <span class="b-door-glyph" title="${esc(t("host.advanced.resolution"))}">${I("expand", 19)}</span>
+          <span class="b-door-glyph" title="${esc(t("host.advanced.resolution"))}">${I("expand", 19)}${cap("host.advanced.resolution")}</span>
           <div class="b-chips" role="group" aria-label="${esc(t("host.advanced.resolution"))}">
             ${["480p", "720p", "1080p", "1440p"].map((r, i) => `<button class="b-chip ${i === 2 ? "is-selected" : ""}" ${capsLocked ? "disabled" : ""}>${r}</button>`).join("")}
           </div>
         </div>
         <div class="b-door-group">
-          <span class="b-door-glyph" title="${esc(t("host.advanced.framerate"))}">${I("wave", 19)}</span>
+          <span class="b-door-glyph" title="${esc(t("host.advanced.framerate"))}">${I("wave", 19)}${cap("host.advanced.framerate")}</span>
           <span class="b-slider"><input type="range" min="15" max="60" step="5" value="30" data-range="fps" aria-label="${esc(t("host.advanced.framerate"))}" ${capsLocked ? "disabled" : ""}><output>30</output></span>
         </div>
         <div class="b-door-group">
-          <span class="b-door-glyph" title="${esc(t("host.advanced.bitrate"))}">${I("gauge", 19)}</span>
+          <span class="b-door-glyph" title="${esc(t("host.advanced.bitrate"))}">${I("gauge", 19)}${cap("host.advanced.bitrate")}</span>
           <span class="b-slider"><input type="range" min="2" max="12" step="0.5" value="5" data-range="mbps" aria-label="${esc(t("host.advanced.bitrate"))}" ${capsLocked ? "disabled" : ""}><output>5.0</output></span>
         </div>
         <div class="b-door-group">
-          <span class="b-door-glyph" title="${esc(t("host.advanced.preference"))}">${I("mountain", 19)}</span>
+          <span class="b-door-glyph" title="${esc(t("host.advanced.preference"))}">${I("mountain", 19)}${cap("host.advanced.preference")}</span>
           <div class="b-chips" role="group" aria-label="${esc(t("host.advanced.preference"))}">
             <button class="b-chip" title="${esc(t("host.advanced.preference.resolution"))} · ${esc(t("host.advanced.preference.resolutionHint"))}" ${prefLocked ? "disabled" : ""}>${I("mountain", 18)}</button>
             <button class="b-chip is-selected" title="${esc(t("host.advanced.preference.balanced"))} · ${esc(t("host.advanced.preference.balancedHint"))}" ${prefLocked ? "disabled" : ""}>${I("balance", 18)}</button>
@@ -306,7 +360,7 @@
           </div>
         </div>
         <div class="b-door-group">
-          <span class="b-door-glyph" title="${esc(t("host.advanced.audio"))}">${I("speaker", 19)}</span>
+          <span class="b-door-glyph" title="${esc(t("host.advanced.audio"))}">${I("speaker", 19)}${cap("host.advanced.audio")}</span>
           <div class="b-chips" role="group" aria-label="${esc(t("host.advanced.audio"))}">
             <button class="b-chip" title="${esc(t("host.advanced.audio.saver"))} · 64 kbps" ${capsLocked ? "disabled" : ""}>64</button>
             <button class="b-chip is-selected" title="${esc(t("host.advanced.audio.music"))} · 128 kbps" ${capsLocked ? "disabled" : ""}>128</button>
@@ -314,14 +368,14 @@
           </div>
         </div>
         <div class="b-door-group">
-          <span class="b-door-glyph" title="${esc(t("host.advanced.route"))}">${I("branch", 19)}</span>
+          <span class="b-door-glyph" title="${esc(t("host.advanced.route"))}">${I("branch", 19)}${cap("host.advanced.route")}</span>
           <div class="b-chips">
             <button class="b-switch" role="switch" aria-checked="false" data-act="switch-toggle" title="${esc(t("host.advanced.route.topo"))} · ${esc(t("host.advanced.route.topoHint"))}" aria-label="${esc(t("host.advanced.route.topo"))}" ${routeCodecLocked ? "disabled" : ""}></button>
             <button class="b-switch" role="switch" aria-checked="false" data-act="switch-toggle" title="${esc(t("host.advanced.route.peerOnly"))} · ${esc(t("host.advanced.route.peerOnlyHint"))}" aria-label="${esc(t("host.advanced.route.peerOnly"))}" ${routeCodecLocked ? "disabled" : ""}></button>
           </div>
         </div>
         <div class="b-door-group">
-          <span class="b-door-glyph" title="${esc(t("host.advanced.codec"))}">${I("cpu", 19)}</span>
+          <span class="b-door-glyph" title="${esc(t("host.advanced.codec"))}">${I("cpu", 19)}${cap("host.advanced.codec")}</span>
           <div class="b-chips" role="group" aria-label="${esc(t("host.advanced.codec"))}">
             <button class="b-chip" title="VP8 · ${esc(t("host.advanced.codec.vp8Hint"))}" ${routeCodecLocked ? "disabled" : ""}>VP8</button>
             <button class="b-chip is-selected" title="${isLive() ? "AUTO · H264" : `${esc(t("host.advanced.codec.auto"))} · ${esc(t("host.advanced.codec.autoHint"))}`}" ${routeCodecLocked ? "disabled" : ""}>AUTO${isLive() ? '<i class="b-chip-dot" title="H264"></i>' : ""}</button>
@@ -351,6 +405,17 @@
         : H.scene === "paused" ? ["warn", t("host.paused")]
         : ["", t("state.signal.offline")];
       document.getElementById("header-leds").innerHTML = ledStrip(led[0], led[1]);
+      const phaseText = D.vis ? "" : (() => {
+        const map = {
+          starting: `${t("host.starting")}…`,
+          live: `${t("host.live")} · ${list.length} / 20 ${t("common.online")}`,
+          paused: t("host.paused"),
+          ended: t("host.ended"),
+          error: t("host.captureError"),
+        };
+        const text = map[H.scene];
+        return text ? `<span class="b-status-text">${esc(text)}</span>` : "";
+      })();
 
       root.innerHTML = `
       <div class="b-scene">
@@ -378,8 +443,9 @@
             <button class="b-btn" data-act="replace-confirm" title="${esc(t("host.roomReplaceConfirm"))}" aria-label="${esc(t("host.roomReplaceConfirm"))}">${I("check", 18)}</button>
             <button class="b-btn" data-act="replace-cancel" title="${esc(t("common.cancel"))}" aria-label="${esc(t("common.cancel"))}">${I("x", 18)}</button>
           ` : `
-            <button class="b-btn" data-act="replace-room" title="${esc(t("host.roomReplace"))}" aria-label="${esc(t("host.roomReplace"))}" ${H.scene === "starting" ? "disabled" : ""}>${I("refresh", 18)}</button>
+            <button class="b-btn" data-act="replace-room" title="${esc(t("host.roomReplace"))}" aria-label="${esc(t("host.roomReplace"))}" ${H.scene === "starting" ? "disabled" : ""}>${I("refresh", 18)}${cap("host.roomReplace")}</button>
           `) : ""}
+          ${phaseText}
           <span class="b-spacer"></span>
           ${H.noAudio && isLive() ? pill("speaker", "", t("host.noAudio")) : ""}
           ${H.notice ?? ""}
@@ -389,8 +455,8 @@
         ${inviteRowHtml()}
         ${qualityRowHtml()}
         <div class="b-row" role="group" aria-label="${esc(t("host.details"))}">
-          <button class="b-btn ${H.details ? "is-on" : ""}" data-act="details" title="${esc(t(H.details ? "host.details.hide" : "host.details"))}" aria-label="${esc(t("host.details"))}" aria-expanded="${H.details}">${I("gauge", 20)}</button>
-          <button class="b-btn ${H.topology ? "is-on" : ""}" data-act="topology" title="${esc(t(H.topology ? "host.topology.hide" : "host.topology.show"))}" aria-label="${esc(t("host.topology"))}" aria-expanded="${H.topology}">${I("network", 20)}</button>
+          <button class="b-btn ${H.details ? "is-on" : ""}" data-act="details" title="${esc(t(H.details ? "host.details.hide" : "host.details"))}" aria-label="${esc(t("host.details"))}" aria-expanded="${H.details}">${I("gauge", 20)}${cap("host.details")}</button>
+          <button class="b-btn ${H.topology ? "is-on" : ""}" data-act="topology" title="${esc(t(H.topology ? "host.topology.hide" : "host.topology.show"))}" aria-label="${esc(t("host.topology"))}" aria-expanded="${H.topology}">${I("network", 20)}${cap("host.topology")}</button>
         </div>
         ${H.details ? `<div class="b-row is-sub b-fade">${meterTag("arrowUp", t("stats.title"))}${meterStrip()}</div>` : ""}
         ${H.topology ? `<div class="b-row is-sub b-fade">${routePath({ viewers: list, hostLabel: H.name, flow: H.scene === "starting" })}</div>` : ""}
@@ -482,12 +548,13 @@
           dial.classList.toggle("is-active", i === value.length);
         });
         if (value.length === 4) {
-          window.location.assign(`viewer.html?scene=playing&lang=${D.lang}&room=${encodeURIComponent(value)}`);
+          window.location.assign(`viewer.html?scene=playing&lang=${D.lang}&mode=${D.vis ? "vis" : "text"}&room=${encodeURIComponent(value)}`);
         }
       }
     });
 
     D.mountSceneBar("host", SCENES, H.scene, (scene) => setScene(scene));
+    bindHeaderControls(render);
     render();
   }
 
@@ -515,11 +582,11 @@
 
     function tvOverlay() {
       const map = {
-        waiting: { icon: "moon", label: t("viewer.msg.waitingHost"), dim: false, spin: false },
-        paused: { icon: "pause", label: t("viewer.msg.hostPaused"), dim: true, spin: false },
-        recovering: { icon: "loader", label: t("viewer.msg.recovering"), dim: true, spin: true },
-        failed: { icon: "alert", label: t("viewer.msg.routeFailed"), dim: true, spin: false },
-        hostoffline: { icon: "wifiOff", label: t("viewer.msg.hostOffline"), dim: true, spin: false },
+        waiting: { icon: "moon", label: t("viewer.msg.waitingHost"), key: "viewer.msg.waitingHost", dim: false, spin: false },
+        paused: { icon: "pause", label: t("viewer.msg.hostPaused"), key: "viewer.msg.hostPaused", dim: true, spin: false },
+        recovering: { icon: "loader", label: t("viewer.msg.recovering"), key: "viewer.msg.recovering", dim: true, spin: true },
+        failed: { icon: "alert", label: t("viewer.msg.routeFailed"), key: "viewer.msg.routeFailed", dim: true, spin: false },
+        hostoffline: { icon: "wifiOff", label: t("viewer.msg.hostOffline"), key: "viewer.msg.hostOffline", dim: true, spin: false },
       };
       if (V.scene === "connecting") {
         return `<div class="b-tv-static"></div>
@@ -529,6 +596,7 @@
       if (!o) return "";
       return `<div class="b-tv-overlay ${o.dim ? "is-dim" : ""}" role="status" aria-label="${esc(o.label)}">
         <span class="b-tv-big ${o.spin ? "b-spin" : ""}">${I(o.icon, 30)}</span>
+        ${tvMsg(o.key)}
       </div>`;
     }
 
@@ -541,16 +609,22 @@
       const p = map[V.scene];
       return `<div class="b-join"><div class="b-join-panel b-fade">
         <span class="b-tv-big" style="border-color:var(--ink);color:var(--ink);background:var(--paper)" title="${esc(p.label)}" aria-label="${esc(p.label)}">${I(p.icon, 30)}</span>
-        <span class="b-pill is-bad" title="${esc(p.hint)}">${I("alert", 16)}<span class="visually-hidden">${esc(p.hint)}</span></span>
+        ${D.vis ? `<span class="b-pill is-bad" title="${esc(p.hint)}">${I("alert", 16)}<span class="visually-hidden">${esc(p.hint)}</span></span>` : `
+        <div class="b-access-text">
+          <h2>${esc(p.label)}</h2>
+          <p>${esc(p.hint)}</p>
+        </div>`}
         ${p.password ? `
         <form data-form="viewer-password" style="display:grid;justify-items:center;gap:14px">
           <span class="b-input" style="min-width:220px">
             ${I("key", 17)}
-            <input type="password" aria-label="${esc(t("join.password"))}" placeholder="····">
+            <input type="password" aria-label="${esc(t("join.password"))}" placeholder="${D.vis ? "····" : esc(t("join.password"))}">
           </span>
           <button class="b-join-go" type="submit" title="${esc(t("join.submit"))}" aria-label="${esc(t("join.submit"))}">${I("arrowRight", 26)}</button>
+          ${cap("join.submit")}
         </form>` : `
-        <button class="b-join-go" data-act="back-join" title="${esc(t("common.retry"))}" aria-label="${esc(t("common.retry"))}">${I("refresh", 24)}</button>`}
+        <button class="b-join-go" data-act="back-join" title="${esc(t("common.retry"))}" aria-label="${esc(t("common.retry"))}">${I("refresh", 24)}</button>
+        ${cap("common.retry")}`}
       </div></div>`;
     }
 
@@ -577,10 +651,12 @@
             ${V.scene === "needsplay" ? `
               <div class="b-tv-overlay is-dim">
                 <button type="button" class="b-tv-big is-action is-ripple" data-act="play" title="${esc(t("viewer.play"))}" aria-label="${esc(t("viewer.play"))}">${I("play", 30)}</button>
+                ${tvMsg("viewer.msg.needsPlay")}
               </div>` : ""}
             ${V.scene === "failed" ? `
               <div class="b-tv-overlay" style="align-content:end;padding-bottom:26px">
                 <button type="button" class="b-tv-big is-action" data-act="reconnect" title="${esc(t("viewer.reconnect"))}" aria-label="${esc(t("viewer.reconnect"))}">${I("refresh", 26)}</button>
+                ${tvMsg("viewer.reconnect")}
               </div>` : ""}
           </div>
           <div class="b-tv-chin"><i class="${V.scene === "playing" ? "is-on" : ["paused", "recovering"].includes(V.scene) ? "is-warn" : ["failed", "hostoffline"].includes(V.scene) ? "is-bad" : "is-busy"}"></i></div>
@@ -598,6 +674,7 @@
       <div class="b-deck">
         <div class="b-row">
           ${lcd(D.roomCode())}
+          ${D.vis ? "" : `<span class="b-status-text">${esc(ledState[1])}</span>`}
           <span class="b-spacer"></span>
           ${V.editingName ? `
             <span class="b-input" style="min-width:140px"><input data-name-input value="${esc(V.name)}" maxlength="48" aria-label="${esc(t("host.name"))}"></span>
@@ -607,9 +684,9 @@
             <span class="b-name-tag" title="${esc(t("host.name"))}"><i></i>${esc(V.name)}</span>
             <button class="b-btn" data-act="name-edit" title="${esc(t("host.nameEdit"))}" aria-label="${esc(t("host.nameEdit"))}" style="min-width:44px;height:44px">${I("pencil", 15)}</button>
           `}
-          <button class="b-btn ${V.topology ? "is-on" : ""}" data-act="topology" title="${esc(t(V.topology ? "host.topology.hide" : "host.topology.show"))}" aria-label="${esc(t("host.topology"))}" aria-expanded="${V.topology}">${I("network", 19)}</button>
-          <button class="b-btn" data-act="reconnect" title="${esc(t("viewer.reconnect"))}" aria-label="${esc(t("viewer.reconnect"))}" ${["playing", "recovering", "failed", "hostoffline", "paused"].includes(V.scene) ? "" : "disabled"}>${I("refresh", 19)}</button>
-          <button class="b-btn ${V.details ? "is-on" : ""}" data-act="details" title="${esc(t(V.details ? "host.details.hide" : "host.details"))}" aria-label="${esc(t("host.details"))}" aria-expanded="${V.details}">${I("gauge", 19)}</button>
+          <button class="b-btn ${V.topology ? "is-on" : ""}" data-act="topology" title="${esc(t(V.topology ? "host.topology.hide" : "host.topology.show"))}" aria-label="${esc(t("host.topology"))}" aria-expanded="${V.topology}">${I("network", 19)}${cap("host.topology")}</button>
+          <button class="b-btn" data-act="reconnect" title="${esc(t("viewer.reconnect"))}" aria-label="${esc(t("viewer.reconnect"))}" ${["playing", "recovering", "failed", "hostoffline", "paused"].includes(V.scene) ? "" : "disabled"}>${I("refresh", 19)}${cap("viewer.reconnect")}</button>
+          <button class="b-btn ${V.details ? "is-on" : ""}" data-act="details" title="${esc(t(V.details ? "host.details.hide" : "host.details"))}" aria-label="${esc(t("host.details"))}" aria-expanded="${V.details}">${I("gauge", 19)}${cap("host.details")}</button>
         </div>
         ${V.details ? `<div class="b-row is-sub b-fade">${meterTag("arrowDown", t("stats.title"))}${meterStrip(V.route)}</div>` : ""}
         ${V.details && V.relay ? `<div class="b-row is-sub b-fade">${meterTag("arrowUp", t("stats.relay"))}${meterStrip()}</div>` : ""}
@@ -621,7 +698,7 @@
       if (!inRoom()) { root.innerHTML = accessView(); return; }
       if (V.scene === "joining") {
         document.getElementById("header-leds").innerHTML = ledStrip("busy", t("viewer.msg.joining"));
-        root.innerHTML = `<div class="b-join"><span class="b-tv-big b-spin" role="status" aria-label="${esc(t("viewer.msg.joining"))}">${I("loader", 30)}</span></div>`;
+        root.innerHTML = `<div class="b-join"><div class="b-join-panel"><span class="b-tv-big b-spin" role="status" aria-label="${esc(t("viewer.msg.joining"))}">${I("loader", 30)}</span>${tvMsg("viewer.msg.joining")}</div></div>`;
         V.timer = window.setTimeout(() => setScene("playing"), 1800);
         return;
       }
@@ -671,6 +748,7 @@
     });
 
     D.mountSceneBar("viewer", SCENES, V.scene, (scene) => setScene(scene));
+    bindHeaderControls(render);
     render();
   }
 
@@ -695,18 +773,20 @@
       if (J.scene === "gate") {
         root.innerHTML = `<div class="b-join"><form class="b-join-panel b-fade" data-form="gate">
           <span class="b-tv-big" style="border-color:var(--ink);color:var(--ink);background:var(--paper)" title="${esc(t("gate.title"))}" aria-label="${esc(t("gate.title"))}">${I("key", 30)}</span>
+          ${D.vis ? "" : `<div class="b-access-text"><h2>${esc(t("gate.title"))}</h2><p>${esc(t("gate.hint"))}</p></div>`}
           <span class="b-input" style="min-width:230px">
             ${I("lock", 17)}
-            <input type="password" aria-label="${esc(t("gate.password"))}" placeholder="····" autofocus>
+            <input type="password" aria-label="${esc(t("gate.password"))}" placeholder="${D.vis ? "····" : esc(t("gate.password"))}" autofocus>
           </span>
           <button class="b-join-go" type="submit" title="${esc(t("gate.submit"))}" aria-label="${esc(t("gate.submit"))}">${I("arrowRight", 26)}</button>
+          ${cap("gate.submit")}
         </form></div>`;
         return;
       }
       if (J.scene === "joining") {
-        root.innerHTML = `<div class="b-join"><span class="b-tv-big b-spin" role="status" aria-label="${esc(t("join.joining"))}">${I("loader", 30)}</span></div>`;
+        root.innerHTML = `<div class="b-join"><div class="b-join-panel"><span class="b-tv-big b-spin" role="status" aria-label="${esc(t("join.joining"))}">${I("loader", 30)}</span>${tvMsg("join.joining")}</div></div>`;
         window.setTimeout(() => {
-          window.location.assign(`viewer.html?scene=playing&lang=${D.lang}&room=${encodeURIComponent(J.code || "7316")}`);
+          window.location.assign(`viewer.html?scene=playing&lang=${D.lang}&mode=${D.vis ? "vis" : "text"}&room=${encodeURIComponent(J.code || "7316")}`);
         }, 1500);
         return;
       }
@@ -719,24 +799,33 @@
         const p = map[J.scene];
         root.innerHTML = `<div class="b-join"><div class="b-join-panel b-fade">
           <span class="b-tv-big" style="border-color:var(--ink);color:var(--ink);background:var(--paper)" title="${esc(p.label)}" aria-label="${esc(p.label)}">${I(p.icon, 30)}</span>
-          <span class="b-pill is-bad" title="${esc(p.hint)}">${I("alert", 16)}<span class="visually-hidden">${esc(p.hint)}</span></span>
+          ${D.vis ? `<span class="b-pill is-bad" title="${esc(p.hint)}">${I("alert", 16)}<span class="visually-hidden">${esc(p.hint)}</span></span>` : `
+          <div class="b-access-text">
+            <h2>${esc(p.label)}</h2>
+            <p>${esc(p.hint)}</p>
+          </div>`}
           ${p.password ? `
           <form data-form="room-password" style="display:grid;justify-items:center;gap:14px">
             <span class="b-input" style="min-width:220px">
               ${I("key", 17)}
-              <input type="password" aria-label="${esc(t("join.password"))}" placeholder="····" autofocus>
+              <input type="password" aria-label="${esc(t("join.password"))}" placeholder="${D.vis ? "····" : esc(t("join.password"))}" autofocus>
             </span>
             <button class="b-join-go" type="submit" title="${esc(t("join.submit"))}" aria-label="${esc(t("join.submit"))}">${I("arrowRight", 26)}</button>
+            ${cap("join.submit")}
           </form>` : `
-          <button class="b-join-go" data-act="again" title="${esc(t("common.retry"))}" aria-label="${esc(t("common.retry"))}">${I("refresh", 24)}</button>`}
+          <button class="b-join-go" data-act="again" title="${esc(t("common.retry"))}" aria-label="${esc(t("common.retry"))}">${I("refresh", 24)}</button>
+          ${cap("common.retry")}`}
         </div></div>`;
         return;
       }
       root.innerHTML = `<div class="b-join"><form class="b-join-panel b-fade" data-form="code">
         <span class="b-join-door ${J.scene === "invalid" ? "is-shake" : ""}" title="${esc(t("join.title"))}" aria-label="${esc(t("join.title"))}">${I("door", 96)}</span>
+        ${D.vis ? "" : `<div class="b-access-text"><h2>${esc(t("join.title"))}</h2><p>${esc(t("join.hint"))}</p></div>`}
         ${dialsHtml()}
         ${J.scene === "invalid" ? `<span class="b-join-error" role="alert" title="${esc(t("join.invalid"))}" aria-label="${esc(t("join.invalid"))}">${I("x", 24)}</span>` : ""}
+        ${J.scene === "invalid" && !D.vis ? `<span class="b-cap" style="color:var(--danger)">${esc(t("join.invalid"))}</span>` : ""}
         <button class="b-join-go" type="submit" title="${esc(t("join.submit"))}" aria-label="${esc(t("join.submit"))}" disabled>${I("arrowRight", 26)}</button>
+        ${cap("join.submit")}
       </form></div>`;
       const input = root.querySelector("[data-dials-input]");
       input.focus();
@@ -780,6 +869,7 @@
     });
 
     D.mountSceneBar("join", SCENES, J.scene, (scene) => setScene(scene));
+    bindHeaderControls(render);
     render();
   }
 })();

@@ -27,6 +27,7 @@
   --lcd: #1d2b22;
   --lcd-digits: #9de8bf;
   --stage: #101a2c;
+  --frame: #22303e;
   --radius: 16px;
   --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", "PingFang SC",
     "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", sans-serif;
@@ -121,9 +122,9 @@ ul { margin: 0; padding: 0; list-style: none; }
   width: min(760px, 100%);
   margin: 0 auto;
   padding: 12px 12px 0;
-  border: 3px solid var(--ink);
+  border: 3px solid var(--frame);
   border-radius: 26px 26px 20px 20px;
-  background: var(--ink);
+  background: var(--frame);
 }
 .b-tv-screen {
   position: relative;
@@ -639,6 +640,151 @@ ul { margin: 0; padding: 0; list-style: none; }
 /* spinner for glyph contexts */
 .b-spin { animation: b-rotate .9s linear infinite; }
 @keyframes b-rotate { to { transform: rotate(360deg); } }
+
+/* ---------- language mode: visible captions (text mode only) ---------- */
+
+.b-cap {
+  font-size: 12.5px;
+  font-weight: 600;
+  color: inherit;
+  white-space: nowrap;
+}
+.b-btn .b-cap { margin-left: 2px; }
+
+.b-tv-msg {
+  font-size: 14.5px;
+  font-weight: 600;
+  color: #dfe8f2;
+}
+
+.b-entry-text { display: grid; gap: 6px; margin-bottom: 6px; }
+.b-entry-text h2 { font-size: clamp(19px, 2.6vw, 24px); font-weight: 800; color: #f2efe7; letter-spacing: -0.01em; }
+.b-entry-text p { max-width: 400px; margin: 0 auto; color: #9aa0b0; font-size: 13.5px; }
+
+.b-story-item { display: grid; justify-items: center; gap: 6px; }
+.b-story-cap { font-size: 10.5px; font-weight: 600; color: #8ea0bd; white-space: nowrap; }
+.b-story-item.is-done .b-story-cap { color: var(--live); }
+.b-story-item.is-now .b-story-cap { color: #fff; }
+
+.b-status-text {
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--ink);
+  opacity: .78;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.b-pawn-name {
+  max-width: 58px;
+  margin-top: -4px;
+  padding: 1px 6px;
+  border-radius: 7px;
+  background: var(--paper);
+  color: var(--ink);
+  font-size: 10px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  box-shadow: 0 1px 0 rgba(0, 0, 0, .12);
+}
+
+.b-door-glyph .b-cap { font-size: 13px; }
+.b-meter-tag .b-cap { margin-left: 6px; font-size: 12px; }
+.b-toggle .b-cap { margin-left: 5px; font-size: 12px; }
+.b-toggle button { width: auto; min-width: 44px; padding: 0 10px; }
+
+.b-access-text {
+  display: grid;
+  gap: 7px;
+  justify-items: center;
+  max-width: 330px;
+  text-align: center;
+}
+.b-access-text h2 { font-size: 20px; font-weight: 800; letter-spacing: -0.01em; }
+.b-access-text p { font-size: 13px; line-height: 1.6; opacity: .72; }
+
+/* language + theme switcher */
+.b-lang {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 2.5px solid var(--ink);
+  border-radius: 999px;
+  background: var(--paper);
+}
+.b-lang button {
+  display: inline-grid;
+  min-width: 38px;
+  height: 34px;
+  place-items: center;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ink);
+  font-size: 12px;
+  font-weight: 700;
+  opacity: .55;
+}
+.b-lang button.is-selected { background: var(--ink); color: var(--paper); opacity: 1; }
+.b-lang button:hover:not(.is-selected) { opacity: .85; }
+.b-top-right { display: inline-flex; gap: 10px; align-items: center; }
+
+/* ---------- dark theme: the same room, lights out ---------- */
+
+html[data-theme="dark"] {
+  color-scheme: dark;
+  --wall: #141e29;
+  --wall-2: #0e1620;
+  --ink: #dde8f3;
+  --paper: #22303e;
+  --frame: #0a111a;
+  --couch: #e4572e;
+  --couch-dark: #c8492b;
+  --action: #4a84f2;
+  --action-deep: #3a70d8;
+  --live: #3fb97a;
+  --warn: #e8a33d;
+  --danger: #e25a52;
+  --lcd: #0d1611;
+}
+
+html[data-theme="dark"] body { background: var(--wall); color: var(--ink); }
+html[data-theme="dark"] .b-brand:hover { background: var(--paper); color: var(--ink); }
+html[data-theme="dark"] .b-btn:hover:not(:disabled) { background: #2b3d4f; }
+html[data-theme="dark"] .b-btn.is-on { background: var(--ink); color: #22303e; }
+html[data-theme="dark"] .b-btn.is-danger:hover:not(:disabled) { background: #3d2626; }
+html[data-theme="dark"] .b-tile:hover:not(:disabled):not(.is-selected) { background: #2b3d4f; }
+html[data-theme="dark"] .b-tile.is-selected { background: var(--ink); color: #22303e; }
+html[data-theme="dark"] .b-tile.is-selected small { color: #4a5f78; }
+html[data-theme="dark"] .b-chip.is-selected { background: var(--ink); color: #22303e; }
+html[data-theme="dark"] .b-toggle button.is-selected { background: var(--ink); color: #22303e; }
+html[data-theme="dark"] .b-row.is-sub { background: #1a2634; }
+html[data-theme="dark"] .b-meter-cell { background: #1a2634; }
+html[data-theme="dark"] .b-meter-cell svg,
+html[data-theme="dark"] .b-meter-tag,
+html[data-theme="dark"] .b-door-glyph { color: #7d92a8; }
+html[data-theme="dark"] .b-door-body { border-color: #33465c; }
+html[data-theme="dark"] .b-leds { background: #1a2634; }
+html[data-theme="dark"] .b-pawn-name { background: #0e1620; box-shadow: none; }
+html[data-theme="dark"] .b-pill { background: #2e2410; }
+html[data-theme="dark"] .b-pill.is-bad { background: #331c1a; }
+html[data-theme="dark"] .b-pill.is-good { background: #14291d; }
+html[data-theme="dark"] .b-join-go:disabled { background: #1a2634; color: #48607a; }
+html[data-theme="dark"] .b-switch { background: #0e1620; }
+html[data-theme="dark"] .b-switch::after { background: var(--ink); }
+html[data-theme="dark"] .b-couch-empty { color: #54708c; }
+html[data-theme="dark"] .b-dial { background: #22303e; }
+html[data-theme="dark"] .b-dial.is-filled { background: var(--ink); color: #22303e; }
+html[data-theme="dark"] .scene-bar { background: rgba(20, 30, 41, .94); border-color: #48607a; }
+html[data-theme="dark"] .scene-bar button,
+html[data-theme="dark"] .scene-bar a { background: #22303e; border-color: #48607a; color: #b9c9da; }
+html[data-theme="dark"] .scene-bar button.is-active { background: #dde8f3; border-color: #dde8f3; color: #141e29; }
+html[data-theme="dark"] .scene-bar-label { color: #7d92a8; }
 
 /* ---------- responsive ---------- */
 

@@ -222,6 +222,9 @@ window.SCREENER_COPY = {
     "mode.en": "English",
     "mode.vis": "纯视觉",
 
+    "theme.dark": "切换到暗色模式",
+    "theme.light": "切换到浅色模式",
+
     "story.room": "找到房间",
     "story.link": "建立连接",
     "story.show": "接收画面",
@@ -446,6 +449,9 @@ window.SCREENER_COPY = {
     "mode.zh": "中文",
     "mode.en": "English",
     "mode.vis": "Visual only",
+
+    "theme.dark": "Switch to dark mode",
+    "theme.light": "Switch to light mode",
 
     "story.room": "Room found",
     "story.link": "Linking up",

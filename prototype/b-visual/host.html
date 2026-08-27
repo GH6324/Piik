@@ -4,6 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Screener · Host (B 纯视觉)</title>
+<script>
+try {
+  var theme = new URLSearchParams(location.search).get("theme")
+    || localStorage.getItem("screener-proto-theme")
+    || (matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light");
+  document.documentElement.dataset.theme = theme === "dark" ? "dark" : "light";
+} catch (e) { document.documentElement.dataset.theme = "light"; }
+</script>
 <link rel="stylesheet" href="b.css">
 <link rel="stylesheet" href="../shared/scenebar.css">
 </head>
@@ -12,7 +20,10 @@
   <a class="b-brand" href="../../index.html" title="Screener" aria-label="Screener">
     <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M8 2l4 3 4-3"/></svg>
   </a>
-  <span id="header-leds"></span>
+  <span class="b-top-right">
+    <span id="header-leds"></span>
+    <span id="header-mode"></span>
+  </span>
 </header>
 <main class="b-room" id="host-root"></main>
 <script src="../shared/strings.js"></script>
