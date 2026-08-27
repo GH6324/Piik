@@ -217,6 +217,10 @@ ul { margin: 0; padding: 0; list-style: none; }
   opacity: .6;
 }
 .b-pawn-detail-close:hover { opacity: 1; background: rgba(0, 0, 0, .06); }
+
+/* row groups: keep related controls on one line; they become tidy stacked
+   lines with equal-width buttons on narrow screens */
+.b-row-group { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; min-width: 0; }
 .b-pawn.is-child { width: 34px; margin-left: -8px; align-self: end; }
 .b-pawn.is-child svg { width: 30px; height: 36px; }
 
@@ -239,9 +243,9 @@ ul { margin: 0; padding: 0; list-style: none; }
   content: "";
   position: absolute;
   top: -13px; left: 50%;
-  width: 14px; height: 14px;
+  width: 13px; height: 10px;
   background: var(--you);
-  clip-path: polygon(50% 0, 63% 35%, 100% 38%, 71% 60%, 82% 100%, 50% 75%, 18% 100%, 29% 60%, 0 38%, 37% 35%);
+  clip-path: polygon(50% 100%, 0 0, 100% 0);
   transform: translateX(-50%);
 }
 .b-pawn.is-you { z-index: 1; }
@@ -836,10 +840,22 @@ html[data-theme="dark"] .scene-bar-label { color: #7d92a8; }
   .b-pawns { top: -24px; gap: 2px 6px; }
   .b-pawn { width: 36px; }
   .b-pawn svg { width: 32px; height: 39px; }
-  .b-row { padding: 12px; gap: 10px; }
-  .b-lcd { font-size: 20px; }
-  .b-dial { width: 54px; height: 66px; font-size: 28px; }
+  .b-row { flex-direction: column; align-items: stretch; gap: 12px; padding: 14px; }
+  .b-row > .b-spacer,
+  .b-row > .b-divider { display: none; }
+  .b-row-group { width: 100%; gap: 9px; }
+  .b-group-actions { display: flex; width: 100%; gap: 8px; min-width: 0; }
+  .b-group-actions .b-btn { flex: 1 1 0; min-width: 0; min-height: 52px; padding: 4px 8px; }
+  .b-group-actions .b-btn .b-cap { white-space: normal; text-align: center; line-height: 1.25; }
+  .b-lcd { flex: 1; justify-content: center; }
+  .b-tiles { display: flex; width: 100%; gap: 8px; }
+  .b-tiles .b-tile { flex: 1 1 0; min-width: 0; padding: 10px 6px 8px; }
+  .b-meter { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); width: 100%; }
+  .b-meter-cell { justify-content: flex-start; }
+  .b-pawn-detail-close { margin-left: 0; }
   .b-door-body { padding: 12px; }
+  .b-dial { width: 54px; height: 66px; font-size: 28px; }
+  .b-status-text { width: 100%; }
 }
 
 /* ---------- reduced motion ---------- */

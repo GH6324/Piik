@@ -236,7 +236,7 @@
       <svg viewBox="0 0 640 ${h}">
         <title>${esc(t("host.topology"))}</title>
         ${edges.join("")}
-        <g transform="translate(${hostPos.x - 4}, ${hostPos.y - 20}) scale(0.85)">${pawnSvg("#e4572e")}<title>${esc(hostLabel)} · ${esc(t("common.host"))}</title></g>
+        <g transform="translate(${hostPos.x - 4}, ${hostPos.y - 20}) scale(0.85)"><path d="M11 12.5 L8.5 2 L14 6.5 L17 0 L20 6.5 L25.5 2 L23 12.5 Z" fill="#efb23f"/>${pawnSvg("#e4572e")}<title>${esc(hostLabel)} · ${esc(t("common.host"))}</title></g>
         ${nameText(hostLabel, hostPos.x + 14, hostPos.y + 30)}
         ${sfuPos ? `<g transform="translate(${sfuPos.x - 20}, ${sfuPos.y - 16})"><title>${esc(t("host.sfu"))}</title><rect width="40" height="32" rx="7" fill="none" stroke="#8ea3b8" stroke-width="2.5"/><path d="M8 12h24M8 20h24" stroke="#8ea3b8" stroke-width="2.5" stroke-linecap="round"/></g>${nameText(t("host.sfu"), sfuPos.x, sfuPos.y + 32)}` : ""}
         ${rendered.join("")}
@@ -385,25 +385,29 @@
     function inviteRowHtml() {
       if (!hasRoom()) return "";
       return `<div class="b-row" role="group" aria-label="${esc(t("host.invite"))}">
-        <button class="b-btn ${H.invite ? "is-primary" : ""}" data-act="copy-invite" title="${esc(t("host.invite.copy"))}" aria-label="${esc(t("host.invite.copy"))}" ${H.invite ? "" : "disabled"}>${I("link", 19)}${cap("common.copy")}</button>
-        <button class="b-btn" data-act="rotate-invite" title="${esc(t("host.invite.rotate"))}" aria-label="${esc(t("host.invite.rotate"))}">${I("refresh", 18)}${cap("host.invite.rotate")}</button>
-        <button class="b-btn is-danger" data-act="revoke-invite" title="${esc(t("host.invite.revoke"))}" aria-label="${esc(t("host.invite.revoke"))}" ${H.invite ? "" : "disabled"}>${I("linkOff", 19)}${cap("host.invite.revoke")}</button>
+        <div class="b-row-group b-group-actions">
+          <button class="b-btn ${H.invite ? "is-primary" : ""}" data-act="copy-invite" title="${esc(t("host.invite.copy"))}" aria-label="${esc(t("host.invite.copy"))}" ${H.invite ? "" : "disabled"}>${I("link", 19)}${cap("common.copy")}</button>
+          <button class="b-btn" data-act="rotate-invite" title="${esc(t("host.invite.rotate"))}" aria-label="${esc(t("host.invite.rotate"))}">${I("refresh", 18)}${cap("host.invite.rotate")}</button>
+          <button class="b-btn is-danger" data-act="revoke-invite" title="${esc(t("host.invite.revoke"))}" aria-label="${esc(t("host.invite.revoke"))}" ${H.invite ? "" : "disabled"}>${I("linkOff", 19)}${cap("host.invite.revoke")}</button>
+        </div>
         <span class="b-divider"></span>
-        <span class="b-toggle" role="group" aria-label="${esc(t("host.policy"))}">
-          <button type="button" data-act="policy" data-v="open" class="${H.policy === "open" ? "is-selected" : ""}" title="${esc(t("host.policy.open"))} · ${esc(t("host.policy.openHint"))}" aria-label="${esc(t("host.policy.open"))}" aria-pressed="${H.policy === "open"}">${I("globe", 19)}${cap("host.policy.open")}</button>
-          <button type="button" data-act="policy" data-v="private" class="${H.policy === "private" ? "is-selected" : ""}" title="${esc(t("host.policy.private"))} · ${esc(t("host.policy.privateHint"))}" aria-label="${esc(t("host.policy.private"))}" aria-pressed="${H.policy === "private"}">${I("lock", 19)}${cap("host.policy.private")}</button>
-        </span>
-        ${H.policy === "private" ? `
-        <button class="b-btn ${H.hasPassword ? "is-on" : ""}" data-act="password-toggle" title="${esc(t(H.hasPassword ? "host.password.set" : "host.password.unset"))}" aria-label="${esc(t("host.password.setAction"))}" aria-expanded="${H.passwordOpen}">${I("key", 19)}${cap("join.password")}</button>
-        ${H.passwordOpen ? `
+        <div class="b-row-group">
+          <span class="b-toggle" role="group" aria-label="${esc(t("host.policy"))}">
+            <button type="button" data-act="policy" data-v="open" class="${H.policy === "open" ? "is-selected" : ""}" title="${esc(t("host.policy.open"))} · ${esc(t("host.policy.openHint"))}" aria-label="${esc(t("host.policy.open"))}" aria-pressed="${H.policy === "open"}">${I("globe", 19)}${cap("host.policy.open")}</button>
+            <button type="button" data-act="policy" data-v="private" class="${H.policy === "private" ? "is-selected" : ""}" title="${esc(t("host.policy.private"))} · ${esc(t("host.policy.privateHint"))}" aria-label="${esc(t("host.policy.private"))}" aria-pressed="${H.policy === "private"}">${I("lock", 19)}${cap("host.policy.private")}</button>
+          </span>
+          ${H.policy === "private" ? `
+          <button class="b-btn ${H.hasPassword ? "is-on" : ""}" data-act="password-toggle" title="${esc(t(H.hasPassword ? "host.password.set" : "host.password.unset"))}" aria-label="${esc(t("host.password.setAction"))}" aria-expanded="${H.passwordOpen}">${I("key", 19)}${cap("join.password")}</button>` : ""}
+        </div>
+        ${H.policy === "private" && H.passwordOpen ? `
+        <div class="b-row-group">
           <span class="b-input" style="flex:1;min-width:180px">
             ${I("key", 17)}
             <input type="password" data-password-input placeholder="····" aria-label="${esc(t("join.password"))}" value="${H.hasPassword ? "momo42" : ""}">
           </span>
           <button class="b-btn" data-act="password-save" title="${esc(t("host.password.setAction"))}" aria-label="${esc(t("common.save"))}">${I("check", 18)}</button>
           ${H.hasPassword ? `<button class="b-btn is-danger" data-act="password-remove" title="${esc(t("host.password.remove"))}" aria-label="${esc(t("host.password.remove"))}">${I("x", 18)}</button>` : ""}
-        ` : ""}
-        ` : ""}
+        </div>` : ""}
       </div>`;
     }
 
@@ -546,26 +550,28 @@
       <div class="b-deck">
         ${pawnDetailHtml()}
         <div class="b-row">
-          ${!D.vis && hasRoom() ? `<span class="b-field-cap">${esc(t("common.roomCode"))}</span>` : ""}
-          ${hasRoom() ? lcd(H.code) : ""}
-          ${hasRoom() ? (H.replacing ? `
-            <button class="b-btn" data-act="replace-confirm" title="${esc(t("host.roomReplaceConfirm"))}" aria-label="${esc(t("host.roomReplaceConfirm"))}">${I("check", 18)}</button>
-            <button class="b-btn" data-act="replace-cancel" title="${esc(t("common.cancel"))}" aria-label="${esc(t("common.cancel"))}">${I("x", 18)}</button>
-          ` : `
-            <button class="b-btn" data-act="replace-room" title="${esc(t("host.roomReplace"))}" aria-label="${esc(t("host.roomReplace"))}" ${H.scene === "starting" ? "disabled" : ""}>${I("refresh", 18)}${cap("host.roomReplace")}</button>
-          `) : ""}
-          ${phaseText}
+          <div class="b-row-group b-group-code">
+            ${!D.vis && hasRoom() ? `<span class="b-field-cap">${esc(t("common.roomCode"))}</span>` : ""}
+            ${hasRoom() ? lcd(H.code) : ""}
+            ${hasRoom() ? (H.replacing ? `
+              <button class="b-btn" data-act="replace-confirm" title="${esc(t("host.roomReplaceConfirm"))}" aria-label="${esc(t("host.roomReplaceConfirm"))}">${I("check", 18)}</button>
+              <button class="b-btn" data-act="replace-cancel" title="${esc(t("common.cancel"))}" aria-label="${esc(t("common.cancel"))}">${I("x", 18)}</button>
+            ` : `
+              <button class="b-btn" data-act="replace-room" title="${esc(t("host.roomReplace"))}" aria-label="${esc(t("host.roomReplace"))}" ${H.scene === "starting" ? "disabled" : ""}>${I("refresh", 18)}${cap("host.roomReplace")}</button>
+            `) : ""}
+          </div>
+          ${phaseText ? `<div class="b-row-group b-group-status">${phaseText}${H.noAudio && isLive() ? pill("speaker", "", t("host.noAudio")) : ""}${H.notice ?? ""}</div>` : H.noAudio && isLive() ? `<div class="b-row-group b-group-status">${pill("speaker", "", t("host.noAudio"))}</div>` : H.notice ? `<div class="b-row-group b-group-status">${H.notice}</div>` : ""}
           <span class="b-spacer"></span>
-          ${H.noAudio && isLive() ? pill("speaker", "", t("host.noAudio")) : ""}
-          ${H.notice ?? ""}
-          ${nameHtml()}
-          ${controlsHtml()}
+          <div class="b-row-group b-group-name">${nameHtml()}</div>
+          <div class="b-row-group b-group-actions">${controlsHtml()}</div>
         </div>
         ${inviteRowHtml()}
         ${qualityRowHtml()}
         <div class="b-row" role="group" aria-label="${esc(t("host.details"))}">
-          <button class="b-btn ${H.details ? "is-on" : ""}" data-act="details" title="${esc(t(H.details ? "host.details.hide" : "host.details"))}" aria-label="${esc(t("host.details"))}" aria-expanded="${H.details}">${I("gauge", 20)}${cap("host.details")}</button>
-          <button class="b-btn ${H.topology ? "is-on" : ""}" data-act="topology" title="${esc(t(H.topology ? "host.topology.hide" : "host.topology.show"))}" aria-label="${esc(t("host.topology"))}" aria-expanded="${H.topology}">${I("network", 20)}${cap("host.topology")}</button>
+          <div class="b-row-group b-group-actions">
+            <button class="b-btn ${H.details ? "is-on" : ""}" data-act="details" title="${esc(t(H.details ? "host.details.hide" : "host.details"))}" aria-label="${esc(t("host.details"))}" aria-expanded="${H.details}">${I("gauge", 20)}${cap("host.details")}</button>
+            <button class="b-btn ${H.topology ? "is-on" : ""}" data-act="topology" title="${esc(t(H.topology ? "host.topology.hide" : "host.topology.show"))}" aria-label="${esc(t("host.topology"))}" aria-expanded="${H.topology}">${I("network", 20)}${cap("host.topology")}</button>
+          </div>
         </div>
         ${H.details ? `<div class="b-row is-sub b-fade">${meterTag("arrowUp", t("stats.title"))}${meterStrip()}</div>` : ""}
         ${H.topology ? `<div class="b-row is-sub b-fade">${routePath({ viewers: list, hostLabel: H.name, flow: H.scene === "starting" })}</div>` : ""}
@@ -808,10 +814,13 @@
       <div class="b-deck">
         ${pawnDetailHtml(children)}
         <div class="b-row">
-          ${!D.vis ? `<span class="b-field-cap">${esc(t("common.roomCode"))}</span>` : ""}
-          ${lcd(D.roomCode())}
-          ${D.vis ? "" : `<span class="b-status-text">${esc(ledState[1])} · ${onlineCount} ${esc(t("common.online"))}</span>`}
+          <div class="b-row-group b-group-code">
+            ${!D.vis ? `<span class="b-field-cap">${esc(t("common.roomCode"))}</span>` : ""}
+            ${lcd(D.roomCode())}
+          </div>
+          ${D.vis ? "" : `<div class="b-row-group b-group-status"><span class="b-status-text">${esc(ledState[1])} · ${onlineCount} ${esc(t("common.online"))}</span></div>`}
           <span class="b-spacer"></span>
+          <div class="b-row-group b-group-name">
           ${V.editingName ? `
             <span class="b-input" style="min-width:140px"><input data-name-input value="${esc(V.name)}" maxlength="48" aria-label="${esc(t("host.name"))}"></span>
             <button class="b-btn" data-act="name-save" title="${esc(t("host.nameSave"))}" aria-label="${esc(t("host.nameSave"))}" style="min-width:44px;height:44px">${I("check", 16)}</button>
@@ -820,9 +829,12 @@
             <span class="b-name-tag" title="${esc(t("host.name"))}"><i></i>${esc(V.name)}</span>
             <button class="b-btn" data-act="name-edit" title="${esc(t("host.nameEdit"))}" aria-label="${esc(t("host.nameEdit"))}" style="min-width:44px;height:44px">${I("pencil", 15)}${cap("common.edit")}</button>
           `}
-          <button class="b-btn ${V.topology ? "is-on" : ""}" data-act="topology" title="${esc(t(V.topology ? "host.topology.hide" : "host.topology.show"))}" aria-label="${esc(t("host.topology"))}" aria-expanded="${V.topology}">${I("network", 19)}${cap("host.topology")}</button>
-          <button class="b-btn" data-act="reconnect" title="${esc(t("viewer.reconnect"))}" aria-label="${esc(t("viewer.reconnect"))}" ${["playing", "recovering", "failed", "hostoffline", "paused"].includes(V.scene) ? "" : "disabled"}>${I("refresh", 19)}${cap("viewer.reconnect")}</button>
-          <button class="b-btn ${V.details ? "is-on" : ""}" data-act="details" title="${esc(t(V.details ? "host.details.hide" : "host.details"))}" aria-label="${esc(t("host.details"))}" aria-expanded="${V.details}">${I("gauge", 19)}${cap("host.details")}</button>
+          </div>
+          <div class="b-row-group b-group-actions">
+            <button class="b-btn ${V.topology ? "is-on" : ""}" data-act="topology" title="${esc(t(V.topology ? "host.topology.hide" : "host.topology.show"))}" aria-label="${esc(t("host.topology"))}" aria-expanded="${V.topology}">${I("network", 19)}${cap("host.topology")}</button>
+            <button class="b-btn" data-act="reconnect" title="${esc(t("viewer.reconnect"))}" aria-label="${esc(t("viewer.reconnect"))}" ${["playing", "recovering", "failed", "hostoffline", "paused"].includes(V.scene) ? "" : "disabled"}>${I("refresh", 19)}${cap("viewer.reconnect")}</button>
+            <button class="b-btn ${V.details ? "is-on" : ""}" data-act="details" title="${esc(t(V.details ? "host.details.hide" : "host.details"))}" aria-label="${esc(t("host.details"))}" aria-expanded="${V.details}">${I("gauge", 19)}${cap("host.details")}</button>
+          </div>
         </div>
         ${V.details ? `<div class="b-row is-sub b-fade">${meterTag("arrowDown", t("stats.title"))}${meterStrip(V.route)}</div>` : ""}
         ${V.details && V.relay ? `<div class="b-row is-sub b-fade">${meterTag("arrowUp", t("stats.relay"))}${meterStrip()}</div>` : ""}

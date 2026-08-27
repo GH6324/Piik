@@ -62,3 +62,5 @@ shot b-viewer-tree.png    "$BASE/b-visual/viewer.html?scene=playing&viewers=5&to
 shot b-host-live-m.png    "$BASE/frame.html?src=b-visual/host.html%3Fscene%3Dlive%26viewers%3D3%26chrome%3D0%26theme%3Dlight" 430,932
 shot b-viewer-playing-m.png "$BASE/frame.html?src=b-visual/viewer.html%3Fscene%3Dplaying%26chrome%3D0%26theme%3Dlight" 430,932
 shot b-join-m.png         "$BASE/frame.html?src=b-visual/join.html%3Fscene%3Dform%26chrome%3D0%26theme%3Dlight" 430,932
+shot b-host-live-zh-m.png "$BASE/frame.html?src=b-visual/host.html%3Fscene%3Dlive%26viewers%3D4%26mode%3Dtext%26lang%3Dzh%26chrome%3D0%26theme%3Dlight" 430,932
+shot b-viewer-playing-zh-m.png "$BASE/frame.html?src=b-visual/viewer.html%3Fscene%3Dplaying%26viewers%3D4%26mode%3Dtext%26lang%3Dzh%26chrome%3D0%26theme%3Dlight" 430,932
