@@ -216,6 +216,15 @@ window.SCREENER_COPY = {
     "viewer.hint.notFound": "请确认房间号，或向分享者获取新的邀请链接。",
     "viewer.hint.invite": "请向分享者获取新的邀请链接。",
     "viewer.hint.generic": "请检查入口后重试。",
+
+    "mode.language": "界面语言",
+    "mode.zh": "中文",
+    "mode.en": "English",
+    "mode.vis": "纯视觉",
+
+    "story.room": "找到房间",
+    "story.link": "建立连接",
+    "story.show": "接收画面",
   },
 
   en: {
@@ -432,5 +441,14 @@ window.SCREENER_COPY = {
     "viewer.hint.notFound": "Check the room code, or ask the host for a new invite link.",
     "viewer.hint.invite": "Ask the host for a new invite link.",
     "viewer.hint.generic": "Check your entry point and try again.",
+
+    "mode.language": "Interface language",
+    "mode.zh": "中文",
+    "mode.en": "English",
+    "mode.vis": "Visual only",
+
+    "story.room": "Room found",
+    "story.link": "Linking up",
+    "story.show": "Receiving picture",
   },
 };
