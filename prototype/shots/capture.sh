@@ -54,6 +54,9 @@ shot b-host-crowded.png   "$BASE/b-visual/host.html?scene=live&viewers=20&chrome
 shot b-host-crowded-zh.png "$BASE/b-visual/host.html?scene=live&viewers=20&mode=text&lang=zh&chrome=0&theme=light" 1440,900
 shot b-viewer-crowded.png "$BASE/b-visual/viewer.html?scene=playing&viewers=19&chrome=0&theme=light" 1440,900
 shot b-host-pawn.png      "$BASE/b-visual/host.html?scene=live&viewers=4&pawn=%E8%98%91%E8%8F%87&mode=text&lang=zh&chrome=0&theme=light" 1440,900
+shot b-host-pawn-full.png "$BASE/b-visual/host.html?scene=live&viewers=4&pawn=%E8%98%91%E8%8F%87&metrics=1&mode=text&lang=zh&chrome=0&theme=light" 1440,1050
+shot b-host-tree.png      "$BASE/b-visual/host.html?scene=live&viewers=6&topology=1&mode=text&lang=zh&chrome=0&theme=light" 1440,1900
+shot b-viewer-tree.png    "$BASE/b-visual/viewer.html?scene=playing&viewers=5&topology=1&relay=1&mode=text&lang=zh&chrome=0&theme=light" 1440,1900
 
 # --- Direction B mobile ---
 shot b-host-live-m.png    "$BASE/frame.html?src=b-visual/host.html%3Fscene%3Dlive%26viewers%3D3%26chrome%3D0%26theme%3Dlight" 430,932

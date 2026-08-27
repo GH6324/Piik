@@ -73,26 +73,42 @@
     "天天", "Nora", "小雨", "CC", "南风", "阿栋", "米粒", "Zed",
   ];
 
-  const ROUTES = ["p2p", "p2p", "sfu", "p2p", "sfu", "p2p", "p2p", "sfu"];
-  const PEER_STATES = [
-    "connected",
-    "connected",
-    "connected",
-    "connecting",
-    "connected",
-    "routing",
-    "connected",
-    "connected",
+  // route: p2p | sfu; via: relay parent name (null = fed by host/sfu directly)
+  const TOPO = [
+    { route: "p2p", via: null, state: "connected" },
+    { route: "p2p", via: null, state: "connected" },
+    { route: "p2p", via: "阿茶", state: "connected" },
+    { route: "sfu", via: null, state: "connecting" },
+    { route: "sfu", via: null, state: "connected" },
+    { route: "p2p", via: "老白", state: "connected" },
+    { route: "p2p", via: null, state: "routing" },
+    { route: "sfu", via: null, state: "connected" },
+    { route: "p2p", via: "阿茶", state: "connected" },
+    { route: "p2p", via: null, state: "connected" },
+    { route: "sfu", via: null, state: "connected" },
+    { route: "p2p", via: "蘑菇", state: "connected" },
+    { route: "p2p", via: null, state: "connected" },
+    { route: "sfu", via: null, state: "connected" },
+    { route: "p2p", via: "老白", state: "connecting" },
+    { route: "p2p", via: null, state: "connected" },
+    { route: "sfu", via: null, state: "connected" },
+    { route: "p2p", via: null, state: "connected" },
+    { route: "p2p", via: "夜风", state: "connected" },
+    { route: "sfu", via: null, state: "connected" },
+    { route: "p2p", via: null, state: "connected" },
+    { route: "p2p", via: "阿茶", state: "connected" },
+    { route: "sfu", via: null, state: "connected" },
+    { route: "p2p", via: null, state: "connected" },
   ];
 
   function roster(count) {
     return NAMES.slice(0, Math.max(0, Math.min(count, NAMES.length))).map(
       (name, index) => ({
         name,
-        route: ROUTES[index % ROUTES.length],
-        state: PEER_STATES[index % PEER_STATES.length],
+        route: TOPO[index].route,
+        via: TOPO[index].via,
+        state: TOPO[index].state,
         hue: index,
-        children: index === 0 && count > 3 ? [NAMES[3]] : [],
       }),
     );
   }

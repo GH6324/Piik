@@ -24,7 +24,7 @@
   }
 
   function pawnSvg(color) {
-    return `<svg viewBox="0 0 40 48" aria-hidden="true"><circle cx="20" cy="12" r="8.5" fill="${color}"/><path d="M5 46c0-13 6.5-19 15-19s15 6 15 19Z" fill="${color}"/><circle cx="17" cy="11" r="1.6" fill="#22303e"/><circle cx="23" cy="11" r="1.6" fill="#22303e"/></svg>`;
+    return `<svg viewBox="0 0 40 48" width="40" height="48" aria-hidden="true"><circle cx="20" cy="12" r="8.5" fill="${color}"/><path d="M5 46c0-13 6.5-19 15-19s15 6 15 19Z" fill="${color}"/><circle cx="17" cy="11" r="1.6" fill="#22303e"/><circle cx="23" cy="11" r="1.6" fill="#22303e"/></svg>`;
   }
 
   function pawn(viewer, index, opts = {}) {
@@ -47,26 +47,43 @@
   }
 
   // Deterministic per-viewer fake metrics, varied from the name.
-  function viewerStats(name) {
+  function viewerMetrics(name) {
     const hash = [...name].reduce((sum, c) => sum + c.charCodeAt(0), 0);
-    return [
-      ["expand", D.STATS.resolution, t("stats.resolution")],
-      ["wave", `${60 - (hash % 2) * 5} fps`, t("stats.fps")],
-      ["gauge", `${(5.2 + (hash % 18) / 10).toFixed(1)} Mbps`, t("stats.bitrate")],
-      ["drop", `${(0.2 + (hash % 9) / 10).toFixed(1)}%`, t("stats.loss")],
-      ["clock", `${18 + (hash % 21)} ms`, t("stats.rtt")],
-    ];
+    return {
+      primary: [
+        ["expand", D.STATS.resolution, t("stats.resolution")],
+        ["wave", `${60 - (hash % 2) * 5} fps`, t("stats.fps")],
+        ["gauge", `${(5.2 + (hash % 18) / 10).toFixed(1)} Mbps`, t("stats.bitrate")],
+        ["drop", `${(0.2 + (hash % 9) / 10).toFixed(1)}%`, t("stats.loss")],
+      ],
+      secondary: [
+        ["clock", `${18 + (hash % 21)} ms`, t("stats.rtt")],
+        ["cpu", D.STATS.codec, t("stats.codec")],
+        ["wave", `${(1 + (hash % 30) / 10).toFixed(1)} ms`, t("stats.jitter")],
+        ["drop", `${hash % 3}`, t("stats.dropped")],
+        ["cpu", hash % 2 ? "H264HW" : "OpenH264", t("stats.encoder")],
+        ["speaker", "128 kbps", t("stats.audio")],
+      ],
+    };
   }
 
-  function detailRow({ color, name, tag, route, stats }) {
+  // Metric cells: glyph + value in visual mode; glyph + value + label in text modes.
+  function metricCells(stats) {
+    return stats.map(([icon, value, label]) => `
+      <span class="b-meter-cell" title="${esc(label)}">${I(icon, 16)}${D.vis
+        ? `<b>${esc(value)}</b>`
+        : `<span class="b-meter-text"><b>${esc(value)}</b><small>${esc(label)}</small></span>`}</span>`).join("");
+  }
+
+  function detailRow({ color, name, tag, route, metrics, expanded }) {
     return `<div class="b-row is-sub b-fade b-pawn-detail" role="group" aria-label="${esc(name)}">
       <span class="b-pawn-mini">${pawnSvg(color)}</span>
       <span class="b-pawn-detail-name">${esc(name)}</span>
       ${tag ? `<span class="b-meter-cell">${I(tag.icon, 16)}<b>${esc(tag.text)}</b></span>` : ""}
       ${route ? `<span class="b-meter-cell" title="${esc(t(route === "sfu" ? "state.route.sfu" : "state.route.p2p"))}">${routeGlyph(route)}<b>${route === "sfu" ? "SFU" : "P2P"}</b></span>` : ""}
-      <div class="b-meter">
-        ${stats.map(([icon, value, label]) => `<span class="b-meter-cell" title="${esc(label)}">${I(icon, 16)}<b>${esc(value)}</b></span>`).join("")}
-      </div>
+      <div class="b-meter">${metricCells(metrics.primary)}</div>
+      <button type="button" class="b-btn b-metrics-more ${expanded ? "is-open" : ""}" data-act="metrics-more" title="${esc(t("stats.more"))}" aria-label="${esc(t("stats.more"))}" aria-expanded="${expanded}">${I("chevron", 15)}${cap("stats.more")}</button>
+      ${expanded ? `<div class="b-meter b-fade">${metricCells(metrics.secondary)}</div>` : ""}
       <button type="button" class="b-pawn-detail-close" data-act="pawn-close" title="${esc(t("common.close"))}" aria-label="${esc(t("common.close"))}">${I("x", 16)}</button>
     </div>`;
   }
@@ -128,8 +145,7 @@
     ];
     return `<div class="b-meter" role="group" aria-label="${esc(t("stats.title"))}">
       ${route ? `<span class="b-meter-cell" title="${esc(t(route === "sfu" ? "state.route.sfu" : "state.route.p2p"))}">${routeGlyph(route)}<b>${route === "sfu" ? "SFU" : "P2P"}</b></span>` : ""}
-      ${cells.map(([icon, value, label]) => `
-        <span class="b-meter-cell" title="${esc(label)}">${I(icon, 17)}<b>${esc(value)}</b></span>`).join("")}
+      ${metricCells(cells)}
     </div>`;
   }
 
@@ -138,48 +154,92 @@
   }
 
   function routePath({ viewers, self, hostLabel, flow }) {
-    const column = [];
-    if (self) column.push({ name: self.name, route: self.route, state: "connected", isSelf: true });
-    for (const v of viewers) column.push({ ...v, isSelf: false });
-    const children = self?.children ?? [];
-    const spacing = column.length > 10 ? 34 : 40;
-    const w = children.length ? 736 : 640;
-    const h = Math.max(150, 60 + column.length * spacing);
-    const midY = h / 2;
-    const hostX = 30;
-    const colX = children.length ? 560 : 570;
-    const childX = 668;
-    const sfuX = 300;
-    const lines = [];
+    // Build the real tree: host roots direct P2P viewers and the SFU node;
+    // relay children hang off their parent viewer.
     const nodes = [];
+    if (self) nodes.push({ name: self.name, route: self.route, state: "connected", via: self.via ?? null, isSelf: true });
+    for (const v of viewers) nodes.push({ ...v, isSelf: false });
+    const relayChildren = self?.children ?? [];
+    relayChildren.forEach((name, i) =>
+      nodes.push({ name, route: "p2p", state: "connected", via: self.name, isSelf: false, relayIndex: i }));
+
+    const SFU = Symbol("sfu");
+    const childrenOf = new Map();
+    const add = (parent, node) => {
+      const list = childrenOf.get(parent) ?? [];
+      list.push(node);
+      childrenOf.set(parent, list);
+    };
+    for (const n of nodes) {
+      if (n.via && nodes.some((p) => p.name === n.via)) add(n.via, n);
+      else if (n.route === "sfu") add(SFU, n);
+      else add(null, n);
+    }
+    const hasSfu = nodes.some((n) => n.route === "sfu");
+
+    const spacing = nodes.length > 10 ? 32 : 42;
+    let row = 0;
+    const pos = new Map();
+    const X = [34, 272, 510];
+    function layout(node, depth) {
+      const kids = childrenOf.get(node.name) ?? [];
+      let y;
+      if (!kids.length) {
+        y = 40 + row * spacing;
+        row += 1;
+      } else {
+        kids.forEach((k) => layout(k, depth + 1));
+        y = kids.reduce((sum, k) => sum + pos.get(k).y, 0) / kids.length;
+      }
+      pos.set(node, { x: X[Math.min(depth + 1, X.length - 1)], y });
+    }
+    (childrenOf.get(null) ?? []).forEach((k) => layout(k, 0));
+    let sfuPos = null;
+    if (hasSfu) {
+      const sfuKids = childrenOf.get(SFU) ?? [];
+      sfuKids.forEach((k) => layout(k, 1));
+      sfuPos = {
+        x: X[1],
+        y: sfuKids.reduce((sum, k) => sum + pos.get(k).y, 0) / sfuKids.length,
+      };
+    }
+    const rootYs = [...(childrenOf.get(null) ?? []).map((k) => pos.get(k).y), ...(sfuPos ? [sfuPos.y] : [])];
+    const hostY = rootYs.reduce((a, b) => a + b, 0) / rootYs.length;
+    const h = Math.max(140, row * spacing + 52);
+    const hostPos = { x: X[0], y: hostY };
+
+    const edges = [];
+    const rendered = [];
     const nameText = (name, x, y) =>
       D.vis ? "" : `<text x="${x}" y="${y}" text-anchor="middle">${esc(name)}</text>`;
-    column.forEach((node, i) => {
-      const y = 40 + i * spacing;
-      const color = node.isSelf ? YOU : PAWN_COLORS[(i - (self ? 1 : 0)) % PAWN_COLORS.length];
-      const ok = node.state === "connected";
-      const stroke = node.route === "sfu" ? "#8ea3b8" : ok ? "#2fa66a" : "#d98e04";
-      const fromX = node.route === "sfu" ? sfuX + 20 : hostX + 24;
-      lines.push(`<path d="M ${fromX} ${midY} Q ${(fromX + colX) / 2} ${midY + (y - midY) * 0.7}, ${colX - 24} ${y}" fill="none" stroke="${stroke}" stroke-width="2.5" class="${flow ? "flow" : ""}"/>`);
-      nodes.push(`<g transform="translate(${colX - 14}, ${y - 15}) scale(0.72)"><title>${esc(node.name)}${node.isSelf ? ` · ${esc(t("common.you"))}` : ""}</title>${pawnSvg(color)}${node.isSelf ? `<circle cx="20" cy="24" r="22" fill="none" stroke="${YOU}" stroke-width="3"/>` : ""}</g>${nameText(node.isSelf ? `${node.name}` : node.name, colX + 4, y + 26)}`);
-    });
-    children.forEach((name, i) => {
-      const y = 40 + i * 34;
-      lines.push(`<path d="M ${colX + 12} 40 Q ${(colX + childX) / 2} ${40 + (y - 40) * 0.5}, ${childX - 16} ${y}" fill="none" stroke="#2fa66a" stroke-width="2.5" class="${flow ? "flow" : ""}"/>`);
-      nodes.push(`<g transform="translate(${childX - 12}, ${y - 12}) scale(0.5)"><title>${esc(name)}</title>${pawnSvg(PAWN_COLORS[(i + 4) % PAWN_COLORS.length])}</g>${nameText(name, childX + 2, y + 22)}`);
-    });
-    const hasSfu = column.some((n) => n.route === "sfu");
-    if (hasSfu) {
-      lines.push(`<path d="M ${hostX + 24} ${midY} L ${sfuX - 20} ${midY}" fill="none" stroke="#8ea3b8" stroke-width="2.5" class="${flow ? "flow" : ""}"/>`);
+    const edge = (from, to, color) =>
+      `<path d="M ${from.x + 20} ${from.y} Q ${(from.x + to.x) / 2} ${from.y + (to.y - from.y) * 0.55}, ${to.x - 18} ${to.y}" fill="none" stroke="${color}" stroke-width="2.5" class="${flow ? "flow" : ""}"/>`;
+
+    for (const n of nodes) {
+      const p = pos.get(n);
+      const parent = n.via && pos.get(nodes.find((x) => x.name === n.via))
+        ? pos.get(nodes.find((x) => x.name === n.via))
+        : n.route === "sfu" && sfuPos
+          ? sfuPos
+          : hostPos;
+      const ok = n.state === "connected";
+      edges.push(edge(parent, p, n.route === "sfu" ? "#8ea3b8" : ok ? "#2fa66a" : "#d98e04"));
+      const index = n.isSelf ? -1 : n.relayIndex !== undefined ? n.relayIndex + 4 : nodes.indexOf(n) - (self ? 1 : 0);
+      const scale = n.relayIndex !== undefined ? 0.52 : 0.72;
+      rendered.push(`<g transform="translate(${p.x - 14}, ${p.y - 15}) scale(${scale})"><title>${esc(n.name)}${n.isSelf ? ` · ${esc(t("common.you"))}` : ""}</title>${pawnSvg(n.isSelf ? YOU : PAWN_COLORS[((index % 8) + 8) % 8])}${n.isSelf ? `<circle cx="20" cy="24" r="22" fill="none" stroke="${YOU}" stroke-width="3"/>` : ""}</g>${nameText(n.name, p.x + 4, p.y + (n.relayIndex !== undefined ? 20 : 26))}`);
     }
+    if (sfuPos) {
+      edges.push(edge(hostPos, sfuPos, "#8ea3b8"));
+    }
+
     return `<div class="b-route" role="img" aria-label="${esc(t("host.topology"))}">
-      <svg viewBox="0 0 ${w} ${h}">
+      <svg viewBox="0 0 640 ${h}">
         <title>${esc(t("host.topology"))}</title>
-        ${lines.join("")}
-        <g transform="translate(${hostX - 4}, ${midY - 20}) scale(0.85)">${pawnSvg("#e4572e")}<title>${esc(hostLabel)} · ${esc(t("common.host"))}</title></g>
-        ${nameText(hostLabel, hostX + 14, midY + 30)}
-        ${hasSfu ? `<g transform="translate(${sfuX - 20}, ${midY - 16})"><title>${esc(t("host.sfu"))}</title><rect width="40" height="32" rx="7" fill="none" stroke="#8ea3b8" stroke-width="2.5"/><path d="M8 12h24M8 20h24" stroke="#8ea3b8" stroke-width="2.5" stroke-linecap="round"/></g>${nameText(t("host.sfu"), sfuX, midY + 32)}` : ""}
-        ${nodes.join("")}
+        ${edges.join("")}
+        <g transform="translate(${hostPos.x - 4}, ${hostPos.y - 20}) scale(0.85)">${pawnSvg("#e4572e")}<title>${esc(hostLabel)} · ${esc(t("common.host"))}</title></g>
+        ${nameText(hostLabel, hostPos.x + 14, hostPos.y + 30)}
+        ${sfuPos ? `<g transform="translate(${sfuPos.x - 20}, ${sfuPos.y - 16})"><title>${esc(t("host.sfu"))}</title><rect width="40" height="32" rx="7" fill="none" stroke="#8ea3b8" stroke-width="2.5"/><path d="M8 12h24M8 20h24" stroke="#8ea3b8" stroke-width="2.5" stroke-linecap="round"/></g>${nameText(t("host.sfu"), sfuPos.x, sfuPos.y + 32)}` : ""}
+        ${rendered.join("")}
       </svg>
     </div>`;
   }
@@ -262,6 +322,7 @@
       noAudio: D.boolParam("noaudio"),
       editingName: false,
       selectedPawn: D.param("pawn", null),
+      metricsMore: D.boolParam("metrics"),
       preset: 1,
       notice: null,
       timer: null,
@@ -530,7 +591,8 @@
         name: v.name,
         route: v.state === "connected" ? v.route : null,
         tag: v.state === "connected" ? null : { icon: "loader", text: t("state.peer.connecting") },
-        stats: viewerStats(v.name),
+        metrics: viewerMetrics(v.name),
+        expanded: H.metricsMore,
       });
     }
 
@@ -583,6 +645,7 @@
         render();
       }
       if (act === "pawn-close") { H.selectedPawn = null; render(); }
+      if (act === "metrics-more") { H.metricsMore = !H.metricsMore; render(); }
       if (act === "advanced") { H.advanced = !H.advanced; render(); }
       if (act === "details") { H.details = !H.details; render(); }
       if (act === "topology") { H.topology = !H.topology; render(); }
@@ -640,6 +703,7 @@
       topology: D.boolParam("topology"),
       editingName: false,
       selectedPawn: D.param("pawn", null),
+      metricsMore: D.boolParam("metrics"),
       timer: null,
     };
     let prevScene = null;
@@ -793,7 +857,8 @@
           color: YOU,
           name: `${V.name} · ${t("common.you")}`,
           route: V.route,
-          stats: viewerStats(V.name),
+          metrics: viewerMetrics(V.name),
+          expanded: V.metricsMore,
         });
       }
       if (V.selectedPawn && children.includes(V.selectedPawn)) {
@@ -802,7 +867,8 @@
           color: PAWN_COLORS[(index + 4) % PAWN_COLORS.length],
           name: V.selectedPawn,
           tag: { icon: "arrowUp", text: t("stats.downstream") },
-          stats: viewerStats(V.selectedPawn),
+          metrics: viewerMetrics(V.selectedPawn),
+          expanded: V.metricsMore,
         });
       }
       return "";
@@ -826,6 +892,7 @@
         render();
       }
       if (act === "pawn-close") { V.selectedPawn = null; render(); }
+      if (act === "metrics-more") { V.metricsMore = !V.metricsMore; render(); }
       if (act === "topology") { V.topology = !V.topology; render(); }
       if (act === "details") { V.details = !V.details; render(); }
       if (act === "copy-room") { if (await copyText(D.roomCode())) flashCheck(target); }
