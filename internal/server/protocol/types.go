@@ -168,18 +168,33 @@ func (v *RoutePolicy) UnmarshalJSON(data []byte) error {
 
 // RuntimeCapabilities mirrors runtimeCapabilitiesSchema.
 type RuntimeCapabilities struct {
+	Sfu           bool `json:"sfu"`
 	NatPrediction bool `json:"natPrediction"`
 }
 
 // UnmarshalJSON implements json.Unmarshaler.
 func (v *RuntimeCapabilities) UnmarshalJSON(data []byte) error {
 	*v = RuntimeCapabilities{}
-	type raw RuntimeCapabilities
-	present, err := decodeObject(data, (*raw)(v))
-	if err != nil {
+	var present fields
+	if err := json.Unmarshal(data, &present); err != nil {
 		return err
 	}
-	return present.require("natPrediction")
+	if present == nil {
+		return errors.New("runtime capabilities must be an object")
+	}
+	if err := present.optional("sfu", "natPrediction"); err != nil {
+		return err
+	}
+	for key, target := range map[string]*bool{
+		"sfu": &v.Sfu, "natPrediction": &v.NatPrediction,
+	} {
+		if value, ok := present[key]; ok {
+			if err := json.Unmarshal(value, target); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 // ---------------------------------------------------------------------------

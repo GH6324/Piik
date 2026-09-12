@@ -1,6 +1,6 @@
 # Current Status
 
-Last updated: 2026-09-10
+Last updated: 2026-09-12
 
 This is the compact execution/deployment index. Product modules own behavior,
 [verification status](./verification-status.md) owns unresolved physical limits,
@@ -8,9 +8,9 @@ and Git/PRs own completed history.
 
 ## Accepted Release Contract
 
-- Browser/server v23, Native control v9 and capture v7 form one private contract.
-  The release requires matching Web/App/Server artifacts and a reload of old
-  active pages at cutover.
+- Browser/server v23, Native control v9 and capture v7 form the current contract.
+  The coordinated brand/protocol cutover requires matching Web/App/Server
+  artifacts and a reload of incompatible active pages.
 - Hosted Server defaults to SQLite schema 2. Room authority has no inactivity
   expiry; explicit replacement/deletion or grant rotation/revocation ends the
   corresponding authority. Explicit memory mode and App Local end rooms at
@@ -24,23 +24,40 @@ and Git/PRs own completed history.
 ## Deployment
 
 Source, package identity, GitHub repository and local worktree paths use Piik.
-The strict wire labels and stored keys move together at the coordinated
-[brand cutover](./research/piik-rename-plan.md). Directly compatible, accessible
-settings are transferred once; unavailable settings start fresh. Runtime code
-keeps only the Piik contract.
+Runtime code keeps only the Piik wire labels and stored keys. The coordinated
+private cutover requires matching App/Server/Web packages; unavailable old
+Browser credentials cannot be reconstructed from stored digests.
 The immutable release descriptor, runtime `REVISION` and operator deployment
-record own exact identity and postflight results. The
-[schema cutover](./deployment.md#permanent-room-schema-cutover) preserved existing
-room authority and Browser credential keys. Old active pages reload at the
-signaling v23 boundary.
+record own exact identity and postflight results. Old active pages reload at
+the signaling v23 boundary.
 
 The existing deployment uses one Go process for Web, room authority/signaling,
 Binding-only STUN on UDP 3478/3479/3480 and optional SFU on UDP 7882. nginx owns
 HTTPS; external LiveKit/coturn services remain disabled. Participants, routes and
 media remain process-only. This private service is not a public demonstration.
 
-[TODO](./todo.md) owns rename acceptance, distribution and ablation work.
-The public website is a later phase.
+The separate US [public demo](https://demo.piik.tv) is deployed with open site
+entry, persistent room authority and P2P-only media. Caddy owns HTTPS, and the
+standard systemd service runs the verified Server test candidate. Public DNS,
+HTTPS, runtime assets, all three STUN listeners and a bounded browser P2P
+sharing/stop check passed; the browser check used synthetic video on one network.
+The operator record owns exact identity and postflight evidence.
+
+[TODO](./todo.md) owns remaining publication work. The owner accepted the public
+introduction and authorized launch on 2026-09-12. The source repository is public,
+main protection is active, and GitHub Pages is configured for `piik.tv`. The
+private service remains a separate deployment. Release descriptors and GitHub
+deployment records identify published artifacts and website revisions.
+
+The Windows test archive passed complete anonymous Gitee download, checksum,
+App entry/presentation and update-link acceptance. Bounded two-build
+interoperability also passed. The complete publisher rehearsal previously hit
+the private repository's Actions artifact quota and must complete on the public
+repository before package publication. GitHub/Gitee release comparison, mirror
+publishing and PR-sourced release notes are implemented under
+[versioning](./reference/versioning.md). [Verification status](./verification-status.md#candidate-evidence-boundary)
+owns the remaining physical limits; shared lessons live in
+[engineering](./reference/engineering.md).
 
 ## Media Evidence And Limits
 

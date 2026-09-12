@@ -23,7 +23,7 @@ leave `main` alone until the next material phase. Only a user-authorized P0/P1
 emergency may use a separate PR, and that PR must still contain one coherent
 fix.
 
-1. Create one short-lived branch/worktree from exact canonical `main`; use `feat/`, `fix/`, `docs/`, `refactor/`, `test/`, `chore/`, or `spike/` followed by a short description.
+1. Create one short-lived branch/worktree from exact canonical `main`, following the [branch naming convention](#commit-pr-and-branch-names).
 2. Update only the single durable owner for changed semantics and any materially changed current snapshot. If semantics remain disputed, record a hold and stop dependent work.
 3. Implement and run repository hygiene, `npm run check`, the relevant browser/network gates, and review in proportion to the whole acceptance boundary.
 4. Keep accepted truth checkpoints and dependent candidates on branches until the phase is complete. Rebase or rebuild a retained candidate from exact `main` only when starting a new phase, preserving main's owning truth on conflicts and transplanting only approved scoped code, tests, and new facts.
@@ -37,19 +37,23 @@ the repository. Exact deployment identity belongs to the immutable release
 descriptor, runtime `REVISION`, and deployment record. Preserve separate commits
 only when they carry independently useful history.
 
-Direct commits to `main` are reserved for an explicit user-approved exception. Never force-push shared branches or rewrite shared history without explicit approval.
+Update `main` through PRs only; branch checkpoints and generated release metadata
+do not bypass that boundary. Never force-push shared branches or rewrite shared
+history without explicit approval.
 
 For deployment work, a routine application-only release verifies a new immutable artifact, switches to it atomically, and guarantees the pre-cutover application release only through bounded health and postflight checks; it has no retention contract afterward and is not a maintained backup. Define recovery only for the infrastructure, configuration, secrets, persistent state, or irreversible surfaces the task actually touches, before changing them.
 
-Do not change `SIGNALING_PROTOCOL` for compatible internal, UI, routing, or
-release work. A wire change makes existing pages stale and forces an active
-Browser Host to reload, which ends its capture. Bump it only for an actually
-incompatible message contract whose atomic cutover and capture interruption are
-explicitly accepted.
+Use the [version/compatibility policy](./docs/reference/versioning.md) to classify
+release changes. In today's private contract an incompatible signaling cutover
+forces old pages to reload and ends Browser capture; include that interruption
+in the accepted cutover. Compatible UI/internal work does not require a wire bump.
 
 Clean up worktrees and branches only after semantic review and integration are complete and the normal merged-head, open-reference, clean-tree, and non-following link checks pass. Never merge an old branch wholesale after a newer truth checkpoint.
 
 ## Research Standard
+
+The [engineering reference](./docs/reference/engineering.md) owns module and
+interface discipline, including the post-change ablation pass.
 
 Follow the [naming convention](./docs/reference/naming.md) for product copy,
 commands, packages and code ownership. Keep display names separate from stable
@@ -64,6 +68,10 @@ protocol identifiers; use normal language-specific identifier conventions.
   study-only unless a separate distribution decision accepts their obligations.
 
 ## Verification Entrypoints
+
+Every retained test must be collected by a documented verification entry point.
+Confirm runner inclusion when adding or moving a test; a file's presence alone
+does not establish coverage.
 
 - `npm run check` owns deterministic Web type-check, unit, and build acceptance.
 - `npm run check:client` owns Go formatting, unit tests, vet, three-platform
@@ -80,15 +88,43 @@ protocol identifiers; use normal language-specific identifier conventions.
   identities; do not run network tests with a changing temporary executable
   path. Keep browser profiles isolated and consider the active firewall when
   diagnosing connection failures rather than changing global firewall rules.
-- Server and three-platform Client candidates run only from an explicit manual
-  workflow dispatch with `client_checks=true`. Ordinary `main` pushes validate
-  source without running the expensive packaging matrix.
-  Publishing a tag or GitHub Release remains an explicit release decision rather
-  than a side effect of every merge.
+- CI, versioning and release automation belong to complete, accepted squash
+  merges into `main`; ordinary branch pushes and PRs stay quiet. The
+  [versioning policy](./docs/reference/versioning.md) owns version selection,
+  publication and activation state. Package the merged SHA without writing
+  version-record commits back to `main`.
+
+## Commit, PR And Branch Names
+
+Use [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/):
+`type(scope): outcome`. Scope is optional. Use `feat` for new behavior, `fix`
+for repairs, or `docs`, `refactor`, `test`, `build`, `ci`, and `chore` for their
+named purpose. Keep the outcome short and concrete; English is the default,
+and a Chinese explanation may follow in the body.
+
+The PR title names the complete phase and becomes its single squash commit on
+`main`, for example `fix(app): restore sharing after a source change`. Working
+commits should follow the same form where useful; no history rewrite is needed
+just to rename commits that will be squashed. Add `!` before the colon for a
+breaking change, such as `feat(protocol)!: replace the join handshake`, and
+explain its effect in the body. The final squash title and body supply release
+intent; the [versioning policy](./docs/reference/versioning.md) owns version
+selection and publication behavior.
+
+Name branches `<type>/<short-kebab-case-description>`, using the same types;
+reserve `spike/` for experiments. No issue number is required. 中文说明：PR 标题
+与最终 squash 提交使用上述格式；分支用英文短名，破坏性变更标记 `!` 并说明影响。
 
 ## Pull Request Scope
 
 A pull request should explain the problem, the chosen design, verification performed, user-visible or operational effects, and remaining risks.
+
+Before an integration PR is accepted, fill its exact `## Release notes` section
+with concise public copy in Chinese and English: user-visible changes, fixes and
+required upgrade actions. Use `###` for subsections. Review this text as product
+copy; it is published automatically from the squash commit, without PR discussion
+or verification logs. The [release-note policy](./docs/reference/versioning.md#release-notes)
+owns aggregation and preview. Do not add a changelog file or release-note archive.
 
 Durable semantic or current-snapshot changes must update their single owner in the same integration boundary. Ordinary implementation and bug fixes may be complete with code plus focused evidence.
 

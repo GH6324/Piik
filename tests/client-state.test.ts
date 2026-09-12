@@ -23,6 +23,7 @@ import {
 import { setCopy } from "../src/client/ui/copy.ts";
 import {
   clearHostRoom,
+  clientLaunchURL,
   getStableClientId,
   isValidRoomId,
   parseAppRoute,
@@ -87,14 +88,14 @@ describe("browser-local display name", () => {
   it("localizes text defaults and uses visual emoji identities", () => {
     setCopy({ lang: "zh", vis: false });
     expect(defaultViewerDisplayName(false)).toBe("观众");
-    expect(defaultHostDisplayName(false)).toBe("分享者");
+    expect(defaultHostDisplayName(false)).toBe("房主");
 
     setCopy({ lang: "en", vis: false });
     expect(defaultViewerDisplayName(false)).toBe("Viewer");
     expect(defaultHostDisplayName(false)).toBe("Host");
 
     expect(defaultViewerDisplayName(true)).toBe("👤");
-    expect(defaultHostDisplayName(true)).toBe("👑");
+    expect(defaultHostDisplayName(true)).toBe("📺");
   });
 
   it("stores only the canonical preference and falls back when cleared", () => {
@@ -954,6 +955,7 @@ describe("room codes", () => {
     expect(takeClientLaunchBootstrap()).toEqual({
       accessToken: "a".repeat(32),
       launchedByClient: true,
+      presentation: null,
     });
     expect(replaceState).toHaveBeenCalledWith(
       null,
@@ -965,7 +967,49 @@ describe("room codes", () => {
     expect(takeClientLaunchBootstrap()).toEqual({
       accessToken: null,
       launchedByClient: true,
+      presentation: null,
     });
+  });
+
+  it.each([
+    { lang: "zh", vis: false, theme: "light" },
+    { lang: "en", vis: true, theme: null },
+  ] as const)("carries launcher presentation across origins: %j", (presentation) => {
+    const target = new URL(clientLaunchURL(
+      "https://site.example/?room=9527#piik-client=1&client-access=a%2Bb%26c%3Fd%3De&retained=yes",
+      presentation,
+    ));
+    const replaceState = vi.fn();
+    vi.stubGlobal("window", {
+      location: target,
+      history: { state: null, replaceState },
+    });
+
+    expect(target.origin).toBe("https://site.example");
+    expect(takeClientLaunchBootstrap()).toEqual({
+      accessToken: "a+b&c?d=e",
+      launchedByClient: true,
+      presentation,
+    });
+    expect(replaceState).toHaveBeenCalledWith(null, "", "/?room=9527#retained=yes");
+  });
+
+  it.each([
+    "piik-lang=zh&piik-mode=text&piik-theme=light",
+    "piik-client=1&piik-lang=other&piik-mode=text&piik-theme=light",
+    "piik-client=1&piik-lang=zh&piik-mode=other&piik-theme=light",
+    "piik-client=1&piik-lang=zh&piik-mode=text&piik-theme=other",
+  ])("ignores invalid presentation without losing App access: %s", (fragment) => {
+    const replaceState = vi.fn();
+    vi.stubGlobal("window", {
+      location: { hash: `#${fragment}&client-access=${"a".repeat(32)}`, pathname: "/", search: "" },
+      history: { state: null, replaceState },
+    });
+    expect(takeClientLaunchBootstrap()).toMatchObject({
+      accessToken: "a".repeat(32),
+      presentation: null,
+    });
+    expect(replaceState).toHaveBeenCalledWith(null, "", "/");
   });
 });
 

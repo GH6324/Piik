@@ -1,6 +1,6 @@
 # Verification Status
 
-Last updated: 2026-09-09
+Last updated: 2026-09-11
 
 This file owns physical evidence limits that change how the product may be
 described. [Status](./status.md) owns the execution/deployment index.
@@ -11,8 +11,7 @@ implementation and obsolete package history.
 
 Windows App and Browser are the owner's primary acceptance targets. Current
 Go packages embed their Web assets and do not run a Node backend. The current
-contract is Browser/server v22, Native control v9 and capture v7; pre-port
-App/Node package checks do not prove this package.
+contract is Browser/server v23, Native control v9 and capture v7.
 
 Bounded current checks cover:
 
@@ -40,6 +39,29 @@ population success percentage or identify which candidate won without a trace.
 Neither a statistical NAT campaign nor exhaustive Auto hardware benchmarking
 is required to close this phase. Investigate further only from a new failure
 or a measured improvement worth its implementation and maintenance cost.
+
+## Candidate Evidence Boundary
+
+The 2026-09-11 functional test acceptance used two genuine Windows App packages
+and matching Server source/Web builds under the same private contract. Both App/Site version
+directions delivered decoded 1080p H264 from an isolated native test window.
+Replacing the Server process preserved SQLite Host authority, private code-entry
+policy, Viewer grant/password authorization and App configuration. Already-open
+Host/Viewer pages reauthenticated without reloading and completed subsequent
+sharing. Exact measured identity belongs to the package descriptors and local
+structured acceptance result; Git retains the preparation history.
+
+This is bounded single-machine Windows evidence. The local Server executables
+were built for Windows from the matching source; this run did not execute the
+Linux release archives. Process replacement used a forced stop on Windows and
+does not promise uninterrupted media. It does not cover game/audio endurance,
+storage faults, the wider device/network matrix or Go race detection.
+
+The full publisher dry run with genuine matching target artifacts remains
+unverified. The native CI candidate run passed validation and Server packaging
+but hit the Actions artifact-storage quota before App jobs could start. Native
+macOS tooling remains necessary. [TODO](./todo.md) owns the remaining publisher
+rehearsal and owner acceptance; the broader platform deferrals below still apply.
 
 ## Remaining Device And Network Acceptance
 

@@ -1,6 +1,5 @@
-// Package app ports src/server/app.ts: the HTTP composition, the startup and
-// shutdown lifecycle, and the request router. access.go ports
-// src/server/access-session.ts and static.go the sirv frontend handler.
+// Package app composes the shared HTTP service, site access, embedded assets,
+// media listeners, and startup/shutdown lifecycle for Hosted Server and App.
 //
 // # Locking
 //
@@ -207,13 +206,6 @@ func newRoomStore(options Options) (*room.Store, error) {
 		Database:          database,
 	})
 }
-
-// Handler is the composed router, exposed so a host process can mount it.
-func (s *Server) Handler() http.Handler { return s }
-
-// Store is PiikServer.roomStore. The signaling server's mutex guards it, so
-// callers outside that lock may only read it while no request is in flight.
-func (s *Server) Store() *room.Store { return s.store }
 
 // Listen binds application sockets before recovering room authority and accepting traffic.
 func (s *Server) Listen(ctx context.Context) (int, error) {

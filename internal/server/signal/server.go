@@ -1,17 +1,14 @@
-// Package signal ports src/server/signaling.ts (SignalingServer) and
-// src/server/hybrid-media-router.ts (HybridMediaRouter) from baseline
-// b20fd88. server.go is the signaling server's lifecycle, upgrade ladder,
-// HTTP-facing room mutations and message dispatch; session.go the
-// per-connection state; presence.go the viewer presence, host status and
-// room termination paths; router*.go the media router.
+// Package signal owns authenticated signaling and room/media effects. It
+// serializes session and presence changes, HTTP-facing room mutations, and
+// execution of the synchronous route controller's decisions.
 //
 // # Locking
 //
 // Server.mu is the one lock of the effect layer: it guards every field of
 // the server and the router, the room.Store and the route controllers. Every
 // handler, timer callback and goroutine takes it; it is released only around
-// I/O (the password KDF and media transport), after which exactly the guard
-// the TypeScript ran after its await is re-run. Router methods and hooks are
+// I/O (the password KDF and media transport), after which current session,
+// room and operation identities must be revalidated. Router methods and hooks are
 // called with mu held and never lock.
 package signal
 
@@ -35,9 +32,8 @@ import (
 	"github.com/TNTcraftHIM/Piik/internal/server/sfu"
 )
 
-// Ceilings and option defaults ported from src/server/signaling.ts. The first
-// five are its module constants; the last four are the `??` defaults of
-// SignalingOptions.
+// Connection admission, queue and timeout bounds limit the signaling resources
+// a stalled or unauthenticated peer can retain.
 const (
 	// maxBufferedSignalBytes is MAX_BUFFERED_SIGNAL_BYTES: once a connection's
 	// unsent queue passes it the peer is not draining and the connection is
@@ -60,16 +56,15 @@ const (
 	defaultHeartbeatIntervalMs     = 30_000
 )
 
-// SfuFallback is the embedded media runtime the media router
-// may use. A zero timeout means the TypeScript default.
+// SfuFallback configures embedded media; a zero prepare timeout selects the
+// router's default.
 type SfuFallback struct {
 	Media            sfu.Runtime
 	Admission        *sfu.Admission
 	PrepareTimeoutMs int64
 }
 
-// Options is SignalingOptions. Every zero value is the TypeScript `undefined`
-// and takes the same default.
+// Options supplies room authority, runtime capabilities and signaling limits.
 type Options struct {
 	Store                     *room.Store
 	EndpointMediaCopyCapacity int
@@ -336,7 +331,6 @@ func InviteURL(publicBaseURL *url.URL, roomID, viewerGrant string) string {
 // ServeHTTP is the "upgrade" listener: the TS rejection ladder, then the
 // accept (D4).
 func (s *Server) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
-	// TS: new URL(request.url ?? "/", "http://localhost") throws. net/http
 	// accepts a scheme-relative target such as "//[" as a plain path, so
 	// the WHATWG authority parse is re-run on the raw target.
 	if _, err := url.Parse(request.RequestURI); err != nil {
@@ -381,7 +375,6 @@ func (s *Server) ServeHTTP(writer http.ResponseWriter, request *http.Request) {
 		InsecureSkipVerify: true,
 		CompressionMode:    websocket.CompressionDisabled,
 		OnPongReceived: func(context.Context, []byte) {
-			// TS: socket.on("pong", () => { state.alive = true })
 			s.mu.Lock()
 			if sess != nil {
 				sess.alive = true
@@ -1073,7 +1066,7 @@ func (s *Server) settleHostShare(roomID, sessionID string, request authRequest) 
 		}
 	}
 	if currentGeneration != shareGeneration || share.routePolicy == nil {
-		routePolicy := configuredRoutePolicy(request.routePolicy, s.natPredictionEnabled)
+		routePolicy := s.configuredRoutePolicy(request.routePolicy)
 		share.routePolicy = &routePolicy
 		for _, viewer := range s.store.GetConnectedViewers(roomID) {
 			message := protocol.RoutePolicyMessage{
@@ -1127,12 +1120,13 @@ func (s *Server) routePolicyOf(roomID string) protocol.RoutePolicy {
 	if policy := s.shares[roomID].routePolicy; policy != nil {
 		return *policy
 	}
-	return protocol.DefaultRoutePolicy
+	return s.configuredRoutePolicy(protocol.DefaultRoutePolicy)
 }
 
-// configuredRoutePolicy ports configuredRoutePolicy.
-func configuredRoutePolicy(policy protocol.RoutePolicy, natPredictionEnabled bool) protocol.RoutePolicy {
-	policy.NatPrediction = natPredictionEnabled && policy.NatPrediction
+// configuredRoutePolicy restricts share preferences to the services this runtime owns.
+func (s *Server) configuredRoutePolicy(policy protocol.RoutePolicy) protocol.RoutePolicy {
+	policy.PeerOnly = s.router.sfu == nil || policy.PeerOnly
+	policy.NatPrediction = s.natPredictionEnabled && policy.NatPrediction
 	return policy
 }
 
@@ -1245,7 +1239,7 @@ func (s *Server) handleAuthenticatedMessage(sess *session, authenticated *authen
 		s.sendViewerPresence(authenticated.roomID)
 	case protocol.SetSharingPausedMessage:
 		if authenticated.role != protocol.RoleHost {
-			s.sendError(sess, "FORBIDDEN", "只有当前分享者可以暂停分享")
+			s.sendError(sess, "FORBIDDEN", "只有当前房主可以暂停分享")
 			return
 		}
 		connectedHost, hasHost := s.store.GetConnectedHost(authenticated.roomID)
@@ -1267,7 +1261,7 @@ func (s *Server) handleAuthenticatedMessage(sess *session, authenticated *authen
 		s.broadcastHostStatus(authenticated.roomID, true, m.Paused)
 	case protocol.StopSharingMessage:
 		if authenticated.role != protocol.RoleHost {
-			s.sendError(sess, "FORBIDDEN", "只有当前分享者可以停止分享")
+			s.sendError(sess, "FORBIDDEN", "只有当前房主可以停止分享")
 			return
 		}
 		if authenticated.shareGeneration == "" ||

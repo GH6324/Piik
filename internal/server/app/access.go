@@ -17,20 +17,17 @@ import (
 	"github.com/TNTcraftHIM/Piik/internal/server/protocol"
 )
 
-// Ported from src/server/access-session.ts.
 const (
 	defaultSessionTTLSeconds = 24 * 60 * 60
 	cookieVersion            = "v1"
 )
 
 var (
-	// TS: /^\d+$/ over the expiry segment.
-	accessExpiresPattern = regexp.MustCompile(`^[0-9]+$`)
-	// TS: /^[A-Za-z0-9_-]{43}$/ — base64url of a 32-byte HMAC, unpadded.
+	accessExpiresPattern   = regexp.MustCompile(`^[0-9]+$`)
 	accessSignaturePattern = regexp.MustCompile(`^[A-Za-z0-9_-]{43}$`)
 )
 
-// siteAccessOptions mirrors SiteAccessOptions in access-session.ts.
+// siteAccessOptions configures cookie lifetime, signing and transport policy.
 type siteAccessOptions struct {
 	// Password empty means site access is not required.
 	Password string
@@ -38,7 +35,7 @@ type siteAccessOptions struct {
 	Secure bool
 	// Now returns Unix milliseconds; nil uses the wall clock.
 	Now func() int64
-	// TTLSeconds of 0 stands for TS's absent `ttlSeconds`, i.e. 24 hours.
+	// TTLSeconds of 0 selects the default 24-hour lifetime.
 	TTLSeconds int
 }
 
@@ -75,7 +72,6 @@ func newSiteAccess(options siteAccessOptions) (*siteAccessGate, error) {
 	if ttlSeconds == 0 {
 		ttlSeconds = defaultSessionTTLSeconds
 	}
-	// TS: !Number.isSafeInteger(ttlSeconds) || ttlSeconds <= 0.
 	if ttlSeconds < 0 || int64(ttlSeconds) > protocol.MaxSafeInteger {
 		return nil, errors.New("Access session TTL must be a positive integer")
 	}
@@ -111,9 +107,6 @@ func (a *siteAccessGate) isAuthenticated(cookieHeader string) bool {
 	if value == "" {
 		return false
 	}
-	// TS: const [version, expiresText, signature, ...extra] = value.split(".")
-	// Fewer than three segments fail the two regexes below (an absent segment
-	// is tested as ""), more than three fill `extra`.
 	segments := strings.Split(value, ".")
 	if len(segments) != 3 ||
 		segments[0] != cookieVersion ||
@@ -121,8 +114,7 @@ func (a *siteAccessGate) isAuthenticated(cookieHeader string) bool {
 		!accessSignaturePattern.MatchString(segments[2]) {
 		return false
 	}
-	// TS: Number(expiresText) then Number.isSafeInteger. The segment is all
-	// digits, so only an out-of-range value can fail here.
+	// Expiry is already decimal; parsing still enforces integer bounds.
 	expiresAt, err := strconv.ParseInt(segments[1], 10, 64)
 	if err != nil || expiresAt > protocol.MaxSafeInteger {
 		return false

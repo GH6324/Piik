@@ -25,7 +25,7 @@ export const VIEWER_QUALITY_EVIDENCE_EXPIRY_MS = 5_000;
 export const PERSISTENT_NATIVE_EDGE_DEGRADED_WINDOWS = 3;
 export const MAX_DISPLAY_NAME_CODE_POINTS = 24;
 export const DEFAULT_VIEWER_DISPLAY_NAME = "观众";
-export const DEFAULT_HOST_DISPLAY_NAME_PREFIX = "分享者";
+export const DEFAULT_HOST_DISPLAY_NAME_PREFIX = "房主";
 export const MIN_VIEWER_PASSWORD_LENGTH = 1;
 export const MAX_VIEWER_PASSWORD_LENGTH = 64;
 
@@ -217,11 +217,10 @@ export const DEFAULT_ROUTE_POLICY = {
   natPrediction: false,
 } as const satisfies RoutePolicy;
 
-export const runtimeCapabilitiesSchema = z
-  .object({
-    natPrediction: z.boolean(),
-  })
-  .strict();
+export const runtimeCapabilitiesSchema = z.object({
+  sfu: z.boolean().default(false),
+  natPrediction: z.boolean().default(false),
+});
 export type RuntimeCapabilities = z.infer<typeof runtimeCapabilitiesSchema>;
 
 export const relayDownstreamEdgesSchema = z

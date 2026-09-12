@@ -1,16 +1,11 @@
-import { say } from "../ui/copy";
-import {
-  PERSISTENT_NATIVE_EDGE_DEGRADED_WINDOWS,
-  type IceConfig,
-  type SignalPayload,
-} from "../../shared/protocol";
+import type { CopyKey } from "../ui/copy";
+import type { IceConfig, SignalPayload } from "../../shared/protocol";
 import { createOpaqueId } from "../lib/opaque-id";
 import type { BrowserEncodingPool, BrowserPooledSender } from "../media/browser-encoding-pool";
 import { BrowserEncodingOutput, encodedStreams, supportsBrowserEncoding } from "../media/browser-encoding-output";
 import { debugError, debugEvent } from "../lib/debug";
 import { debugTrack, observeDebugConnection } from "../lib/debug-webrtc";
 import {
-  audioSenderParameterWarning,
   applyVideoCaptureProfile,
   cloneSenderVideoTrack,
   configureScreenAudioSender,
@@ -18,7 +13,6 @@ import {
   needsStartupVideoProfile,
   resolveScreenAudioQuality,
   screenAudioQualityEqual,
-  senderParameterWarning,
   STARTUP_VIDEO_ENCODED_FRAMES,
   startupVideoProfile,
   videoQualitySettingsEqual,
@@ -26,11 +20,7 @@ import {
   type QualityProfile,
   type ScreenAudioQuality,
 } from "../media/quality";
-import {
-  EMPTY_METRICS,
-  type PeerSnapshot,
-  type QualityWarningKind,
-} from "../types";
+import { EMPTY_METRICS, type PeerSnapshot } from "../types";
 import {
   captureMetrics,
   collectConnectionMetrics,
@@ -96,15 +86,11 @@ export class HostPeer {
   private statsTimer: number | null = null;
   private statsInFlight = false;
   private statsSamplingBlocked = false;
-  private videoSenderWarning: string | null = null;
-  private audioSenderWarning: string | null = null;
   private appliedVideoProfile: QualityProfile | null = null;
   private appliedAudioQuality: ScreenAudioQuality | null = null;
   private appliedAudioSenderParameters:
     | AudioSenderParameterReadback
     | null = null;
-  private limitationReason: string | null = null;
-  private limitationSamples = 0;
   private disposed = false;
   private profileRevision = 0;
   private negotiationEpoch = 0;
@@ -164,8 +150,6 @@ export class HostPeer {
       error: null,
       senderParameters: null,
       audioSenderParameters: null,
-      qualityWarning: null,
-      qualityWarningKind: null,
     };
     this.bindConnectionEvents();
   }
@@ -173,7 +157,7 @@ export class HostPeer {
   async start(): Promise<boolean> {
     const videoTrack = this.senderVideoTrack;
     if (!videoTrack) {
-      this.setError(new Error(say("host.capture.noSource")), say("host.err.createConnection"));
+      this.setError(null, "host.capture.noSource");
       return false;
     }
     const audioTrack = this.stream.getAudioTracks()[0] ?? null;
@@ -182,7 +166,7 @@ export class HostPeer {
       streams: [this.stream],
     });
     if (!applyVideoCodecPreference(videoTransceiver, this.videoCodec)) {
-      this.setError(null, say("host.err.codecUnsupported"));
+      this.setError(null, "host.err.codecUnsupported");
       return false;
     }
     this.videoSender = videoTransceiver.sender;
@@ -278,7 +262,7 @@ export class HostPeer {
           if (videoRollback.status === "rejected") {
             this.dispose();
           }
-          this.setError(error, say("host.fail.source"));
+          this.setError(error, "host.fail.source");
           return false;
         }
 
@@ -296,8 +280,6 @@ export class HostPeer {
         this.startupVideoProfilePending = needsStartupVideoProfile(
           this.desiredProfile,
         );
-        this.limitationReason = null;
-        this.limitationSamples = 0;
         this.snapshot = { ...this.snapshot, metrics: { ...EMPTY_METRICS } };
         await this.configureSender(videoSender, audioSender, {
           profile: startupVideoProfile(this.desiredProfile),
@@ -415,8 +397,6 @@ export class HostPeer {
       }
       if (updateVideo) {
         this.statsAccumulator = createStatsAccumulator();
-        this.limitationReason = null;
-        this.limitationSamples = 0;
       }
       this.snapshot = { ...this.snapshot, error: null };
       this.emit();
@@ -441,7 +421,7 @@ export class HostPeer {
         this.pendingCandidates.push(payload.candidate);
       }
     } catch (error) {
-      this.setError(error, say("host.err.createConnection"));
+      this.setError(error, "host.err.createConnection");
     }
   }
 
@@ -484,7 +464,7 @@ export class HostPeer {
         ),
       );
     } catch (error) {
-      this.setError(error, say("host.err.createConnection"));
+      this.setError(error, "host.err.createConnection");
     }
   }
 
@@ -658,7 +638,7 @@ export class HostPeer {
           },
         })
       ) {
-        throw new Error(say("host.err.serverError"));
+        throw new Error("signal send rejected");
       }
       this.snapshot = { ...this.snapshot, error: null };
       this.emit();
@@ -670,7 +650,7 @@ export class HostPeer {
       if (this.ordinaryAnswerEpoch === epoch) {
         this.ordinaryAnswerEpoch = null;
       }
-      this.setError(error, say("host.err.createConnection"));
+      this.setError(error, "host.err.createConnection");
       return false;
     }
   }
@@ -779,12 +759,7 @@ export class HostPeer {
         void this.updateProfile(this.desiredProfile);
       }
       const deliveredMetrics = this.pooledVideo?.metrics(metrics) ?? metrics;
-      this.updateLimitationWarning(deliveredMetrics.qualityLimitationReason);
-      this.snapshot = {
-        ...this.snapshot,
-        metrics: deliveredMetrics,
-        ...this.qualityWarningSnapshot(),
-      };
+      this.snapshot = { ...this.snapshot, metrics: deliveredMetrics };
       this.emit();
     } catch {
       // Stats are observational and must never disrupt a healthy media path.
@@ -793,9 +768,9 @@ export class HostPeer {
     }
   }
 
-  private setError(error: unknown, fallback: string): void {
-    debugError("webrtc", "sender-failed", error, { connectionId: this.connectionId, reason: fallback });
-    this.snapshot = { ...this.snapshot, error: fallback };
+  private setError(error: unknown, key: CopyKey): void {
+    debugError("webrtc", "sender-failed", error, { connectionId: this.connectionId, reason: key });
+    this.snapshot = { ...this.snapshot, error: { key } };
     this.emit();
   }
 
@@ -817,19 +792,15 @@ export class HostPeer {
     const { profile, profileRevision } = mutation;
     let senderParameters = this.snapshot.senderParameters ?? null;
     let audioSenderParameters = this.appliedAudioSenderParameters;
-    let videoWarning = this.videoSenderWarning;
-    let audioWarning = this.audioSenderWarning;
     let videoSucceeded = true;
     let audioSucceeded = true;
 
     if (mutation.video) {
       try {
         senderParameters = await configureVideoSender(sender, profile, this.pooledVideo?.carrierScale());
-        videoWarning = senderParameterWarning(senderParameters);
       } catch (error) {
         videoSucceeded = false;
         debugError("webrtc", "sender-parameters-failed", error, { connectionId: this.connectionId, profileRevision, requested: profile });
-        videoWarning = say("host.err.applySender");
       }
     }
 
@@ -843,7 +814,7 @@ export class HostPeer {
 
     if (mutation.video && videoSucceeded && this.pooledVideo) {
       try { await this.pooledVideo.updateProfile(this.desiredProfile); }
-      catch { videoSucceeded = false; videoWarning = say("host.err.applySender"); }
+      catch { videoSucceeded = false; }
     }
 
     if (mutation.audio && audioSender) {
@@ -853,15 +824,12 @@ export class HostPeer {
             audioSender,
             profile.screenAudioQuality,
           );
-          audioWarning = audioSenderParameterWarning(audioSenderParameters);
         } catch (error) {
           audioSucceeded = false;
           debugError("webrtc", "audio-parameters-failed", error, { connectionId: this.connectionId, profileRevision });
-          audioWarning = say("host.err.applyAudioSender");
         }
       } else {
         audioSenderParameters = null;
-        audioWarning = null;
       }
     }
 
@@ -873,8 +841,6 @@ export class HostPeer {
     ) {
       return false;
     }
-    this.videoSenderWarning = videoWarning;
-    this.audioSenderWarning = audioWarning;
     debugEvent("webrtc", "sender-parameters", { connectionId: this.connectionId, profileRevision,
       requested: profile, videoSucceeded, audioSucceeded, senderParameters, audioSenderParameters });
     if (mutation.video && videoSucceeded) {
@@ -890,76 +856,9 @@ export class HostPeer {
       ...this.snapshot,
       senderParameters,
       audioSenderParameters: this.appliedAudioSenderParameters,
-      ...this.qualityWarningSnapshot(),
     };
     this.emit();
     return videoSucceeded && audioSucceeded;
-  }
-
-  private combinedSenderWarning(): string | null {
-    const warnings = [
-      this.videoSenderWarning,
-      this.audioSenderWarning,
-    ].filter((warning): warning is string => warning !== null);
-    return warnings.length > 0 ? warnings.join("；") : null;
-  }
-
-  private updateLimitationWarning(reason: string | null): void {
-    if (!reason || reason === "none") {
-      this.limitationReason = null;
-      this.limitationSamples = 0;
-      return;
-    }
-    if (reason === this.limitationReason) {
-      this.limitationSamples += 1;
-      return;
-    }
-    this.limitationReason = reason;
-    this.limitationSamples = 1;
-  }
-
-  private persistentLimitationWarning(): string | null {
-    if (
-      this.limitationSamples < PERSISTENT_NATIVE_EDGE_DEGRADED_WINDOWS
-    ) {
-      return null;
-    }
-    switch (this.limitationReason) {
-      case "bandwidth":
-        return say("host.warn.bandwidth");
-      case "cpu":
-        return say("host.warn.encoding");
-      case "other":
-        return say("host.warn.other");
-      default:
-        return this.limitationReason
-          ? say("host.warn.unclassified")
-          : null;
-    }
-  }
-
-  private qualityWarningSnapshot(): {
-    qualityWarning: string | null;
-    qualityWarningKind: QualityWarningKind | null;
-  } {
-    const configurationWarning = this.combinedSenderWarning();
-    if (configurationWarning) {
-      return {
-        qualityWarning: configurationWarning,
-        qualityWarningKind: "configuration",
-      };
-    }
-    const qualityWarning = this.persistentLimitationWarning();
-    if (!qualityWarning) {
-      return { qualityWarning: null, qualityWarningKind: null };
-    }
-    return {
-      qualityWarning,
-      qualityWarningKind:
-        this.limitationReason === "bandwidth" || this.limitationReason === "cpu"
-          ? this.limitationReason
-          : "other",
-    };
   }
 
   private emit(): void {

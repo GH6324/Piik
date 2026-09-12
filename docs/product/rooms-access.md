@@ -35,8 +35,10 @@ the storage decision; implementation detail belongs in code and tests.
 
 Three independent authorities exist:
 
-1. **Site access.** Production requires an independent
-   `SITE_ACCESS_PASSWORD`. Successful entry creates a stateless, HttpOnly,
+1. **Site access.** `SITE_ACCESS_PASSWORD` is optional in every environment,
+   including production. Unset or empty makes site access immediate without a
+   cookie; room ownership and Viewer admission still apply. When configured,
+   successful password entry creates a stateless, HttpOnly,
    `SameSite=Strict` cookie with a 24-hour rolling idle lifetime. An already
    authorized page renews it through the site-access check while it remains
    active. It authorizes room creation, Host role, and code-only Viewer
@@ -89,6 +91,9 @@ code-only attempts and does not silently revoke invitations.
   and ends every room when its local authority exits. It persists only its Site
   choice and optional Local site-access password, not rooms or media state. A
   blank password leaves that local site open.
+
+Persistence evidence, limits and the earlier cross-restart evaluation live in
+[cross-restart recovery research](../research/cross-restart-room-recovery.md).
 
 The App opens its own localhost Host page with the configured password, when
 present, in a fragment. The page removes the fragment and uses the existing

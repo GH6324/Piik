@@ -1,12 +1,11 @@
 import type { NatTraversalPath } from "../shared/nat-candidate";
+import type { MediaFailure } from "./ui/media-failure";
 
 export type SignalConnectionState =
   "connecting" | "connected" | "reconnecting" | "offline";
 
 export type MediaPath = "direct" | "unknown";
 export type NativeEdgeQualityState = "unknown" | "healthy" | "degraded";
-export type QualityWarningKind =
-  "bandwidth" | "cpu" | "other" | "configuration";
 
 export interface ConnectionMetrics {
   sampleTimestampMs: number | null;
@@ -87,13 +86,12 @@ export interface PeerSnapshot {
   connectionState: RTCPeerConnectionState;
   iceConnectionState: RTCIceConnectionState;
   metrics: ConnectionMetrics;
-  error: string | null;
+  /** Keyed failure fact; the UI resolves the copy so it follows the language. */
+  error: MediaFailure | null;
   senderParameters?:
     import("./media/quality").VideoSenderParameterReadback | null;
   audioSenderParameters?:
     import("./media/quality").AudioSenderParameterReadback | null;
-  qualityWarning?: string | null;
-  qualityWarningKind?: QualityWarningKind | null;
 }
 
 export const EMPTY_METRICS: ConnectionMetrics = {

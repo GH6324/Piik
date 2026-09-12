@@ -1,79 +1,104 @@
-<img src="./public/favicon.svg" width="64" height="64" alt="Piik 小电视标志">
+<p align="center"><img src="./public/favicon.svg" width="64" height="64" alt="Piik 吉祥物"></p>
+<h1 align="center">Piik</h1>
+<p align="center"><strong>来，看点<br>好康的。</strong><br>私密屏幕共享，邀请最多 20 位朋友观看。</p>
+<p align="center">
+  <a href="https://piik.tv/?lang=zh-CN">官网</a> ·
+  <a href="https://github.com/TNTcraftHIM/Piik/releases">下载</a> ·
+  <a href="https://gitee.com/TNTcraftHIM/Piik/releases">Gitee 镜像</a> ·
+  <a href="https://demo.piik.tv">在线演示</a> ·
+  <a href="./docs/README.md">文档</a>
+</p>
+<p align="center">
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-36564f?style=flat-square" alt="MIT 许可"></a>
+  <img src="https://img.shields.io/badge/viewers-up_to_20-36564f?style=flat-square" alt="最多 20 位观众">
+  <img src="https://img.shields.io/badge/media-P2P_first-36564f?style=flat-square" alt="优先使用 P2P 连接">
+</p>
+<p align="center"><a href="./README.md">English</a> · 简体中文</p>
 
-# Piik
+Piik 是一个免费开源的屏幕共享工具，适合游戏围观、一起看电影、展示绘画或分享照片。
+选择画面，把邀请链接发给朋友，对方用浏览器即可观看。
 
-[English](./README.md) | 简体中文
+<details open>
+<summary>客厅小剧场 · 展开 / 收起动画</summary>
 
-分享你的屏幕，叫上朋友一起看。
+<p align="center"><img src="./site/assets/living-room.svg" width="720" height="472" alt="戴着小金冠的房主分享 RPG 游戏、绘画、照片和动画电影，朋友们坐在沙发上观看。"></p>
 
-Piik 是一个私密屏幕分享工具：一位房主，最多 20 位受邀好友。
-朋友用浏览器就能观看，无须安装。
+</details>
 
-```mermaid
-flowchart LR
-  Browser[浏览器] --> Host[开房分享]
-  App[Piik App] --> Host
-  Host -->|邀请链接| Friends[好友用浏览器观看]
+[功能](#功能) · [开始使用](#开始使用) · [自行部署](#自行部署) · [参与贡献](#参与贡献)
+
+## 功能
+
+- **观看无须安装。** 朋友通过邀请链接，用电脑或手机浏览器加入。
+- **用客户端或已有 Piik 站点分享。** 支持屏幕、窗口和浏览器标签页；可选来源与音频能力取决于平台。
+- **优先直接连接。** 画面优先在设备之间传输（P2P），自建站点可启用媒体转发（SFU）自动兜底。
+- **房间由你管理。** 支持邀请链接、房间号和可选的房间密码，一位房主、最多 20 位观众。
+- **灵活的观看方式。** 支持深浅主题、播放控制、画中画和连接拓扑查看。
+- **一个程序就能建站。** 网页、房间管理和可选的媒体转发打包在同一服务端程序中。
+
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./docs/assets/room-zh-dark.png">
+    <img src="./docs/assets/room-zh-light.png" width="860" alt="Piik 房间：共享的游戏画面、播放控件和坐在沙发上的朋友，房主戴着小金冠。">
+  </picture><br>
+  <sub>界面预览 · 示例房间与生成的游戏画面</sub>
+</p>
+
+## 开始使用
+
+**观看分享：** 打开朋友发来的邀请链接。画面没有自动播放时，点击**播放**即可。
+
+**分享画面：**
+
+| 从这里开始 | 需要做什么 |
+| --- | --- |
+| [体验在线 Demo](https://demo.piik.tv) | 在电脑浏览器打开，开始分享。 |
+| [下载 Piik App](https://piik.tv/?lang=zh-CN#download) | 解压并启动客户端，选择**公网邀请**，点击**进入 Piik**，创建临时房间。 |
+| 使用已有 Piik 站点 | 打开朋友或管理员提供的地址。[自行部署](./docs/operations/self-hosting.zh-CN.md)属于进阶操作。 |
+
+<p align="center"><img src="./docs/assets/quickstart.svg" width="640" alt="选择画面，发送邀请，一起观看。"></p>
+
+1. 点击**开始分享**，选择要分享的画面和声音。
+2. 点击**复制邀请链接**，发给朋友。分享期间保持标签页打开。
+
+Piik 默认使用图示按钮；点击顶部的**中**可显示文字。
+客户端提供本地房间、临时公网邀请和连接已有站点三种模式，分享期间需保持 App 运行。
+
+下载以 **`piik-app`** 开头的压缩包，再按文件名中的平台标识选择：
+
+| 文件名包含 | 适用平台 |
+| --- | --- |
+| `windows-amd64` | Windows x64 |
+| `darwin-arm64` | Apple 芯片；原生采集需 macOS 13 及以上 |
+| `linux-amd64` | Linux x64 |
+
+[**完整使用教程 →**](./docs/guide/getting-started.zh-CN.md) · [**打开在线演示 →**](https://demo.piik.tv)
+
+浏览器采集需要 HTTPS 或 `localhost`。目前主要测试 Windows 客户端和桌面浏览器分享。
+macOS 和 Linux 客户端尚未经过实机测试，欢迎有设备的朋友试用并[反馈问题](https://github.com/TNTcraftHIM/Piik/issues)。
+客户端公网邀请和演示站使用纯 P2P 连接，
+在受限网络下可能无法连通。
+
+## 自行部署
+
+Piik Server 是一个内置网页界面的独立程序。
+下载 Linux x64 服务端程序包，解压后运行：
+
+```sh
+./piik-server
 ```
 
-## 去朋友的房间
+打开 `http://localhost:8787` 即可在本机试用。对外提供服务时，
+再配置域名、HTTPS 反向代理和 STUN 地址。房间数据保存在 SQLite 中。
 
-1. 打开朋友发来的邀请链接。
-2. 如果浏览器提示，点击播放。声音和全屏由视频控件控制。
+[**部署自己的站点 →**](./docs/operations/self-hosting.zh-CN.md) · [配置参考](./docs/reference/configuration.md) · [从源码运行](./docs/README.md#run-from-source)
 
-只有房间号？打开同一个 Piik 站点，选择 **加入房间**。
-站点访问权限和房间密码设置仍然适用。
+## 参与贡献
 
-## 用浏览器分享
-
-1. 打开你们使用的 Piik 站点，按提示输入站点密码。
-2. 点击 **开始分享**，选择屏幕、窗口或标签页，并检查声音开关。
-3. 把房间邀请链接发给朋友，保持分享标签页打开。
-
-浏览器采集需要 HTTPS 或 `localhost`；可选来源和声音支持取决于浏览器与平台。
-界面提供中文、英文和图示模式，以及明暗主题。
-
-## 用 App 自己开房
-
-拿到对应平台的 App 程序包后：
-
-1. 完整解压，保留可执行文件旁的 `runtime` 目录。
-2. Windows 打开 `piik-app.exe`，macOS 打开 `Piik App.app`，
-   Linux 运行 `./piik-app`。
-3. 选择模式和分享来源，发出邀请。分享期间保持 App 运行。
-
-| 模式 | 适合什么情况 |
-| --- | --- |
-| **本地房间** | 与同一局域网内的好友分享，可设置站点访问密码。 |
-| **公网邀请** | 生成本次 App 运行期间有效的临时邀请链接；媒体仍走 P2P。 |
-| **连接站点** | 使用已有 Piik 站点，并在同一浏览器界面使用 App 的采集与媒体能力。 |
-
-App 会打开系统浏览器。程序包包含 Go 应用和采集、临时链接辅助程序，
-运行时无须安装 Node.js、npm 或 Go。Linux 原生采集使用系统的 Portal、PipeWire
-和 GStreamer，平台细节见 [App 指南](./cmd/piik-app/README.md)。
-
-临时公网链接使用 Cloudflare Quick Tunnel，不保证持续可用。
-媒体需要可用的 UDP 路径；网络限制、浏览器或系统挂起都可能中断分享。
-当前以 Windows App 和浏览器为验收重点，macOS/Linux 原生采集的实机验证另行进行。
-候选版本与发布准备情况见 [当前状态](./docs/status.md)。
-
-## 自建站点或参与开发
-
-Server 是一个内嵌 Web 界面的 Go 可执行文件，负责房间信令、STUN 和可选的内置
-SFU 后备路径。搭建自己的站点，请看 [自托管指南](./docs/operations/self-hosting.md)。
-
-源码运行、测试和架构从 [文档地图](./docs/README.md) 开始；
-[贡献指南](./CONTRIBUTING.md) 说明协作流程。
-
-## 遇到问题？
-
-反馈时附上版本、系统与浏览器、预期结果和复现步骤。
-App 可用 `--debug` 启动后按 `D` 导出本地报告；浏览器网址加上 `?debug=1`
-后（放在 `#` 之前），可点击顶部下载按钮。分享前请检查报告内容，详见
-[诊断与导出](./docs/reference/configuration.md#diagnostics)。
-连接不上时，也可以查看 [Chromium WebRTC 常见问题](./cmd/piik-app/README.md#chromium-webrtc-connections)。
+欢迎提交问题、改进文档或参与开发。
+修改前请阅读[贡献指南](./CONTRIBUTING.md)，也可以从
+[项目目录说明](./docs/reference/engineering.md#repository-layout)了解代码结构。
 
 ## 许可
 
-Piik 自有代码采用 [MIT 许可](./LICENSE)，提供 [中文参考译文](./LICENSE.zh-CN.md)。
-第三方组件保留各自的许可与声明，详见 [许可说明](./licenses/README.md)。
+Piik 自有代码采用 [MIT 许可](./LICENSE)，依赖保留各自的[许可与声明](./licenses/README.md)。

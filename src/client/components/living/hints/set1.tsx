@@ -21,10 +21,9 @@ import {
   TV_EDGE,
   TV_SCREEN,
   WARN,
-  YOU,
   rmBlock,
 } from "../Comic";
-import type { HintScene, Set1Kind } from "./index";
+import type { HintScene, Set1Kind } from "../../../ui/visual-kinds";
 
 function SourceWindow({ x, y, alternate = false }: { x: number; y: number; alternate?: boolean }) {
   return <>
@@ -37,17 +36,17 @@ function SourceWindow({ x, y, alternate = false }: { x: number; y: number; alter
 }
 
 /* hint-share-start: [dark TV + pawn reaching toward it] → [TV bright, mint
-   glow, rays + Star]. The after panel replays one power-on beat per loop
+   glow, rays + Star]. The after panel demonstrates one power-on beat
    (CRT screen-on → rays → star → pawn hop), then rests lit ~60%. */
 const SceneShareStart: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-hs-reach{transform-box:fill-box;transform-origin:50% 100%;animation:vlsHsReach 3.2s ease-in-out infinite}
-.vls-hs-intent{animation:vlsHsIntent 3.2s ease-in-out infinite}
-.vls-hs-crt{transform-box:fill-box;transform-origin:center;animation:vlsHsCrt 3.2s ease-out infinite}
-.vls-hs-rays{animation:vlsHsRays 3.2s ease-out infinite}
-.vls-hs-star{transform-box:fill-box;transform-origin:center;animation:vlsHsStar 3.2s cubic-bezier(.3,1.5,.5,1) infinite}
-.vls-hs-hop{animation:vlsHsHop 3.2s cubic-bezier(.3,1.5,.5,1) infinite}
+.vls-hs-reach{transform-box:fill-box;transform-origin:50% 100%;animation:vlsHsReach var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-hs-intent{animation:vlsHsIntent var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-hs-crt{transform-box:fill-box;transform-origin:center;animation:vlsHsCrt var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-hs-rays{animation:vlsHsRays var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-hs-star{transform-box:fill-box;transform-origin:center;animation:vlsHsStar var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
+.vls-hs-hop{animation:vlsHsHop var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
 @keyframes vlsHsReach{0%{transform:rotate(0)}10%{transform:rotate(7deg)}26%{transform:rotate(7deg)}40%,100%{transform:rotate(0)}}
 @keyframes vlsHsIntent{0%{opacity:0}10%{opacity:.9}26%{opacity:.9}40%,100%{opacity:0}}
 @keyframes vlsHsCrt{0%{transform:scaleY(.06);opacity:.5}12%,100%{transform:scaleY(1);opacity:1}}
@@ -63,15 +62,12 @@ ${rmBlock(
 )}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} accent={LIVE} />
+    <Frame x={164} w={152} theme={theme} result />
     <Floor x1={14} x2={146} y={78} />
     <MiniTv x={55} y={24} w={66} h={42} />
     <circle cx={88} cy={73} r={3} fill={TV_EDGE} />
     <g className="vls-hs-reach">
-      <path d="M20 78 c0-11 4.5-15.5 10-15.5 s10 4.5 10 15.5 Z" fill={YOU} />
-      <circle cx={30} cy={58} r={6} fill={YOU} />
-      <circle cx={31.5} cy={57.5} r={1.2} fill="#101a2c" />
-      <circle cx={34.9} cy={57.5} r={1.2} fill="#101a2c" />
+      <Pawn x={30} yb={78} s={9} eyes host gaze={2} />
     </g>
     <g className="vls-hs-intent" opacity={0} stroke={FAINT} strokeWidth={2.5} strokeLinecap="round">
       <path d="M43 45 l7 -5 M46 55 l8 -3" />
@@ -88,7 +84,7 @@ ${rmBlock(
     <Star x={272} y={15} r={7} className="vls-hs-star" />
     <circle cx={240} cy={73} r={3} fill={LIVE} />
     <g className="vls-hs-hop">
-      <Pawn x={184} yb={78} s={9} eyes />
+      <Pawn x={184} yb={78} s={9} eyes host />
     </g>
   </>
 );
@@ -98,11 +94,11 @@ ${rmBlock(
 const SceneShareStop: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-hx-eyes{transform-box:fill-box;transform-origin:center;animation:vlsHxBlink 3.4s ease-in-out infinite}
-.vls-hx-dim{animation:vlsHxDim 3.4s ease-out infinite}
-.vls-hx-led{animation:vlsHxLed 3.4s ease-out infinite}
-.vls-hx-moon{animation:vlsHxMoon 3.4s ease-in-out infinite}
-.vls-hx-settle{animation:vlsHxSettle 3.4s cubic-bezier(.3,1.5,.5,1) infinite}
+.vls-hx-eyes{transform-box:fill-box;transform-origin:center;animation:vlsHxBlink var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-hx-dim{animation:vlsHxDim var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-hx-led{animation:vlsHxLed var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-hx-moon{animation:vlsHxMoon var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-hx-settle{animation:vlsHxSettle var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
 @keyframes vlsHxBlink{0%,44%,52%,100%{transform:scaleY(1)}48%{transform:scaleY(.12)}}
 @keyframes vlsHxDim{0%{opacity:0}14%,100%{opacity:1}}
 @keyframes vlsHxLed{0%{opacity:1}14%,100%{opacity:0}}
@@ -118,7 +114,7 @@ ${rmBlock(
 )}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} />
+    <Frame x={164} w={152} theme={theme} result />
     <Floor x1={14} x2={146} y={78} />
     <MiniTv x={47} y={24} w={66} h={42} />
     <rect x={51.62} y={28.62} width={56.76} height={27.72} rx={4} fill={MINT} />
@@ -127,12 +123,7 @@ ${rmBlock(
       <path d="M62 17 l-6 -7 M80 14 V6 M98 17 l6 -7" />
     </g>
     <circle cx={80} cy={73} r={3} fill={LIVE} />
-    <path d="M15 78 c0-9.9 4.05-13.95 9-13.95 s9 4.05 9 13.95 Z" fill={YOU} />
-    <circle cx={24} cy={60} r={5.4} fill={YOU} />
-    <g className="vls-hx-eyes" fill="#101a2c">
-      <circle cx={24} cy={59.5} r={1.1} />
-      <circle cx={27.6} cy={59.5} r={1.1} />
-    </g>
+    <Pawn x={24} yb={78} s={8} eyes host gaze={2} eyeClassName="vls-hx-eyes" />
     <Floor x1={174} x2={306} y={78} />
     <MiniTv x={207} y={24} w={66} h={42} />
     <rect className="vls-hx-dim" x={211.62} y={28.62} width={56.76} height={27.72} rx={4} fill="#0a101c" />
@@ -142,15 +133,7 @@ ${rmBlock(
       <Moon x={240} y={42} k={0.8} />
     </g>
     <g className="vls-hx-settle">
-      <path d="M187 78 c0-9.9 4.05-13.95 9-13.95 s9 4.05 9 13.95 Z" fill={YOU} />
-      <circle cx={196} cy={60} r={5.4} fill={YOU} />
-      <path
-        d="M191.8 59.5 q1.7 -2.2 3.4 0 M198.8 59.5 q1.7 -2.2 3.4 0"
-        stroke="#101a2c"
-        strokeWidth={1.8}
-        strokeLinecap="round"
-        fill="none"
-      />
+      <Pawn x={196} yb={78} s={8} eyes="closed" host />
     </g>
   </>
 );
@@ -160,9 +143,9 @@ ${rmBlock(
 const ScenePause: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-pz-flick{animation:vlsPzFlick 3s ease-in-out infinite}
-.vls-pz-hold{animation:vlsPzHold 3s ease-out infinite}
-.vls-pz-bars{transform-box:fill-box;transform-origin:center;animation:vlsPzBars 3s cubic-bezier(.3,1.5,.5,1) infinite}
+.vls-pz-flick{animation:vlsPzFlick var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-pz-hold{animation:vlsPzHold var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-pz-bars{transform-box:fill-box;transform-origin:center;animation:vlsPzBars var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
 @keyframes vlsPzFlick{0%{opacity:.5}10%{opacity:.9}20%{opacity:.2}32%{opacity:.85}44%,100%{opacity:.5}}
 @keyframes vlsPzHold{0%{opacity:0}12%,100%{opacity:1}}
 @keyframes vlsPzBars{0%,5%{opacity:0;transform:scale(1.45)}16%,100%{opacity:1;transform:scale(1)}}
@@ -172,7 +155,7 @@ ${rmBlock(
 )}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} accent={WARN} />
+    <Frame x={164} w={152} theme={theme} result />
     <MiniTv x={44} y={22} w={72} h={46} />
     <path d="M73 34 L89 42.2 L73 50.4 Z" fill={MINT} />
     <g className="vls-pz-flick" stroke={SKY} strokeWidth={2} strokeLinecap="round" opacity={0.5}>
@@ -198,9 +181,9 @@ ${rmBlock(
 const SceneResume: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-rs-play{transform-box:fill-box;transform-origin:center;animation:vlsRsPlay 3s cubic-bezier(.3,1.5,.5,1) infinite}
-.vls-rs-led{animation:vlsRsLed 3s ease-out infinite}
-.vls-rs-flick{animation:vlsRsFlick 3s ease-in-out infinite}
+.vls-rs-play{transform-box:fill-box;transform-origin:center;animation:vlsRsPlay var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
+.vls-rs-led{animation:vlsRsLed var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-rs-flick{animation:vlsRsFlick var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 @keyframes vlsRsPlay{0%{transform:scale(.55);opacity:.5}14%{transform:scale(1.18);opacity:1}22%,100%{transform:scale(1);opacity:1}}
 @keyframes vlsRsLed{0%{opacity:.2}10%,100%{opacity:1}}
 @keyframes vlsRsFlick{0%,12%{opacity:0}20%{opacity:.9}30%{opacity:.25}40%{opacity:.85}54%,100%{opacity:.5}}
@@ -210,7 +193,7 @@ ${rmBlock(
 )}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} accent={LIVE} />
+    <Frame x={164} w={152} theme={theme} result />
     <MiniTv x={44} y={22} w={72} h={46} />
     <path d="M73 34 L89 42.2 L73 50.4 Z" fill={MINT} />
     <rect x={49.04} y={27.06} width={61.92} height={30.36} rx={4} fill="#0a101c" opacity={0.45} />
@@ -232,14 +215,14 @@ ${rmBlock(
 const SceneSwitchSource: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-sw-d1{animation:vlsSwD1 3.2s ease-in-out infinite}
-.vls-sw-d2{animation:vlsSwD2 3.2s ease-in-out infinite}
+.vls-sw-d1{animation:vlsSwD1 var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-sw-d2{animation:vlsSwD2 var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 @keyframes vlsSwD1{0%{transform:translate(0,0);opacity:0}8%{opacity:1}22%{transform:translate(11px,-6px)}36%{transform:translate(22px,0);opacity:1}46%,100%{transform:translate(22px,0);opacity:0}}
 @keyframes vlsSwD2{0%{transform:translate(0,0);opacity:0}8%{opacity:1}22%{transform:translate(-11px,6px)}36%{transform:translate(-22px,0);opacity:1}46%,100%{transform:translate(-22px,0);opacity:0}}
 ${rmBlock(["vls-sw-d1", "vls-sw-d2"], [[".vls-sw-d1,.vls-sw-d2", "opacity:0;transform:none"]])}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} accent={SKY} />
+    <Frame x={164} w={152} theme={theme} result />
     <SourceWindow x={27} y={28} />
     <SourceWindow x={87} y={28} alternate />
     <SourceWindow x={187} y={28} />
@@ -261,9 +244,9 @@ ${rmBlock(["vls-sw-d1", "vls-sw-d2"], [[".vls-sw-d1,.vls-sw-d2", "opacity:0;tran
 const SceneReconnect: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-rj-spark{animation:vlsRjSpark 3.2s ease-in-out infinite}
-.vls-rj-plug{transform-box:fill-box;transform-origin:50% 100%;animation:vlsRjPlug 3.2s ease-in-out infinite}
-.vls-rj-led{transform-box:fill-box;transform-origin:center;animation:vlsRjLed 3.2s cubic-bezier(.3,1.5,.5,1) infinite}
+.vls-rj-spark{animation:vlsRjSpark var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-rj-plug{transform-box:fill-box;transform-origin:50% 100%;animation:vlsRjPlug var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-rj-led{transform-box:fill-box;transform-origin:center;animation:vlsRjLed var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
 @keyframes vlsRjSpark{0%,100%{opacity:.55}15%{opacity:1}}
 @keyframes vlsRjPlug{0%{transform:translate(-2px,-8px) rotate(-6deg)}10%{transform:translate(-1px,-3px) rotate(4deg)}20%{transform:translate(0,-1px) rotate(-2deg)}28%,100%{transform:none}}
 @keyframes vlsRjLed{0%,24%{opacity:0;transform:scale(.4)}32%{opacity:1;transform:scale(1.3)}40%,100%{opacity:1;transform:scale(1)}}
@@ -277,7 +260,7 @@ ${rmBlock(
 )}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} accent={LIVE} />
+    <Frame x={164} w={152} theme={theme} result />
     <Socket x={90} y={52} />
     <Plug x={80} y={23} />
     <Spark x={93} y={49} className="vls-rj-spark" />
@@ -292,12 +275,12 @@ ${rmBlock(
 function CaptureHint({ theme, target }: Parameters<HintScene>[0] & { target: "browser" | "window" | "display" }) {
   return <>
     <style>{`
-.vls-capture-choice{animation:vlsCaptureChoice 3.2s ease-out infinite}
+.vls-capture-choice{animation:vlsCaptureChoice var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
 @keyframes vlsCaptureChoice{0%,10%{opacity:.35;transform:translate(3px,3px)}28%,100%{opacity:1;transform:none}}
 ${rmBlock(["vls-capture-choice"], [[".vls-capture-choice", "opacity:1;transform:none"]])}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} accent={LIVE} />
+    <Frame x={164} w={152} theme={theme} result />
     {target === "browser" ? <>
       <BrowserWindow x={29} y={20} w={100} h={58} />
       <rect x={39} y={35} width={80} height={30} rx={3} fill="var(--wall-2)" stroke={SKY} strokeWidth={2} />
@@ -322,7 +305,7 @@ ${rmBlock(["vls-capture-choice"], [[".vls-capture-choice", "opacity:1;transform:
       <rect x={237} y={34} width={37} height={23} rx={2} fill={TV_SCREEN} stroke={SKY} strokeWidth={1.5} />
       <path d="M237 39h37 M243 53l7-10 5 6 4-4 7 8Z" stroke={SKY} strokeWidth={1} fill={SKY} />
     </g> : <path className="vls-capture-choice" d="M229 54l10-14 7 8 5-5 8 11Z" fill={SKY} />}
-    <Pawn x={190} yb={78} s={8} eyes />
+    <Pawn x={190} yb={78} s={8} eyes host />
   </>;
 }
 

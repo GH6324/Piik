@@ -348,11 +348,11 @@ func expectGoroutinesSettled(t *testing.T, before int) {
 
 // --- runtime capabilities -------------------------------------------------
 
-func TestCapabilitiesKeepNATPredictionAbsentByDefault(t *testing.T) {
+func TestCapabilitiesReportServicesDisabledByDefault(t *testing.T) {
 	server := start(t, Options{Config: testConfig(t)})
 
 	server.do(http.MethodGet, "/api/capabilities").
-		expect(http.StatusOK, `{"natPrediction":false}`)
+		expect(http.StatusOK, `{"sfu":false,"natPrediction":false}`)
 }
 
 func TestCapabilitiesReportOptionalNATPredictionWithoutExposingConfiguration(t *testing.T) {
@@ -363,7 +363,7 @@ func TestCapabilitiesReportOptionalNATPredictionWithoutExposingConfiguration(t *
 	server := start(t, Options{Config: configuration})
 
 	server.do(http.MethodGet, "/api/capabilities").
-		expect(http.StatusOK, `{"natPrediction":true}`).
+		expect(http.StatusOK, `{"sfu":false,"natPrediction":true}`).
 		expectHeader("Cache-Control", "no-store").
 		expectHeader("X-Content-Type-Options", "nosniff")
 
@@ -405,6 +405,8 @@ func TestSFUListenerFollowsApplicationCloseAndEnd(t *testing.T) {
 			if server.signaling.Load() == nil || server.media == nil {
 				t.Fatal("missing runtime owner")
 			}
+			server.do(http.MethodGet, "/api/capabilities").
+				expect(http.StatusOK, `{"sfu":true,"natPrediction":false}`)
 			var err error
 			if ending {
 				err = server.End(context.Background())
@@ -671,16 +673,21 @@ func TestSiteAccessRejectsAnExpiredOrModifiedCookie(t *testing.T) {
 }
 
 func TestSiteAccessIsImmediateWhenTheAccessPasswordIsEmpty(t *testing.T) {
-	configuration := testConfig(t)
-	configuration.SiteAccessPassword = ""
-	server := start(t, Options{Config: configuration})
+	for _, environment := range []config.Environment{config.EnvironmentDevelopment, config.EnvironmentProduction} {
+		t.Run(string(environment), func(t *testing.T) {
+			configuration := testConfig(t)
+			configuration.Env = environment
+			configuration.SiteAccessPassword = ""
+			server := start(t, Options{Config: configuration})
 
-	server.do(http.MethodGet, "/api/site-access").
-		expect(http.StatusOK, `{"required":false,"authenticated":true}`).
-		expectHeader("Set-Cookie", "")
-	server.do(http.MethodPost, "/api/site-access", withOrigin(allowedOrigin)).
-		expect(http.StatusOK, `{"required":false,"authenticated":true}`).
-		expectHeader("Set-Cookie", "")
+			server.do(http.MethodGet, "/api/site-access").
+				expect(http.StatusOK, `{"required":false,"authenticated":true}`).
+				expectHeader("Set-Cookie", "")
+			server.do(http.MethodPost, "/api/site-access", withOrigin(allowedOrigin)).
+				expect(http.StatusOK, `{"required":false,"authenticated":true}`).
+				expectHeader("Set-Cookie", "")
+		})
+	}
 }
 
 // --- room HTTP API --------------------------------------------------------
@@ -749,7 +756,7 @@ func TestRoomCreationPassesTheSharedViewerCeilingToRoomAdmission(t *testing.T) {
 	server := start(t, Options{Config: configuration})
 
 	server.createRoom(roomRequest{}).expectStatus(http.StatusCreated)
-	if got := server.Store().MaxViewersPerRoom(); got != protocol.MaxViewersPerRoomLimit {
+	if got := server.store.MaxViewersPerRoom(); got != protocol.MaxViewersPerRoomLimit {
 		t.Fatalf("maxViewersPerRoom = %d, want %d", got, protocol.MaxViewersPerRoomLimit)
 	}
 }
@@ -774,8 +781,9 @@ func TestRoomCreationCreatesPrivateRoomsWithOptionalPasswordsAtomically(t *testi
 	}
 }
 
-func TestRoomCreationAllowsExplicitOpenCreationWithoutSiteAccess(t *testing.T) {
+func TestProductionAllowsRoomCreationWithoutSiteAccessButRequiresRoomOwnership(t *testing.T) {
 	configuration := testConfig(t)
+	configuration.Env = config.EnvironmentProduction
 	configuration.SiteAccessPassword = ""
 	server := start(t, Options{Config: configuration})
 
@@ -787,6 +795,14 @@ func TestRoomCreationAllowsExplicitOpenCreationWithoutSiteAccess(t *testing.T) {
 	if !strings.Contains(created.InviteURL, "#v=") {
 		t.Fatalf("inviteUrl = %q", created.InviteURL)
 	}
+	server.updateRoomAccess(accessRequest{
+		roomID: created.RoomID, hostToken: "wrong-token",
+		body: `{"action":"set-code-entry-policy","policy":"private"}`,
+	}).expectStatus(http.StatusNotFound)
+	server.updateRoomAccess(accessRequest{
+		roomID: created.RoomID, hostToken: created.HostToken,
+		body: `{"action":"set-code-entry-policy","policy":"private"}`,
+	}).expectStatus(http.StatusOK)
 }
 
 func TestRoomCreationAllocatesUniqueFourDigitCodesConcurrently(t *testing.T) {
@@ -840,7 +856,7 @@ func TestRoomReplacementReplacesAuthorityAndClosesOldMembership(t *testing.T) {
 		password: &password, preferredRoomID: "4321",
 	}).expectStatus(http.StatusCreated).room()
 
-	store := server.Store()
+	store := server.store
 	host, err := store.ConnectParticipant(room.ConnectParticipantInput{
 		RoomID: original.RoomID, Role: protocol.RoleHost, Token: original.HostToken,
 		ClientID: "host-client", SessionID: "host-session",
@@ -999,7 +1015,7 @@ func TestRoomAccessManagesADormantRoomWithoutStartingSharing(t *testing.T) {
 		!strings.Contains(revoked.body, `"type":"viewer-grant-updated"`) {
 		t.Fatalf("revocation body = %s", revoked.body)
 	}
-	if _, connected := server.Store().GetConnectedHost(created.RoomID); connected {
+	if _, connected := server.store.GetConnectedHost(created.RoomID); connected {
 		t.Fatal("managing access started a sharing session")
 	}
 
@@ -1153,7 +1169,7 @@ func TestRestoresStableRoomAuthorityAcrossAnApplicationRestart(t *testing.T) {
 
 	now.Store(30 * 24 * 60 * 60 * 1_000)
 	second := start(t, Options{Config: configuration, Now: now.Load})
-	if size := second.Store().Size(); size != 1 {
+	if size := second.store.Size(); size != 1 {
 		t.Fatalf("restored room count = %d, want 1", size)
 	}
 	second.updateRoomAccess(accessRequest{

@@ -1,13 +1,10 @@
 package signal
 
-// Ported from src/server/hybrid-media-router.ts (baseline b20fd88).
-//
 // The router owns no lock. signal.Server.mu (routerOptions.mu) is held by the
 // caller of every method except close, hooks are called with it held, and the
 // goroutines the router starts (pump driver, media prepares, drains and timer
-// callbacks) take it themselves. Every I/O window is an
-// unlock / I/O / lock window followed by exactly the guard the TS code ran
-// after that await (map C:/tmp/piik-go/maps/effect-layer.md, section 2.2).
+// callbacks) take it themselves. After unlocked I/O, revalidate the owning
+// room, operation and resource before committing effects under the lock.
 
 import (
 	"context"
@@ -44,6 +41,15 @@ func routeDebugFlag(value string) bool {
 		}
 	}
 	return false
+}
+
+// routeDebugSink is the injected route-diagnostic sink; nil disables route
+// events. The signaling effect layer owns environment and logger policy.
+func routeDebugSink() func(string, ...any) {
+	if !routeDebugEnabled() {
+		return nil
+	}
+	return slog.Info
 }
 
 // sfuFallback is SfuFallbackOptions. A zero timeout means the TS default.
@@ -299,7 +305,6 @@ func (r *router) completeAuthentication(participant authenticatedRouteParticipan
 		return
 	}
 	r.broadcastActive(participant.roomID, rm)
-	// TS: void this.sendFreshSfuConfig(participant).catch(() => undefined)
 	r.sendFreshSfuConfig(participant)
 	r.requestPump(participant.roomID)
 }
@@ -1002,6 +1007,7 @@ func (r *router) createController(roomID string, rm *roomRuntime, host authentic
 	rm.controller = route.New(route.Options{
 		HostPeerID:                host.peerID,
 		DebugRoomID:               roomID,
+		DebugLog:                  routeDebugSink(),
 		EndpointMediaCopyCapacity: r.capacity,
 		OperationTimeoutMs:        operationTimeoutMs,
 		SfuEnabled:                r.sfu != nil && !(routePolicy != nil && routePolicy.PeerOnly),

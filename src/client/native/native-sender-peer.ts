@@ -55,8 +55,6 @@ export class NativeSenderPeer implements HostMediaPeer {
       error: null,
       senderParameters: null,
       audioSenderParameters: null,
-      qualityWarning: null,
-      qualityWarningKind: null,
     };
     this.edge = new NativeSenderEdge(
       peerId,
@@ -80,7 +78,7 @@ export class NativeSenderPeer implements HostMediaPeer {
                   : state === "closed"
                     ? "closed"
                     : "checking",
-            error: state === "failed" ? "Native media edge failed" : null,
+            error: state === "failed" ? { key: "native.fail.edge" } : null,
           };
           events.onUpdate(this.getSnapshot());
         },
@@ -164,7 +162,7 @@ export class NativeSenderPeer implements HostMediaPeer {
         ...this.snapshot,
         connectionState: "failed",
         iceConnectionState: "failed",
-        error: "Native media signaling failed",
+        error: { key: "native.fail.signaling" },
       };
       this.events.onUpdate(this.getSnapshot());
     }

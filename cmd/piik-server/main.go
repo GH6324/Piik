@@ -1,10 +1,10 @@
 // Command piik-server is the Hosted Piik entry point: it loads the
 // environment, serves the embedded Browser UI together with the signaling and
-// room API, and stops on SIGINT or SIGTERM. It replaces src/server/index.ts.
+// room API, and stops on SIGINT or SIGTERM.
 //
 // Two maintenance modes exit without serving: --check-config validates the
 // environment (the release wrapper runs it as the service user before cutover)
-// and --check-release compares the deployed revision with the latest published
+// and --check-release compares this binary with the latest published
 // release (see release.go).
 package main
 
@@ -37,17 +37,16 @@ const shutdownTimeout = 15 * time.Second
 // release directory. Hosted keeps its real values in the service secret store.
 const environmentFile = ".env"
 
-// BuildRevision is the full Git revision the release packager links in with
-// -ldflags. It matches the REVISION file shipped beside the binary and is
-// reported at startup so one journal line identifies the running release.
-var BuildRevision = "development"
+// The packager injects the product version and full source revision together.
+var (
+	BuildVersion  = "development"
+	BuildRevision = "development"
+)
 
 func main() {
 	checkConfig := flag.Bool("check-config", false, "validate the environment and exit")
 	checkRelease := flag.Bool("check-release", false,
 		"report whether a newer published release exists and exit")
-	currentFile := flag.String("current-file", "",
-		"path to the deployed REVISION file read by --check-release")
 	apiURL := flag.String("api-url", defaultReleaseAPIURL,
 		"release metadata endpoint used by --check-release")
 	debug := flag.Bool("debug", false, "save opt-in server diagnostics to rotated files")
@@ -58,7 +57,7 @@ func main() {
 	}
 	switch {
 	case *checkRelease:
-		os.Exit(checkDeployedRelease(context.Background(), *currentFile, *apiURL, os.Stdout))
+		os.Exit(checkDeployedRelease(context.Background(), *apiURL, os.Stdout))
 	case *checkConfig:
 		if _, err := config.Load(environment()); err != nil {
 			fail(err)
@@ -98,14 +97,16 @@ func serve(debug bool) (returnedErr error) {
 		defer func() {
 			stopExport()
 			_ = dependencyLog.Close()
-			logger.Info("piik-server", "event", "stopped", "failed", returnedErr != nil, diagnostics.Error(returnedErr))
 			returnedErr = errors.Join(returnedErr, exportServerDiagnostics(recorder), recorder.Close())
 			slog.SetDefault(previous)
 			log.SetOutput(previousWriter)
 			log.SetFlags(previousFlags)
 		}()
-		logger.Info("piik-server", "event", "start", "revision", BuildRevision)
+		logger.Info("piik-server", "event", "start", "version", BuildVersion, "revision", BuildRevision)
 	}
+	defer func() {
+		logger.Info("piik-server", "event", "stopped", "failed", returnedErr != nil, diagnostics.Error(returnedErr))
+	}()
 	configuration, err := config.Load(environment())
 	if err != nil {
 		return err
@@ -133,11 +134,26 @@ func serve(debug bool) (returnedErr error) {
 	if err != nil {
 		return err
 	}
-	fmt.Printf("Piik %s is listening on %s:%d; public URL %s\n",
-		BuildRevision, configuration.ListenHost, port, config.Origin(configuration.PublicBaseURL))
+	logger.Info("Piik server is listening", "event", "ready", "version", BuildVersion, "revision", BuildRevision,
+		"host", configuration.ListenHost, "port", port, "publicUrl", config.Origin(configuration.PublicBaseURL),
+		"sqlite", configuration.RoomDatabasePath != "", "siteAccessProtected", configuration.SiteAccessPassword != "",
+		"sfu", configuration.SFU != nil, "natPrediction", configuration.NATPredictionEnabled)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
+	// One bounded background lookup never delays serving. Join it before closing
+	// diagnostic outputs so shutdown cannot leave a late writer behind.
+	releaseChecked := make(chan struct{})
+	go func() {
+		defer close(releaseChecked)
+		result := checkRelease(ctx, BuildVersion, BuildRevision, defaultReleaseAPIURL, os.Getenv("GITHUB_TOKEN"), mirrorReleaseAPIURL)
+		if ctx.Err() == nil {
+			logReleaseNotice(logger, result)
+		}
+	}()
+	defer func() {
+		stop()
+		<-releaseChecked
+	}()
 	<-ctx.Done()
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownTimeout)
 	defer cancel()
@@ -185,9 +201,9 @@ func environment() map[string]string {
 	return values
 }
 
-// loadEnvironmentFile ports the src/server/index.ts loadEnvFile() call: an
-// absent file is the ordinary case and every other read failure stops startup.
-// Like Node, a name the process already carries is never overwritten, so a
+// loadEnvironmentFile reads optional startup overrides. An absent file is the
+// ordinary case and every other read failure stops startup. A name the process
+// already carries is never overwritten, so a
 // systemd EnvironmentFile still wins over a stale file in the release
 // directory. The accepted syntax is DECISIONS D8: KEY=value lines, whole-line
 // '#' comments, an optional 'export ' prefix, and a single- or double-quoted

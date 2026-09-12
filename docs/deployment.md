@@ -12,6 +12,9 @@ media, bare-metal nginx, nftables, and application port 8787. It requires an
 existing running Go release. Another proxy, firewall owner, application port,
 first installation, or initial embedded-media cutover needs its own scoped
 bootstrap/updater; do not call this wrapper generic.
+Its firewall check compares the nftables ruleset without traffic counters; it
+does not depend on a particular table name. Coordinate other firewall writers
+outside the cutover window. See [nft output options](https://netfilter.org/projects/nftables/manpage.html).
 
 ## Release Boundary
 
@@ -95,11 +98,12 @@ Retain the descriptor and successful deployment output as release metadata. Do
 not create a follow-up source commit solely to duplicate their revision, asset,
 or hashes.
 
-After `validate` succeeds on an explicit workflow dispatch with
-`client_checks=true`, CI packages the Server application release and the
-three-platform App candidates that consume it. The artifacts are retained
-for 14 days. Ordinary `main` pushes do not run these packaging jobs. This
-workflow does not create a tag, public GitHub Release, or deployment.
+Manual `client_checks=true` dispatch packages Server and three-platform App
+candidates after validation. Once [automatic publication](./operations/github.md)
+is explicitly enabled, accepted main merges run that same pipeline and publish
+the verified artifacts. Candidate artifacts are retained for 14 days. Branches
+and PRs do not start cloud CI; no release-record commit is written back to main.
+The workflow does not deploy into a running application service.
 
 Do not build or run the full repository check on a constrained production host.
 That host runs only the packaged binary and needs no Node, npm, or dependency
@@ -107,15 +111,19 @@ install.
 
 ## Update Check
 
-The application, Server deployment, and platform App all use the full Git
-revision as their release identity. A formal GitHub Release must use that exact
-40-character revision as its tag and keep the corresponding release URL. The
-current CI workflow produces short-lived candidates but does not publish a
-GitHub Release; publication remains an explicit distribution decision.
+Builds carry a product version plus full source revision. Packagers use one
+release plan or exact Git tag and inject its identity into Server, App and Web;
+untagged local candidates use `development`. Schema-2 package descriptors carry
+the same pair and artifact hashes. The [version policy](./reference/versioning.md)
+owns ordering and first-public-release readiness.
 
-The default App launcher starts immediately, then performs one background
-request to the official Piik GitHub Releases API. It shows a link only when
-the latest release has a valid full revision different from the packaged one.
+The default App launcher starts immediately, then checks GitHub Releases in the
+background, falling back to the Gitee mirror if GitHub is unavailable. The
+[release-source policy](./reference/versioning.md#release-sources) owns selection
+and provenance checks. It shows a link only when
+the latest stable release is newer, the same version has a known different source
+SHA, or a development build can choose the official release. These notices are
+distinct; a different SHA alone is not called newer.
 The request sends no current revision, credentials, room data, or media data;
 network errors, private-repository responses, and missing releases are treated
 as no notice. It never downloads, replaces, or interrupts a running share.
@@ -126,62 +134,26 @@ An operator can perform the corresponding read-only Server check:
 bash deploy/check-release.sh
 ```
 
-The script runs the deployed binary's release check, which reads
-`/opt/piik/current/REVISION` and prints one JSON result.
-Exit status `0` means the deployed revision is current, `10` means a newer
-release is available, and `20` means the check could not establish a valid
-release identity. For a private repository, inject a short-lived `GITHUB_TOKEN`
+The Server also checks once in the background after startup and logs an available
+release with its download URL. It does not delay startup, periodically poll,
+notify room participants or install anything.
+
+The script runs the deployed binary's `--check-release`, using that binary's
+injected identity, and prints one JSON result with versions, available source
+SHAs and the release URL. Exit `0` means no newer/different official build,
+`10` means `update-available`, `different-build` or `official-release`, and `20`
+means the check is unavailable. It does not accept a separate revision file.
+For a private repository, inject a short-lived `GITHUB_TOKEN`
 through the operator environment; never place it in the repository or command
 line. The command does not mutate files, services, containers, or persistent
-state. A different current-revision file may be supplied as its only argument.
-
-## Permanent-Room Schema Cutover
-
-The schema 2 / signaling v23 cutover required matching Web/App/Server builds
-and an accepted active-session interruption. Native control stayed v9; that
-schema change preserved Browser credential keys. It was not an app-only release.
-The separate [brand cutover](./research/piik-rename-plan.md) must preserve this
-database rather than repeat the schema change.
-
-1. Verify the candidate; record the current release, environment, absolute DB
-   path and ownership. Stop ingress and the old application; take and retain a
-   SQLite backup. Require `application_id=1396920910`, `user_version=1`, expected
-   columns and `PRAGMA quick_check='ok'` before touching a separate protected copy.
-2. On that copy, use SQLite with `DROP COLUMN` support and stop on SQL errors:
-
-   ```sql
-   BEGIN EXCLUSIVE;
-   ALTER TABLE rooms DROP COLUMN lease_expires_at_ms;
-   PRAGMA user_version = 2;
-   COMMIT;
-   ```
-
-3. Verify integrity, exact columns/version and equal row counts. Compare retained
-   columns in both directions against the backup using `EXCEPT`; both must be
-   empty. Record only counts/pass/fail, not private verifiers. The candidate must
-   open this copy successfully; no room is dropped because of its former deadline.
-4. Retain the absolute `ROOM_DATABASE_PATH`; remove `ROOM_LEASE_SECONDS`. Install
-   the verified copy and release while stopped, retaining permissions/ownership.
-   Start; check health and Host/Viewer reauthentication before reopening ingress.
-5. On failure, stop and restore prior database, environment and release together.
-   Once new authority mutations are accepted, restoring the backup could revive
-   revoked grants: preserve those changes or make an explicit recovery decision.
-
-The runtime reads only schema 2. SQLite's [column removal](https://www.sqlite.org/lang_altertable.html#altertabdropcol)
-and [backup guidance](https://www.sqlite.org/backup.html) define this offline operation.
+state.
 
 ## Atomic Cutover
 
-### First embedded-media cutover prerequisite
-
-The first move from external services to embedded STUN/SFU is a coordinated
-infrastructure and protocol transaction, including Node-to-Go where still
-needed. Complete the [self-hosting cutover procedure](./operations/self-hosting.md#coordinated-embedded-media-cutover)
-with matching Web/Server signaling and native protocol v9 App builds,
-accepted active-session interruption, released UDP ports, and exact
-unit/environment/proxy/service recovery. The routine wrapper does not perform
-that transaction; it requires an already running packaged Go release and cannot
-restore the previous infrastructure.
+The wrapper requires an already running packaged Go release and the service
+layout described above. For a new installation, use the
+[self-hosting guide](./operations/self-hosting.md). Infrastructure changes need
+their own scoped recovery procedure under [CONTRIBUTING](../CONTRIBUTING.md).
 
 Run the tracked server entry with the uploaded descriptor:
 
@@ -249,3 +221,8 @@ operator intervention; it must not silently report the new release as active.
 Infrastructure or persistent-state recovery is separate and limited to the
 surfaces changed by that task. Do not restore an entire server, old firewall, or
 old secret set for an application-only failure.
+
+If a task changes persistent room data, prepare and verify a separate
+[SQLite backup](https://www.sqlite.org/backup.html) and recover matching data,
+configuration and application together. Restoring old data can revive revoked
+credentials; account for later authority changes before reopening ingress.

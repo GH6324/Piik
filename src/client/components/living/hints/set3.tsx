@@ -10,6 +10,7 @@ import {
   MINT,
   MiniTv,
   Pawn,
+  YOU,
   SKY,
   STAR_GOLD,
   Star,
@@ -17,16 +18,16 @@ import {
   TV_EDGE,
   rmBlock,
 } from "../Comic";
-import type { HintScene, Set3Kind } from "./index";
+import type { HintScene, Set3Kind } from "../../../ui/visual-kinds";
 
 /** hint-quality: soft TV (few fat scanlines, squinting pawn) → sharp TV (many
- * thin crisp lines, one light sweep, star pop). Loop 3s. */
+ * thin crisp lines, one light sweep, star pop). Demonstrates once, then holds. */
 const hintQuality: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-vq-soft{animation:vlsVqSoft 3s ease-in-out infinite}
-.vls-vq-sweep{animation:vlsVqSweep 3s ease-in-out infinite}
-.vls-vq-star{transform-box:fill-box;transform-origin:center;animation:vlsVqStar 3s cubic-bezier(.3,1.5,.5,1) infinite}
+.vls-vq-soft{animation:vlsVqSoft var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-vq-sweep{animation:vlsVqSweep var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-vq-star{transform-box:fill-box;transform-origin:center;animation:vlsVqStar var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
 @keyframes vlsVqSoft{0%,48%,100%{opacity:.4}12%{opacity:.58}24%{opacity:.34}36%{opacity:.52}}
 @keyframes vlsVqSweep{0%,22%{transform:translateX(0);opacity:0}30%{opacity:.3}48%,100%{transform:translateX(49px);opacity:0}}
 @keyframes vlsVqStar{0%,55%{opacity:0;transform:scale(0)}66%{opacity:1;transform:scale(1.25)}74%,100%{opacity:1;transform:scale(1)}}
@@ -40,10 +41,9 @@ ${rmBlock(
 )}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} />
+    <Frame x={164} w={152} theme={theme} result />
     {/* BEFORE: pawn squints at a soft picture (3 fat faint scanlines) */}
-    <Pawn x={26} yb={80} s={8} />
-    <path d="M24 64h2.8 M27.6 64h2.8" stroke="#101a2c" strokeWidth={2} strokeLinecap="round" fill="none" />
+    <Pawn x={26} yb={80} s={8} eyes="closed" host gaze={2} />
     <MiniTv x={52} y={22} w={76} h={46} />
     <g className="vls-vq-soft" fill={LINE} opacity={0.4}>
       <rect x={63} y={33} width={52} height={6} rx={3} />
@@ -51,9 +51,7 @@ ${rmBlock(
       <rect x={63} y={51} width={52} height={6} rx={3} />
     </g>
     {/* AFTER: crisp thin scanlines + sweep + star; pawn brightens up */}
-    <Pawn x={186} yb={80} s={8} />
-    <circle cx={187} cy={62.8} r={1.2} fill="#101a2c" />
-    <circle cx={190} cy={62.8} r={1.2} fill="#101a2c" />
+    <Pawn x={186} yb={80} s={8} eyes host gaze={2} />
     <MiniTv x={212} y={22} w={76} h={46} />
     <g fill={MINT} opacity={0.95}>
       <rect x={221} y={30} width={58} height={2.5} rx={1.25} />
@@ -69,16 +67,16 @@ ${rmBlock(
 );
 
 /** hint-audio-quality: speaker with one thin faint arc (pawn leans in to
- * hear) → three bold rich arcs (happy-eye pawn static, star). Loop 3s. */
+ * hear) → three bold rich arcs (happy-eye pawn static, star). Demonstrates once, then holds. */
 const hintAudioQuality: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-aq-weak{animation:vlsAqWeak 3s ease-in-out infinite}
-.vls-aq-listen{transform-box:fill-box;transform-origin:50% 100%;animation:vlsAqListen 3s ease-in-out infinite}
-.vls-aq-a1{animation:vlsAqPing 3s ease-out infinite}
-.vls-aq-a2{animation:vlsAqPing 3s ease-out .08s infinite}
-.vls-aq-a3{animation:vlsAqPing 3s ease-out .16s infinite}
-.vls-aq-star{transform-box:fill-box;transform-origin:center;animation:vlsAqStar 3s cubic-bezier(.3,1.5,.5,1) infinite}
+.vls-aq-weak{animation:vlsAqWeak var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-aq-listen{transform-box:fill-box;transform-origin:50% 100%;animation:vlsAqListen var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-aq-a1{animation:vlsAqPing var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-aq-a2{animation:vlsAqPing var(--comic-duration,3.2s) ease-out .08s var(--comic-repeat,1) both}
+.vls-aq-a3{animation:vlsAqPing var(--comic-duration,3.2s) ease-out .16s var(--comic-repeat,1) both}
+.vls-aq-star{transform-box:fill-box;transform-origin:center;animation:vlsAqStar var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
 @keyframes vlsAqWeak{0%,30%,100%{opacity:.4}12%{opacity:.6}22%{opacity:.32}}
 @keyframes vlsAqListen{0%,30%,58%,100%{transform:rotate(0)}40%,50%{transform:rotate(-8deg)}}
 @keyframes vlsAqPing{0%,5%{opacity:.25}12%,100%{opacity:1}}
@@ -93,16 +91,14 @@ ${rmBlock(
 )}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} />
+    <Frame x={164} w={152} theme={theme} result />
     {/* BEFORE: thin faint arc, pawn cups its ear and leans in */}
     <rect x={40} y={42} width={13} height={18} rx={3} fill={TV_BODY} stroke={TV_EDGE} strokeWidth={2} />
     <path d="M53 47 L67 38 V64 L53 55 Z" fill={TV_BODY} stroke={TV_EDGE} strokeWidth={2} strokeLinejoin="round" />
     <path className="vls-aq-weak" d="M73 45 a9 9 0 0 1 0 12" stroke={LINE} strokeWidth={2} strokeLinecap="round" fill="none" opacity={0.4} />
     <g className="vls-aq-listen">
-      <Pawn x={122} yb={80} s={9} />
-      <circle cx={118.5} cy={61.3} r={1.3} fill="#101a2c" />
-      <circle cx={122} cy={61.3} r={1.3} fill="#101a2c" />
-      <path d="M116 55 a7 7 0 0 0 0 12" stroke="#23804f" strokeWidth={2.5} strokeLinecap="round" fill="none" />
+      <Pawn x={122} yb={80} s={9} eyes host gaze={-2} />
+      <circle cx={115} cy={61} r={2} fill={YOU} />
     </g>
     {/* AFTER: three bold arcs, happy-eye pawn static, star */}
     <rect x={200} y={42} width={13} height={18} rx={3} fill={TV_BODY} stroke={TV_EDGE} strokeWidth={2} />
@@ -112,20 +108,19 @@ ${rmBlock(
       <path className="vls-aq-a2" d="M237 41 a13 13 0 0 1 0 20" />
       <path className="vls-aq-a3" d="M242 36 a18 18 0 0 1 0 30" />
     </g>
-    <Pawn x={282} yb={80} s={9} />
-    <path d="M277.5 62 q1.7 -2.3 3.4 0 M282.5 62 q1.7 -2.3 3.4 0" stroke="#101a2c" strokeWidth={1.8} strokeLinecap="round" fill="none" />
+    <Pawn x={282} yb={80} s={9} eyes="closed" host />
     <Star x={257} y={21} r={6.5} className="vls-aq-star" baseOpacity={0} />
   </>
 );
 
 /** hint-degrade-pref: balance scale weighing a crisp frame against a
- * motion-blur frame (beam wobbles) → scale settles level, star. Loop 3.2s. */
+ * motion-blur frame (beam wobbles) → scale settles level, star. Demonstrates once, then holds. */
 const hintDegradePref: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-dp-beam{transform-box:fill-box;transform-origin:50% 0%;animation:vlsDpBeam 3.2s ease-in-out infinite}
-.vls-dp-settle{transform-box:fill-box;transform-origin:50% 0%;animation:vlsDpSettle 3.2s ease-in-out infinite}
-.vls-dp-star{transform-box:fill-box;transform-origin:center;animation:vlsDpStar 3.2s cubic-bezier(.3,1.5,.5,1) infinite}
+.vls-dp-beam{transform-box:fill-box;transform-origin:50% 0%;animation:vlsDpBeam var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-dp-settle{transform-box:fill-box;transform-origin:50% 0%;animation:vlsDpSettle var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-dp-star{transform-box:fill-box;transform-origin:center;animation:vlsDpStar var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
 @keyframes vlsDpBeam{0%,40%,100%{transform:rotate(0)}12%{transform:rotate(5deg)}26%{transform:rotate(-4deg)}}
 @keyframes vlsDpSettle{0%,16%,100%{transform:rotate(0)}4%{transform:rotate(3deg)}10%{transform:rotate(-2deg)}}
 @keyframes vlsDpStar{0%,30%{opacity:0;transform:scale(0)}40%{opacity:1;transform:scale(1.25)}48%,100%{opacity:1;transform:scale(1)}}
@@ -138,11 +133,9 @@ ${rmBlock(
 )}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} />
+    <Frame x={164} w={152} theme={theme} result />
     {/* BEFORE: pawn watches the scale wobble — crisp frame vs blur frame */}
-    <Pawn x={26} yb={80} s={7.5} />
-    <circle cx={27.3} cy={64} r={1.1} fill="#101a2c" />
-    <circle cx={29.7} cy={64} r={1.1} fill="#101a2c" />
+    <Pawn x={26} yb={80} s={7.5} eyes host gaze={2} />
     <path d="M84 78 V34 M70 78 H98" stroke="var(--ink)" strokeWidth={2.5} strokeLinecap="round" fill="none" />
     <g className="vls-dp-beam" stroke="var(--ink)" strokeWidth={2.5} strokeLinecap="round" fill="none">
       <path d="M52 34 H116" />
@@ -157,8 +150,7 @@ ${rmBlock(
     </g>
     <circle cx={84} cy={34} r={2.5} fill="var(--ink)" />
     {/* AFTER: settle once, level, star; pawn pleased */}
-    <Pawn x={298} yb={80} s={7.5} />
-    <path d="M294 65 q1.6 -2.2 3.2 0 M299 65 q1.6 -2.2 3.2 0" stroke="#101a2c" strokeWidth={1.8} strokeLinecap="round" fill="none" />
+    <Pawn x={298} yb={80} s={7.5} eyes="closed" host />
     <path d="M244 78 V34 M230 78 H258" stroke="var(--ink)" strokeWidth={2.5} strokeLinecap="round" fill="none" />
     <g className="vls-dp-settle" stroke="var(--ink)" strokeWidth={2.5} strokeLinecap="round" fill="none">
       <path d="M212 34 H276" />
@@ -177,13 +169,13 @@ ${rmBlock(
 );
 
 /** hint-codec: puzzle piece with eyes floats beside a TV with a dashed
- * socket → piece slots in, LED goes live, star. Loop 3s. */
+ * socket → piece slots in, LED goes live, star. Demonstrates once, then holds. */
 const hintCodec: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-cd-bob{animation:vlsCdBob 3s ease-in-out infinite}
-.vls-cd-dock{animation:vlsCdDock 3s cubic-bezier(.3,1.5,.5,1) infinite}
-.vls-cd-star{transform-box:fill-box;transform-origin:center;animation:vlsCdStar 3s cubic-bezier(.3,1.5,.5,1) infinite}
+.vls-cd-bob{animation:vlsCdBob var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-cd-dock{animation:vlsCdDock var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
+.vls-cd-star{transform-box:fill-box;transform-origin:center;animation:vlsCdStar var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
 @keyframes vlsCdBob{0%,40%,100%{transform:translateY(0)}20%{transform:translateY(-2.5px)}}
 @keyframes vlsCdDock{0%,6%{transform:translateX(-8px)}20%{transform:translateX(1px)}26%,100%{transform:translateX(0)}}
 @keyframes vlsCdStar{0%,32%{opacity:0;transform:scale(0)}42%{opacity:1;transform:scale(1.25)}50%,100%{opacity:1;transform:scale(1)}}
@@ -196,7 +188,7 @@ ${rmBlock(
 )}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} />
+    <Frame x={164} w={152} theme={theme} result />
     {/* BEFORE: piece bobs beside the TV, dashed socket waits on the edge */}
     <g className="vls-cd-bob">
       <path
@@ -230,13 +222,13 @@ ${rmBlock(
 );
 
 /** hint-advanced: closed cabinet door with a sliders glyph → door swings
- * open revealing 3 slider tracks with set knobs; pawn hops. Loop 3.2s. */
+ * open revealing 3 slider tracks with set knobs; pawn hops. Demonstrates once, then holds. */
 const hintAdvanced: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-adv-blink{transform-box:fill-box;transform-origin:center;animation:vlsAdvBlink 3.2s ease-in-out infinite}
-.vls-adv-door{transform-box:fill-box;transform-origin:left center;animation:vlsAdvDoor 3.2s ease-in-out infinite}
-.vls-adv-hop{transform-box:fill-box;transform-origin:50% 100%;animation:vlsAdvHop 3.2s cubic-bezier(.3,1.5,.5,1) infinite}
+.vls-adv-blink{transform-box:fill-box;transform-origin:center;animation:vlsAdvBlink var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-adv-door{transform-box:fill-box;transform-origin:left center;animation:vlsAdvDoor var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-adv-hop{transform-box:fill-box;transform-origin:50% 100%;animation:vlsAdvHop var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
 @keyframes vlsAdvBlink{0%,52%,60%,100%{transform:scaleY(1)}56%{transform:scaleY(.12)}}
 @keyframes vlsAdvDoor{0%,8%{transform:scaleX(1)}26%{transform:scaleX(.09)}33%,100%{transform:scaleX(.14)}}
 @keyframes vlsAdvHop{0%,40%,62%,100%{transform:translateY(0)}46%{transform:translateY(-4.5px)}52%{transform:translateY(0)}57%{transform:translateY(-2px)}}
@@ -249,7 +241,7 @@ ${rmBlock(
 )}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} />
+    <Frame x={164} w={152} theme={theme} result />
     {/* BEFORE: closed door, sliders glyph embossed, pawn glances over */}
     <rect x={44} y={18} width={56} height={60} rx={8} fill="var(--wall-2)" stroke="var(--ink)" strokeWidth={2.5} />
     <rect x={49} y={23} width={44} height={50} rx={5} fill="var(--paper)" stroke="var(--ink)" strokeWidth={2} />
@@ -257,11 +249,7 @@ ${rmBlock(
     <circle cx={64} cy={36} r={2.5} fill="var(--ink)" />
     <circle cx={70} cy={46} r={2.5} fill="var(--ink)" />
     <circle cx={87} cy={48} r={2.5} fill="var(--ink)" />
-    <Pawn x={122} yb={80} s={7.5} />
-    <g className="vls-adv-blink">
-      <circle cx={118.6} cy={64.2} r={1.2} fill="#101a2c" />
-      <circle cx={122} cy={64.2} r={1.2} fill="#101a2c" />
-    </g>
+    <Pawn x={122} yb={80} s={7.5} eyes host gaze={-2} eyeClassName="vls-adv-blink" />
     {/* AFTER: tracks + set knobs revealed as the door swings open */}
     <rect x={204} y={18} width={56} height={60} rx={8} fill="var(--wall-2)" stroke="var(--ink)" strokeWidth={2.5} />
     <g stroke={FAINT} strokeWidth={2.5} strokeLinecap="round" fill="none">
@@ -276,20 +264,18 @@ ${rmBlock(
       <rect x={209} y={23} width={44} height={50} rx={5} fill="var(--paper)" stroke="var(--ink)" strokeWidth={2} />
     </g>
     <g className="vls-adv-hop">
-      <Pawn x={284} yb={80} s={7.5} />
-      <circle cx={281} cy={64.2} r={1.2} fill="#101a2c" />
-      <circle cx={284.4} cy={64.2} r={1.2} fill="#101a2c" />
+      <Pawn x={284} yb={80} s={7.5} eyes host gaze={-2} />
     </g>
   </>
 );
 
 /** hint-details: a plain row of meter bars → magnifier pops over the bars,
- * enlarged inside the lens; pawn peeks. Loop 3s. */
+ * enlarged inside the lens; pawn peeks. Demonstrates once, then holds. */
 const hintDetails: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-dt-lens{transform-box:fill-box;transform-origin:center;animation:vlsDtLens 3s cubic-bezier(.3,1.5,.5,1) infinite}
-.vls-dt-blink{transform-box:fill-box;transform-origin:center;animation:vlsDtBlink 3s ease-in-out infinite}
+.vls-dt-lens{transform-box:fill-box;transform-origin:center;animation:vlsDtLens var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
+.vls-dt-blink{transform-box:fill-box;transform-origin:center;animation:vlsDtBlink var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 @keyframes vlsDtLens{0%,6%{transform:scale(0);opacity:0}14%{transform:scale(1.12);opacity:1}20%,100%{transform:scale(1);opacity:1}}
 @keyframes vlsDtBlink{0%,56%,64%,100%{transform:scaleY(1)}60%{transform:scaleY(.12)}}
 ${rmBlock(
@@ -301,7 +287,7 @@ ${rmBlock(
 )}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} />
+    <Frame x={164} w={152} theme={theme} result />
     {/* BEFORE: plain bar row, pawn looks on */}
     <path d="M28 74 H116" stroke="var(--ink)" strokeWidth={2.5} strokeLinecap="round" fill="none" />
     <g fill="var(--ink)">
@@ -311,9 +297,7 @@ ${rmBlock(
       <rect x={82} y={44} width={8} height={30} rx={2.5} />
       <rect x={98} y={52} width={8} height={22} rx={2.5} />
     </g>
-    <Pawn x={132} yb={80} s={7} />
-    <circle cx={129.8} cy={65.2} r={1.2} fill="#101a2c" />
-    <circle cx={132.6} cy={65.2} r={1.2} fill="#101a2c" />
+    <Pawn x={132} yb={80} s={7} eyes gaze={-2} />
     {/* AFTER: magnifier over the same bars, enlarged inside the lens */}
     <path d="M188 74 H276" stroke="var(--ink)" strokeWidth={2.5} strokeLinecap="round" fill="none" />
     <g fill="var(--ink)">
@@ -332,22 +316,18 @@ ${rmBlock(
         <rect x={240} y={40} width={10} height={32} rx={3} />
       </g>
     </g>
-    <Pawn x={296} yb={80} s={7} />
-    <g className="vls-dt-blink">
-      <circle cx={293.4} cy={65.6} r={1.2} fill="#101a2c" />
-      <circle cx={296.2} cy={65.6} r={1.2} fill="#101a2c" />
-    </g>
+    <Pawn x={296} yb={80} s={7} eyes gaze={-2} eyeClassName="vls-dt-blink" />
   </>
 );
 
 /** hint-more-metrics: one meter row + chevron-down (beckons) → three rows
- * unfold with overshoot + chevron-up. Loop 3s. */
+ * unfold with overshoot + chevron-up. Demonstrates once, then holds. */
 const hintMoreMetrics: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-mm-chev{animation:vlsMmChev 3s ease-in-out infinite}
-.vls-mm-r2{animation:vlsMmIn 3s cubic-bezier(.3,1.5,.5,1) infinite}
-.vls-mm-r3{animation:vlsMmIn 3s cubic-bezier(.3,1.5,.5,1) .12s infinite}
+.vls-mm-chev{animation:vlsMmChev var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-mm-r2{animation:vlsMmIn var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
+.vls-mm-r3{animation:vlsMmIn var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) .12s var(--comic-repeat,1) both}
 @keyframes vlsMmChev{0%,30%,100%{transform:translateY(0)}15%{transform:translateY(2.5px)}}
 @keyframes vlsMmIn{0%{opacity:0;transform:translateY(-7px)}8%{opacity:1;transform:translateY(1px)}14%,100%{opacity:1;transform:translateY(0)}}
 ${rmBlock(
@@ -359,7 +339,7 @@ ${rmBlock(
 )}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} />
+    <Frame x={164} w={152} theme={theme} result />
     {/* BEFORE: one folded row, chevron-down bobs, pawn watches */}
     <rect x={34} y={32} width={92} height={15} rx={7.5} fill="var(--wall-2)" stroke="var(--ink)" strokeWidth={2} />
     <g fill="var(--ink)">
@@ -369,9 +349,7 @@ ${rmBlock(
       <circle cx={80} cy={39.5} r={2} />
     </g>
     <path className="vls-mm-chev" d="M70 62 l10 8 l10 -8" stroke="var(--ink)" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
-    <Pawn x={140} yb={80} s={6} />
-    <circle cx={138.2} cy={67.4} r={1} fill="#101a2c" />
-    <circle cx={140.6} cy={67.4} r={1} fill="#101a2c" />
+    <Pawn x={140} yb={80} s={6} eyes gaze={-2} />
     {/* AFTER: three rows unfolded, chevron-up on top */}
     <path d="M230 22 l10 -7 l10 7" stroke="var(--ink)" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
     <rect x={194} y={28} width={92} height={15} rx={7.5} fill="var(--wall-2)" stroke="var(--ink)" strokeWidth={2} />
@@ -395,16 +373,14 @@ ${rmBlock(
       <rect x={226} y={69} width={5} height={6} rx={1.5} fill={STAR_GOLD} />
       <circle cx={240} cy={71.5} r={2} fill={STAR_GOLD} />
     </g>
-    <Pawn x={300} yb={80} s={6} />
-    <circle cx={298.2} cy={67.4} r={1} fill="#101a2c" />
-    <circle cx={300.6} cy={67.4} r={1} fill="#101a2c" />
+    <Pawn x={300} yb={80} s={6} eyes gaze={-2} />
   </>
 );
 
 const hintDebugExport: HintScene = ({ theme }) => (
   <>
     <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} />
+    <Frame x={164} w={152} theme={theme} result />
     <path d="M32 72H128" stroke="var(--ink)" strokeWidth={2.5} strokeLinecap="round" />
     <g fill="var(--ink)">
       <rect x={40} y={54} width={12} height={18} rx={2.5} />

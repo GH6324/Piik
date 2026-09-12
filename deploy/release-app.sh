@@ -26,7 +26,8 @@ descriptor_text() {
   sed -n "s|^  \"$1\": \"\([A-Za-z0-9._/-]*\)\",\{0,1\}\$|\1|p" "$descriptor"
 }
 
-grep -qx '  "schema": 1,' "$descriptor"
+grep -qx '  "schema": 2,' "$descriptor"
+version="$(descriptor_text version)"
 revision="$(descriptor_text revision)"
 release_id="$(descriptor_text releaseId)"
 artifact_name="$(descriptor_text artifact)"
@@ -37,6 +38,7 @@ file_count="$(sed -n 's|^  "fileCount": \([0-9]\{1,\}\),\{0,1\}$|\1|p' "$descrip
 main_asset="$(descriptor_text mainAsset)"
 
 [[ "$revision" =~ ^[0-9a-f]{40}$ ]]
+[[ "$version" = development || "$version" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]
 [[ "$release_id" =~ ^[0-9a-f]{7}$ ]]
 test "$release_id" = "${revision:0:7}"
 test "$artifact_name" = "piik-${release_id}-runtime.tar.gz"
@@ -232,7 +234,8 @@ test -d "$release"
 test ! -L "$release"
 test "$(stat -c '%U:%G %a' "$release")" = 'root:root 755'
 
-firewall_before="$(nft list table inet bonfire_filter | sha256sum | awk '{print $1}')"
+# Compare rules without traffic counters; no operator-specific table name.
+firewall_before="$(nft --stateless list ruleset | sha256sum | awk '{print $1}')"
 nginx_restarts="$(systemctl show nginx.service -p NRestarts --value)"
 cutover_since="$(date '+%Y-%m-%d %H:%M:%S')"
 cutover_start="$(date +%s%3N)"
@@ -249,7 +252,7 @@ health_ready="$(date +%s%3N)"
 test "$(systemctl show piik.service -p ActiveState --value)" = 'active'
 test "$(systemctl show piik.service -p NRestarts --value)" = '0'
 test "$(systemctl show nginx.service -p NRestarts --value)" = "$nginx_restarts"
-test "$(nft list table inet bonfire_filter | sha256sum | awk '{print $1}')" = "$firewall_before"
+test "$(nft --stateless list ruleset | sha256sum | awk '{print $1}')" = "$firewall_before"
 test "$(readlink -f -- "$current")" = "$release"
 pid="$(systemctl show piik.service -p MainPID --value)"
 test "$pid" -gt 1

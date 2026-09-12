@@ -25,18 +25,33 @@ import { BrandLoader } from "./components/living/BrandMark";
 import { Btn, Pill } from "./components/living/primitives";
 import { Comic, type ComicKind } from "./components/living/Comic";
 import { Glyph, type GlyphName } from "./ui/icons";
-import { useCopy } from "./ui/copy";
+import { setCopy, useCopy } from "./ui/copy";
+import { initTheme } from "./ui/theme";
 import { installBrowserDebug } from "./lib/debug";
-import { OverlayPreviewPage } from "./pages/OverlayPreviewPage";
-import { TooltipPreviewPage } from "./pages/TooltipPreviewPage";
+
+const OverlayPreviewPage = import.meta.env.DEV
+  ? lazy(() => import("./pages/OverlayPreviewPage").then((module) => ({ default: module.OverlayPreviewPage })))
+  : null;
+const TooltipPreviewPage = import.meta.env.DEV
+  ? lazy(() => import("./pages/TooltipPreviewPage").then((module) => ({ default: module.TooltipPreviewPage })))
+  : null;
+
+const StatusPreviewPage = import.meta.env.DEV
+  ? lazy(() => import("./pages/StatusPreviewPage").then((module) => ({ default: module.StatusPreviewPage })))
+  : null;
+const PlaybackPreviewPage = import.meta.env.DEV
+  ? lazy(() => import("./pages/PlaybackPreviewPage").then((module) => ({ default: module.PlaybackPreviewPage })))
+  : null;
 
 const appRoute = parseAppRoute(window.location.pathname);
-const overlayPreview = import.meta.env.DEV && window.location.pathname === "/__overlay-preview";
-const tooltipPreview = import.meta.env.DEV && window.location.pathname === "/__tooltip-preview";
 const clientLaunchBootstrap =
   appRoute.kind === "host" || appRoute.kind === "viewer"
     ? takeClientLaunchBootstrap()
     : null;
+initTheme(clientLaunchBootstrap?.presentation?.theme);
+if (clientLaunchBootstrap?.presentation) {
+  setCopy(clientLaunchBootstrap.presentation);
+}
 const clientAccessBootstrap = clientLaunchBootstrap?.accessToken ?? null;
 const viewerRoute = appRoute.kind === "viewer" ? readViewerRoute() : null;
 const hostPageModule =
@@ -129,10 +144,16 @@ class RouteBoundary extends Component<
 }
 
 function AppRoute() {
-  if (overlayPreview) {
+  if (PlaybackPreviewPage && window.location.pathname === "/__playback-preview") {
+    return <PlaybackPreviewPage />;
+  }
+  if (StatusPreviewPage && window.location.pathname === "/__status-preview") {
+    return <StatusPreviewPage />;
+  }
+  if (OverlayPreviewPage && window.location.pathname === "/__overlay-preview") {
     return <OverlayPreviewPage />;
   }
-  if (tooltipPreview) {
+  if (TooltipPreviewPage && window.location.pathname === "/__tooltip-preview") {
     return <TooltipPreviewPage />;
   }
   if (appRoute.kind === "client") {
@@ -267,16 +288,16 @@ function SiteAccessGate({
   const [password, setPassword] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
+  function loadAccess(password?: string) {
+    return Promise.all([
+      password ? authenticateSiteAccess(password) : getSiteAccess(),
+      surface === "host" ? getRuntimeCapabilities() : Promise.resolve(null),
+    ]);
+  }
+
   useEffect(() => {
     let active = true;
-    void Promise.all([
-      clientAccessBootstrap
-        ? authenticateSiteAccess(clientAccessBootstrap)
-        : getSiteAccess(),
-      surface === "host"
-        ? getRuntimeCapabilities()
-        : Promise.resolve<RuntimeCapabilities>({ natPrediction: false }),
-    ]).then(
+    void loadAccess(clientAccessBootstrap ?? undefined).then(
       ([status, nextCapabilities]) => {
         if (!active) return;
         setCapabilities(nextCapabilities);
@@ -336,12 +357,7 @@ function SiteAccessGate({
   async function retry(): Promise<void> {
     setAccess({ kind: "checking" });
     try {
-      const [status, nextCapabilities] = await Promise.all([
-        getSiteAccess(),
-        surface === "host"
-          ? getRuntimeCapabilities()
-          : Promise.resolve<RuntimeCapabilities>({ natPrediction: false }),
-      ]);
+      const [status, nextCapabilities] = await loadAccess();
       setCapabilities(nextCapabilities);
       setAccess(stateFromStatus(status));
     } catch (error) {
@@ -360,17 +376,15 @@ function SiteAccessGate({
 
     setSubmitting(true);
     try {
-      setAccess(
-        stateFromStatus(await authenticateSiteAccess(submittedPassword)),
-      );
+      const [status, nextCapabilities] = await loadAccess(submittedPassword);
+      setCapabilities(nextCapabilities);
+      setAccess(stateFromStatus(status));
     } catch (error) {
-      setAccess({
-        kind: "required",
-        error:
-          error instanceof ApiError && error.status === 401
-            ? t("gate.wrong")
-            : readableError(error, t),
-      });
+      setAccess(
+        error instanceof ApiError && error.status === 401
+          ? { kind: "required", error: t("gate.wrong") }
+          : { kind: "unavailable", message: readableError(error, t) },
+      );
     } finally {
       setSubmitting(false);
     }
@@ -391,6 +405,7 @@ function SiteAccessGate({
     return (
       <HostPage
         launchedByClient={clientLaunchBootstrap?.launchedByClient}
+        sfuAvailable={capabilities?.sfu === true}
         natPredictionAvailable={capabilities?.natPrediction === true}
         onAuthorizationRequired={() =>
           setAccess({ kind: "required", error: t("gate.expired") })
