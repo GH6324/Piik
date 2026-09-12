@@ -9,6 +9,7 @@ import (
 	"net"
 	"net/http"
 	"net/url"
+	"runtime"
 	"strings"
 	"sync"
 	"time"
@@ -78,10 +79,6 @@ func Start(parent context.Context, assets fs.FS, site, version, revision, localA
 		return nil, errors.New("App launcher Site is invalid")
 	}
 	site = normalizedSite
-	normalizedPassword, err := appconfig.NormalizeLocalAccessPassword(localAccessPassword)
-	if err != nil {
-		return nil, errors.New("App launcher local access password is invalid")
-	}
 	if assets == nil {
 		return nil, errors.New("App launcher assets are unavailable")
 	}
@@ -100,7 +97,7 @@ func Start(parent context.Context, assets fs.FS, site, version, revision, localA
 		assets:              assets,
 		static:              http.FileServer(http.FS(assets)),
 		site:                site,
-		localAccessPassword: normalizedPassword,
+		localAccessPassword: localAccessPassword,
 		version:             version,
 		revision:            strings.TrimSpace(revision),
 		selection:           make(chan Selection, 1),
@@ -205,6 +202,7 @@ func (server *Server) handleState(response http.ResponseWriter, request *http.Re
 		"localAccessPassword": server.localAccessPassword,
 		"version":             server.version,
 		"revision":            server.revision,
+		"packageTarget":       runtime.GOOS + "-" + runtime.GOARCH,
 		"defaultMode": func() Mode {
 			if server.site != "" {
 				return ModeSite
@@ -313,13 +311,6 @@ func decodeSelection(reader io.Reader) (Selection, error) {
 			return Selection{}, errors.New("local launch cannot include a Site")
 		}
 		selection.Site = ""
-		normalizedPassword, err := appconfig.NormalizeLocalAccessPassword(
-			selection.LocalAccessPassword,
-		)
-		if err != nil {
-			return Selection{}, errors.New("local access password is invalid")
-		}
-		selection.LocalAccessPassword = normalizedPassword
 	case ModeSite:
 		if selection.LocalAccessPassword != "" {
 			return Selection{}, errors.New("Site launch cannot include a local access password")
