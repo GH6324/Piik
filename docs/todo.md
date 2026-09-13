@@ -8,8 +8,8 @@ history. A parked idea is not implementation authority.
 ## Now
 
 - [ ] **Post-launch monitoring.** Collect App/Server feedback and verify the
-  public download path and deployed services after product releases. Follow the
-  [deployment runbook](./deployment.md) for the private service and keep public
+  public downloads, container pulls and deployed services after product releases.
+  Follow the [deployment runbook](./deployment.md) for the private service and keep public
   demo deployment separate. Preserve the owner's
   [device/network deferrals](./verification-status.md#candidate-evidence-boundary).
 
@@ -17,14 +17,6 @@ Keep fixes on a maintenance branch until acceptance. The public release is the
 compatibility baseline; private service deployment stays independent.
 
 ## Next: P2P Connection And Feedback Evidence
-
-**Next release: NAT-PMP dependency correctness.** Integrate an upstream fix or
-maintained dependency revision that uses the gateway-assigned external port,
-sends an actual deletion request and honors cancellation/deadlines. Preserve
-the existing PCPv6 combination and bounded mapping lifecycle. The current
-optional path can advertise a requested port that the router reassigned;
-ordinary ICE remains available. Keep this out of the current release. See the
-[dependency boundary](./research/nat-traversal.md#gateway-and-survey-limits).
 
 After the current phase, measure connection success, time to first picture and
 failure causes on representative networks, especially App and P2P-only sites.
@@ -42,21 +34,6 @@ Preserve one graph and one operation under the
 not establish better connection success or speed; this note adds no retry policy.
 
 ## Parked Product Work
-
-The reported persistent low resolution after Viewer backgrounding and square
-black video remain unconfirmed incident leads, separate from the closed,
-reproduced reconnect ownership bug. They do not block this release. Reopen from
-matching upstream/receiver evidence; local H264 relay background checks did not
-reproduce them. Missing NAT attempt text alone does not prove skipped attempts.
-If Native adaptation is implicated, compare actual VSE limitations with sender
-quality evidence before changing policy. Do not add retry budgets, visibility
-resets or resolution heuristics without proof. Sanitized aggregates and the
-isolated reconnect reproductions are diagnostic evidence, not a recovery policy.
-Game/background settings behavior also remains an unconfirmed incident lead;
-reopen from actual control actions and matching requested/applied media evidence.
-Clarify whether Viewer-local pause should survive replacement media before
-adding playback-intent state; the current binding starts new media unless the
-Host is paused. No preservation policy has been accepted for that transition.
 
 1. **Representative device/network acceptance.** Resume the remaining matrix in
    [verification status](./verification-status.md#remaining-device-and-network-acceptance)
@@ -107,9 +84,7 @@ Host is paused. No preservation policy has been accepted for that transition.
     support: the pinned capture SDK currently has no Windows x86 package.
     Complete native packaging and real launch/capture acceptance before
     advertising a 32-bit target.
-10. **Ready-to-run Docker distribution.** Publish a maintained image and a short
-    deployment recipe. The existing runtime image already contains Web, room
-    signaling, STUN and optional embedded SFU in one process; the gap is a
-    published image and simple HTTPS, port and persistent-volume setup. Reuse
-    that server artifact and the existing release identity rather than adding
-    another service stack.
+10. **Windows code signing.** Revisit after enrollment in a trusted signing
+    service. Sign Piik's executables before archive checksums are computed;
+    signing improves publisher identity but does not guarantee that antivirus
+    cloud scanning stops. Service selection and enrollment remain pending.

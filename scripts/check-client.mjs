@@ -15,13 +15,16 @@ import { CLIENT_PACKAGE_TARGETS, clientPackageTarget, clientGoEnvironment } from
 // fail without it. The Hosted binary is cross-built for its deployment target.
 const CLIENT_INDEX = join("internal", "server", "webassets", "dist", "index.html");
 const SERVER_TARGET = clientPackageTarget("linux-amd64");
+// Local dependency repairs retain upstream tests, including PCPv6 composition.
+// Nested modules need explicit test patterns; remove these with the replacements.
+const GO_TEST_PACKAGES = ["./...", "github.com/netbirdio/go-nat/...", "github.com/jackpal/go-nat-pmp"];
 
 const root = realpathSync(resolve(dirname(fileURLToPath(import.meta.url)), ".."));
 const captureRoot = join(root, "native", "capture");
 const mode = process.argv[2] ?? "--all";
 
-if (!["--all", "--core", "--capture-only"].includes(mode)) {
-  throw new Error("Usage: node scripts/check-client.mjs [--all|--core|--capture-only]");
+if (!["--all", "--core", "--capture-only", "--race"].includes(mode)) {
+  throw new Error("Usage: node scripts/check-client.mjs [--all|--core|--capture-only|--race]");
 }
 
 function run(command, args, options = {}) {
@@ -61,7 +64,7 @@ function checkCore() {
     throw new Error(`Go source is not formatted:\n${unformatted}`);
   }
   runClientTests(go);
-  run(go, ["vet", "./..."]);
+  run(go, ["vet", ...GO_TEST_PACKAGES]);
 
   const buildRoot = join(root, "build", "client-check");
   mkdirSync(buildRoot, { recursive: true });
@@ -86,15 +89,18 @@ function checkCore() {
   }
 }
 
-function runClientTests(go) {
+function runClientTests(go, packagesToTest = GO_TEST_PACKAGES, flags = []) {
   if (process.platform !== "win32") {
-    run(go, ["test", "./..."]);
+    run(go, ["test", ...flags, ...packagesToTest.filter((entry) => entry.startsWith("./"))]);
+    // PCP and NAT-PMP both require port 5351. Serialize only their fixture
+    // packages, keeping ordinary Piik tests parallel and using portable loopback.
+    run(go, ["test", ...flags, "-p=1", ...packagesToTest.filter((entry) => !entry.startsWith("./"))]);
     return;
   }
 
   // Windows firewall permissions follow executable paths, including tests that
   // open sockets indirectly. Never execute a test from Go's temporary directory.
-  const packages = run(go, ["list", "-f", '{{if or .TestGoFiles .XTestGoFiles}}[{{printf "%q" .ImportPath}},{{printf "%q" .Dir}}]{{end}}', "./..."], { capture: true })
+  const packages = run(go, ["list", "-f", '{{if or .TestGoFiles .XTestGoFiles}}[{{printf "%q" .ImportPath}},{{printf "%q" .Dir}}]{{end}}', ...packagesToTest], { capture: true })
     .split(/\r?\n/)
     .map((value) => value.trim())
     .filter(Boolean)
@@ -103,8 +109,8 @@ function runClientTests(go) {
   mkdirSync(stableRoot, { recursive: true });
   for (const [entry, directory] of packages) {
     const binary = join(stableRoot, `${basename(entry)}.test.exe`);
-    run(go, ["test", "-c", "-o", binary, entry]);
-    run(binary, [], { cwd: directory });
+    run(go, ["test", ...flags, "-c", "-o", binary, entry]);
+    run(binary, flags.includes("-race") ? ["-test.timeout=2m"] : [], { cwd: directory });
   }
 }
 
@@ -203,6 +209,14 @@ function checkPlatformCapture() {
   }
 }
 
-if (mode !== "--capture-only") checkCore();
-if (mode !== "--core") checkPlatformCapture();
+if (mode === "--race") {
+  buildWebAssets();
+  runClientTests(process.env.PIIK_GO?.trim() || "go", [
+    "./internal/app/portmapping", "./internal/app/mediaedge",
+    "github.com/netbirdio/go-nat/...", "github.com/jackpal/go-nat-pmp",
+  ], ["-race", "-count=1", "-timeout=2m"]);
+} else {
+  if (mode !== "--capture-only") checkCore();
+  if (mode !== "--core") checkPlatformCapture();
+}
 process.stdout.write("Piik App checks passed.\n");
