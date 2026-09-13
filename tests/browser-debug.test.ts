@@ -20,9 +20,38 @@ afterEach(() => {
 });
 
 describe("opt-in Browser diagnostics", () => {
+  it("keeps explicit diagnostics through room and App entry without copying source credentials", async () => {
+    const page = browser("?debug=1&token=source-secret");
+    const { withBrowserDebug } = await import("../src/client/lib/debug");
+    const { clientLaunchURL, roomRouteForExplicitEntry, readViewerRoute } = await import("../src/client/lib/session");
+    const launched = new URL(clientLaunchURL(
+      "https://site.example/?existing=1#client-access=target-capability&piik-client=1",
+      { lang: "en", vis: false, theme: "light" },
+    ));
+    expect(launched.origin).toBe("https://site.example");
+    expect(launched.search).toBe("?existing=1&debug=1");
+    expect(new URLSearchParams(launched.hash.slice(1)).get("client-access")).toBe("target-capability");
+    expect(launched.href).not.toContain("source-secret");
+    expect(new URL(clientLaunchURL("https://site.example/",
+      { lang: "en", vis: false, theme: "light" }, false)).search).toBe("");
+    expect(new URL(clientLaunchURL("https://site.example/",
+      { lang: "en", vis: false, theme: "light" }, true)).search).toBe("?debug=1");
+    expect(roomRouteForExplicitEntry("5678")).toBe("https://private.example/r/5678?debug=1");
+    expect(withBrowserDebug("/join")).toBe("https://private.example/join?debug=1");
+    const replaceState = vi.fn();
+    Object.assign(page, { history: { state: null, replaceState } });
+    const grant = `${"a".repeat(21)}A`;
+    page.location.hash = `#v=${grant}`;
+    expect(readViewerRoute()?.viewerGrant).toBe(grant);
+    // Consuming the invitation removes its credential and unrelated query
+    // parameters while keeping diagnostics enabled for a later reload.
+    expect(replaceState).toHaveBeenCalledWith(null, "", "https://private.example/r/1234?debug=1");
+  });
+
   it("does no diagnostic collection without the explicit flag", async () => {
     const page = browser("");
     const debug = await import("../src/client/lib/debug");
+    expect(debug.withBrowserDebug("/join")).toBe("/join");
     expect(debug.installBrowserDebug()).toBeUndefined();
     debug.debugEvent("capture", "requested", { resolution: "1080p" });
     debug.debugError("capture", "failed", new Error("private detail"));
@@ -125,6 +154,36 @@ describe("opt-in Browser diagnostics", () => {
     expect(report).toContain("framesEncoded");
     expect(report).toContain("packetization-mode=1;profile-level-id=42e01f");
     expect(report).not.toContain("private-certificate");
+  });
+
+  it("keeps selected ICE evidence when many interface pairs exceed the raw report limit", async () => {
+    browser();
+    const debug = await import("../src/client/lib/debug");
+    const rtc = await import("../src/client/lib/debug-webrtc");
+    const connection = Object.assign(new EventTarget(), { getSenders: () => [], getReceivers: () => [] });
+    const peer = connection as unknown as RTCPeerConnection;
+    rtc.observeDebugConnection(peer, { connectionId: "many-interfaces", role: "receive" });
+    const records = new Map<string, object>();
+    for (let index = 0; index < 70; index++) {
+      records.set(`pair-${index}`, { type: "candidate-pair", state: "failed" });
+    }
+    records.set("chosen", { type: "candidate-pair", state: "succeeded",
+      localCandidateId: "local", remoteCandidateId: "remote", requestsSent: 4, responsesReceived: 3 });
+    records.set("local", { type: "local-candidate", candidateType: "host", protocol: "udp", address: "192.0.2.1" });
+    records.set("remote", { type: "remote-candidate", candidateType: "srflx", foundation: "sp1", address: "192.0.2.2" });
+    records.set("transport", { type: "transport", selectedCandidatePairId: "chosen" });
+    rtc.debugRtcStats(peer, records as unknown as RTCStatsReport);
+    const report = JSON.parse(await debug.exportBrowserDebug());
+    const sample = report.events.find((entry: { event: string }) => entry.event === "stats");
+    expect(report.partial).toBe(true);
+    expect(sample.details.stats).toHaveLength(64);
+    expect(sample.details.ice.pairs).toMatchObject({ total: 71, failed: 70, succeeded: 1 });
+    expect(sample.details.ice.selected).toEqual([{
+      state: "succeeded", dtlsState: null,
+      localType: "host", remoteType: "srflx", protocol: "udp", natTraversalPath: "predicted",
+      requestsSent: 4, responsesReceived: 3, currentRoundTripTime: null,
+    }]);
+    expect(JSON.stringify(sample.details.ice)).not.toContain("192.0.2.");
   });
 
   it("correlates actual Native request and response using their existing wire identity", async () => {

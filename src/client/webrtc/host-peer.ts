@@ -98,6 +98,9 @@ export class HostPeer {
   private senderMutationTail: Promise<void> = Promise.resolve();
   private negotiationTail: Promise<void> = Promise.resolve();
   private startupVideoProfilePending: boolean;
+  // RTP frame counts can survive replaceTrack; 0 suits a fresh sender, while
+  // a replacement needs a valid current-track sample to establish its baseline.
+  private startupFramesBaseline: number | null = 0;
   private connectedOnce = false;
   private awaitingReconnect = false;
   private paused = false;
@@ -280,6 +283,7 @@ export class HostPeer {
         this.startupVideoProfilePending = needsStartupVideoProfile(
           this.desiredProfile,
         );
+        this.startupFramesBaseline = null;
         this.snapshot = { ...this.snapshot, metrics: { ...EMPTY_METRICS } };
         await this.configureSender(videoSender, audioSender, {
           profile: startupVideoProfile(this.desiredProfile),
@@ -415,10 +419,19 @@ export class HostPeer {
           return;
         }
         await this.enqueueNegotiation(() => this.acceptAnswer(payload));
-      } else if (this.connection.remoteDescription) {
-        await addRemoteIceCandidate(this.connection, payload.candidate);
-      } else if (this.pendingCandidates.length < MAX_PENDING_CANDIDATES) {
-        this.pendingCandidates.push(payload.candidate);
+      } else {
+        await this.enqueueNegotiation(async () => {
+          if (this.disposed) return;
+          // Native trickle events may precede a restart answer. The retained
+          // remote description still belongs to the previous ICE generation.
+          if (this.ordinaryAnswerEpoch !== null || !this.connection.remoteDescription) {
+            if (this.pendingCandidates.length < MAX_PENDING_CANDIDATES) {
+              this.pendingCandidates.push(payload.candidate);
+            }
+          } else {
+            await addRemoteIceCandidate(this.connection, payload.candidate);
+          }
+        });
       }
     } catch (error) {
       this.setError(error, "host.err.createConnection");
@@ -751,12 +764,17 @@ export class HostPeer {
       ) {
         return;
       }
-      if (
-        this.startupVideoProfilePending &&
-        (statsAccumulator.frames ?? 0) >= STARTUP_VIDEO_ENCODED_FRAMES
-      ) {
-        this.startupVideoProfilePending = false;
-        void this.updateProfile(this.desiredProfile);
+      const encodedFrames = statsAccumulator.frames;
+      if (this.startupVideoProfilePending && encodedFrames !== null) {
+        if (this.startupFramesBaseline === null) {
+          this.startupFramesBaseline = encodedFrames;
+        } else if (
+          encodedFrames - this.startupFramesBaseline >=
+          STARTUP_VIDEO_ENCODED_FRAMES
+        ) {
+          this.startupVideoProfilePending = false;
+          void this.updateProfile(this.desiredProfile);
+        }
       }
       const deliveredMetrics = this.pooledVideo?.metrics(metrics) ?? metrics;
       this.snapshot = { ...this.snapshot, metrics: deliveredMetrics };

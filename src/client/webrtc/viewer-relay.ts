@@ -4,6 +4,7 @@ import type {
   SignalPayload,
 } from "../../shared/protocol";
 import type { QualityProfile } from "../media/quality";
+import { debugEvent } from "../lib/debug";
 import { BrowserEncodingPool } from "../media/browser-encoding-pool";
 import type { PeerSnapshot } from "../types";
 import {
@@ -23,6 +24,7 @@ export interface ViewerRelayEvents {
   sendSignal: (peerId: string, payload: SignalPayload) => boolean;
   onUpdate?: (snapshot: PeerSnapshot | null) => void;
   onSenderUpdate?: (snapshot: PeerSnapshot, revision: number | null) => void;
+  onPreparedChildFailed?: (revision: number, connectionId: string) => void;
 }
 interface PreparedChild {
   revision: number;
@@ -92,17 +94,22 @@ export class ViewerRelay {
   ): boolean {
     const stream = this.stream;
     const planned = [...new Set(plannedChildPeerIds)];
-    if (
-      this.disposed ||
-      (!stream && (this.peerFactory?.requiresStream ?? true)) ||
-      candidate.transport === "sfu" ||
-      !planned.includes(candidate.childPeerId) ||
-      planned.length !== plannedChildPeerIds.length ||
-      planned.length < this.childPeerIds.length ||
-      planned.length > this.childPeerIds.length + 1 ||
-      planned.length > this.maxMediaEdges ||
-      this.childPeerIds.some((peerId) => !planned.includes(peerId))
-    ) {
+    let refusal: string | null = null;
+    if (this.disposed) refusal = "disposed";
+    else if (!stream && (this.peerFactory?.requiresStream ?? true)) refusal = "no-stream";
+    else if (candidate.transport === "sfu") refusal = "sfu-transport";
+    else if (!planned.includes(candidate.childPeerId)) refusal = "child-unplanned";
+    else if (planned.length !== plannedChildPeerIds.length) refusal = "plan-duplicate";
+    else if (planned.length < this.childPeerIds.length) refusal = "plan-shrinks";
+    else if (planned.length > this.childPeerIds.length + 1) refusal = "plan-skips";
+    else if (planned.length > this.maxMediaEdges) refusal = "over-capacity";
+    else if (this.childPeerIds.some((peerId) => !planned.includes(peerId))) refusal = "drops-current";
+    if (refusal !== null) {
+      debugEvent("webrtc", "relay-prepare-refused", {
+        revision,
+        childPeerId: candidate.childPeerId,
+        reason: refusal,
+      });
       this.discardPreparedChild();
       return false;
     }
@@ -643,11 +650,15 @@ export class ViewerRelay {
 
   private failPreparedChild(peer: HostMediaPeer): void {
     const prepared = this.preparedChild;
-    if (prepared?.peer !== peer) {
+    if (prepared?.peer !== peer || prepared.failed) {
       return;
     }
     prepared.failed = true;
     peer.dispose();
+    this.events.onPreparedChildFailed?.(
+      prepared.revision,
+      prepared.candidate.connectionId,
+    );
   }
 
   private disposePeers(): void {

@@ -7,6 +7,8 @@ import {
 } from "../../shared/protocol";
 import { z } from "zod";
 import { createOpaqueId } from "./opaque-id";
+import { isLang, type Lang } from "../locales";
+import { withBrowserDebug } from "./debug";
 
 const CLIENT_ID_PATTERN = /^[A-Za-z0-9_-]{8,128}$/;
 const CLIENT_LAUNCH_STORAGE_KEY = "piik:client-launch:v1";
@@ -71,7 +73,7 @@ export function roomRouteForExplicitEntry(value: string): string | null {
   if (route) {
     clearViewerGrant(value);
   }
-  return route;
+  return route ? withBrowserDebug(route) : null;
 }
 
 export function parseAppRoute(pathname: string): AppRoute {
@@ -101,19 +103,19 @@ export interface ClientLaunchBootstrap {
 }
 
 export interface ClientLaunchPresentation {
-  lang: "zh" | "en";
+  lang: Lang;
   vis: boolean;
   theme: "light" | "dark" | null;
 }
 
-export function clientLaunchURL(target: string, presentation: ClientLaunchPresentation): string {
+export function clientLaunchURL(target: string, presentation: ClientLaunchPresentation, debug?: boolean): string {
   const url = new URL(target);
   const params = new URLSearchParams(url.hash.slice(1));
   params.set("piik-lang", presentation.lang);
   params.set("piik-mode", presentation.vis ? "vis" : "text");
   params.set("piik-theme", presentation.theme ?? "system");
   url.hash = params.toString();
-  return url.toString();
+  return withBrowserDebug(url.toString(), debug);
 }
 
 export function takeClientLaunchBootstrap(): ClientLaunchBootstrap {
@@ -145,7 +147,7 @@ export function takeClientLaunchBootstrap(): ClientLaunchBootstrap {
   const result: ClientLaunchBootstrap = {
     accessToken: accessValue || null,
     launchedByClient,
-    presentation: launchedFromFragment && (lang === "zh" || lang === "en") &&
+    presentation: launchedFromFragment && isLang(lang) &&
       (mode === "vis" || mode === "text") &&
       (theme === "light" || theme === "dark" || theme === "system")
       ? { lang, vis: mode === "vis", theme: theme === "system" ? null : theme }
@@ -451,7 +453,7 @@ export function readViewerRoute(): ViewerRoute | null {
     } else {
       clearViewerGrant(roomId);
     }
-    window.history.replaceState(window.history.state, "", `/r/${roomId}`);
+    window.history.replaceState(window.history.state, "", withBrowserDebug(`/r/${roomId}`));
     return validGrant
       ? { roomId, viewerGrant: validGrant }
       : { roomId, invalidGrant: true };

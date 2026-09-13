@@ -28,8 +28,8 @@ publication are separate steps in [deployment](../../docs/deployment.md).
   origin; later manually opened Host pages may reuse the running App.
 - The `--site`, `--local`, and `--link` flags select a mode for CI and development.
 - The default launcher checks official releases after it opens, using GitHub
-  first and Gitee if GitHub is unavailable. It links to an available release
-  without installing or replacing the App.
+  first and Gitee if GitHub is unavailable. It opens the matching platform ZIP
+  when available, falling back to the release page. It does not install or replace the App.
 
 Local mode uses memory-only rooms, P2P relay, no SFU listener, and no public
 discovery. Ordinary Local works on a reachable LAN. The **Public invite** mode
@@ -39,8 +39,14 @@ uses one ordinary public STUN destination plus two bounded public survey
 destinations. Browser and Native edges share the same prediction rule; Native
 STUN, ICE checks, and media use one Pion UDP mux. Media does not
 travel through the HTTP tunnel, and a difficult media path still has no SFU or
-TURN fallback. The App chooses a sole private LAN IPv4 automatically. Use
-`--lan-address <address>` only when multiple real LAN interfaces are active.
+TURN fallback.
+
+For Local invitations, the App automatically selects a sole active address or
+sole private IPv4. If several addresses remain possible, choose an interface
+and IP in the launcher. Public invite and Site mode need no LAN selection.
+When bypassing the launcher with `--local`, use `--lan-address <address>` to
+resolve an ambiguous choice. The selected address is checked again at startup;
+it affects Local invitation links, while ICE selects media paths independently.
 
 The system Browser remains the Host UI. An App-launched Host offers the
 Browser's standard capture picker and a list of exact platform capture targets;
@@ -86,6 +92,9 @@ follows the launcher and App-enabled pages.
 Press `o` to reopen the Browser, or `q` / Ctrl+C to end Local
 rooms and stop the local server and temporary public link. Plain-text output
 uses Ctrl+C. The App keeps running after a Site tab closes.
+When launched in its own Windows console, a startup or runtime error leaves the
+error visible until Enter is pressed. Normal shutdown, existing terminals and
+redirected or automated runs exit directly.
 
 For one-link Internet sharing, open the App launcher, choose **Public invite**,
 create a room in the opened Browser, and send its normal invitation link. The
@@ -118,11 +127,12 @@ and the [verified policy mechanism and field case](../../docs/research/native-cl
 
 ### Diagnostics
 
-Start the packaged executable with `--debug`, reproduce the problem, then press
-`D` in the interactive terminal to export a local ZIP. This does not stop the
-share or upload the archive. Browser diagnostics are separate: open the page with
-`?debug=1` and use its header download button. For cooperation failures, include
-both reports from the same reproduction. The
+Enable **Debug launch** in the mode selector before opening Piik, reproduce the
+problem, then press `D` in the interactive terminal to export a local ZIP.
+Use `--debug` for failures before the selector opens. Exporting does not stop
+the share or upload the archive. For Browser diagnostics, click the **Debug**
+chip icon after the theme control, confirm the reload, then use **Web report** to download.
+For cooperation failures, include both reports from the same reproduction. The
 [diagnostic reference](../../docs/reference/configuration.md#diagnostics) owns
 log locations, export commands, retention and privacy boundaries.
 
@@ -197,7 +207,7 @@ Supported targets are `windows-amd64`, `linux-amd64`, and `darwin-arm64`.
 Use the matching target name in the command above. Darwin assembly requires a
 native macOS runner with its SDK and enables cgo; Windows and Linux assembly keep
 cgo disabled.
-The result is a `tar.gz` bundle and SHA-256 file. Manual sidecar assembly,
+The result is a ZIP bundle and SHA-256 file. Manual sidecar assembly,
 explicit CI packaging, Release publication and updates are documented in
 [deployment](../../docs/deployment.md); creating a candidate does not publish it.
 

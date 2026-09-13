@@ -26,8 +26,9 @@ import { Btn, Pill } from "./components/living/primitives";
 import { Comic, type ComicKind } from "./components/living/Comic";
 import { Glyph } from "./ui/icons";
 import { setCopy, useCopy } from "./ui/copy";
+import { consoleLanguage } from "./locales";
 import { initTheme } from "./ui/theme";
-import { installBrowserDebug } from "./lib/debug";
+import { installBrowserDebug, withBrowserDebug } from "./lib/debug";
 
 const OverlayPreviewPage = import.meta.env.DEV
   ? lazy(() => import("./pages/OverlayPreviewPage").then((module) => ({ default: module.OverlayPreviewPage })))
@@ -103,7 +104,7 @@ export function App() {
     const controller = new AbortController();
     void import("./native/client")
       .then(({ notifyNativePresentation }) =>
-        notifyNativePresentation(vis ? "vis" : lang, controller.signal))
+        notifyNativePresentation(consoleLanguage(lang, vis), controller.signal))
       .catch(() => undefined);
     return () => controller.abort();
   }, [lang, vis]);
@@ -245,7 +246,7 @@ function StaticRoute({
               title="join.title"
               cap="join.title"
               hint="hint-join-go"
-              onClick={() => window.location.assign("/join")}
+              onClick={() => window.location.assign(withBrowserDebug("/join"))}
             />
           ) : action === "reload" ? (
             <Btn

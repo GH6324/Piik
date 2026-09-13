@@ -80,6 +80,13 @@ schema field. The user settings are:
 The launcher preselects a saved Site when present; otherwise it preselects the
 public invitation link. Selecting a mode does not start it: the user confirms
 with the launch button. Local mode remains available for the same network.
+For Local mode, the launcher selects a sole active address or sole private IPv4
+address automatically. With several choices it shows interface names and IPs;
+an ambiguous choice must be selected before launch. `--lan-address` preselects
+an active address. Selection applies to this launch and is revalidated at startup.
+It sets the local invitation origin; HTTP still listens on the existing wildcard
+listener and ICE remains free to use available media interfaces. Public Link and
+Site mode require no local address selection.
 
 Command-line options select entry and local runtime behavior:
 
@@ -92,8 +99,8 @@ Command-line options select entry and local runtime behavior:
 | `--capture-process <path>` / `--tunnel-process <path>` | Override packaged native capture or public tunnel helpers. Ordinary installations use the packaged paths. |
 | `--debug` / `--log-dir <path>` | Enable diagnostics or choose their destination as described below. |
 
-Share quality, room access policy, language, theme and motion are configured in
-the shared Web UI, not through Server environment variables or App JSON.
+Share quality, room access policy, language and theme are configured in
+the shared Web UI. Decorative motion follows the system's reduced-motion preference.
 
 ## Diagnostics
 
@@ -105,26 +112,40 @@ Diagnostics are local and opt-in. Enable them **before** reproducing the problem
 
 | Surface | Enable | Export |
 | --- | --- | --- |
-| App | Start with `--debug` or `PIIK_DEBUG=client` | Press `D` in the terminal for a ZIP |
-| Browser Host/Viewer | Add `?debug=1` to the page URL, before any invitation fragment | Use the download button beside language/theme controls |
+| App | Enable **Debug launch** with the small chip icon after the theme control in the mode selector, or start with `--debug` / `PIIK_DEBUG=client` | Press `D` in the terminal for a ZIP |
+| Browser Host/Viewer | Click the **Debug** chip icon after the theme control and confirm the reload, or add `?debug=1` before any invitation fragment | The same control becomes a download arrow for the web report |
 | Hosted Server | Start with `--debug`, `PIIK_DEBUG=server` or `PIIK_DEBUG=route` | On Unix, `kill -USR1 <pid>`; also exported at orderly shutdown |
+
+App **Debug launch** enables App and Browser collection for that run before
+starting the selected mode. It records Native capability results and subsequent
+capture, connection and local-server activity. Use `--debug` for failures before
+the mode selector opens. This choice does not change the saved App configuration.
+When bypassing the mode selector, `--debug` and `PIIK_DEBUG=client` enable backend
+collection; enable the Browser control separately for browser-side diagnosis.
+
+The Browser entry reloads the current page so collection includes connection
+startup. The opt-in follows App launch and room entry. Enabling it keeps the
+current URL parameters and any invitation fragment, but interrupts active
+sharing/viewing; enable it before reproducing the problem. Reports remain local
+until exported and shared by the user.
 
 Server Debug is controlled by its startup environment or CLI, never by a remote
 page or room role. Browser `?debug=1` only enables that page's local collection;
-it cannot change Server logging or download Server reports. The Server exposes
-no HTTP diagnostic export or pprof endpoint.
+it does not enable App Native/capture or Server logging, or download their
+reports. The Server exposes no HTTP diagnostic export or pprof endpoint.
 
 App/Server ZIP and Browser JSON reports are separate: when investigating
-Browser/App cooperation, include both from the same reproduction. Neither
-action stops an active share or uploads anything. Browser export also remains
-available as `await window.__PIIK_DEBUG__.export()` in DevTools.
+Browser/App cooperation, include both from the same reproduction. Exporting
+either report does not stop an active share or upload anything. Browser export
+also remains available as `await window.__PIIK_DEBUG__.export()` in DevTools.
 
 App logs go to `logs` beside the executable, falling back to `Piik/logs`
 in the OS user-cache directory when that default is unwritable. The TUI shows
 the actual path and the exported ZIP. `--log-dir` overrides
 `PIIK_LOG_DIR`; an explicit directory must be writable. Choosing a
 directory alone does not enable collection. Non-interactive Apps export at
-orderly shutdown. On App, `PIIK_DEBUG=route` alone retains console route
+orderly shutdown; a returned App error also exports before the terminal closes.
+On App, `PIIK_DEBUG=route` alone retains console route
 tracing; use `--debug` for file collection and the `D` action.
 
 Hosted logs use `PIIK_LOG_DIR`, otherwise systemd `LOGS_DIRECTORY`,
@@ -152,6 +173,10 @@ The report combines operation history and existing runtime evidence:
   Pool observations distinguish native carrier reports, actual output and its
   assigned producer. Export adds Browser/platform metadata; diagnostic collection
   does not replace media APIs or control transport.
+  Each RTC sample includes a compact ICE summary ahead of the bounded raw stats:
+  reported pair states and selected-path type, prediction provenance, check
+  responses and RTT when available. Pair counts describe that sample, not route
+  attempts or a connection-success rate.
 
 Each Go component keeps an 8 MiB current log and one 8 MiB backup. ZIPs contain
 these retained logs, a report marker, selected startup context, build/module and
@@ -162,12 +187,14 @@ or C++ memory dumps. A failed optional collector leaves useful files available;
 failure still reports an export failure. Rotation and preexisting history are
 identified; retained logs do not claim a complete session history.
 
+Exported ZIPs remain until the user moves or deletes them; rotation manages only
+the current logs. Repeated exports and Debug-mode error exits accumulate archives,
+so manage that directory's disk usage separately.
+
 Browser retains up to 8,192 events and 8 MiB of compact event data in the current
 page. Reports identify retained sequence/time ranges, evicted/truncated events
 and collector failures. Field/record limits are explicit in the report.
 Browser reload/close loses that in-page history; export before closing it.
-Go ZIP exports remain until the user/operator removes them; rotation only
-manages the current logs.
 
 Credentials, authorization/cookies, invitation secrets, ICE passwords/fragments
 and private keys are filtered before persistence/export. Application media

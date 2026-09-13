@@ -16,14 +16,27 @@ history. A parked idea is not implementation authority.
 Keep fixes on a maintenance branch until acceptance. The public release is the
 compatibility baseline; private service deployment stays independent.
 
-## Next: P2P Connection And Feedback Review
+## Next: P2P Connection And Feedback Evidence
+
+**Next release: NAT-PMP dependency correctness.** Integrate an upstream fix or
+maintained dependency revision that uses the gateway-assigned external port,
+sends an actual deletion request and honors cancellation/deadlines. Preserve
+the existing PCPv6 combination and bounded mapping lifecycle. The current
+optional path can advertise a requested port that the router reassigned;
+ordinary ICE remains available. Keep this out of the current release. See the
+[dependency boundary](./research/nat-traversal.md#gateway-and-survey-limits).
 
 After the current phase, measure connection success, time to first picture and
 failure causes on representative networks, especially App and P2P-only sites.
-Review user progress/failure feedback and useful privacy-conscious diagnostics.
-Trace the existing ICE and P2P/SFU handoffs, including background P2P attempts
-behind working SFU media; compare SFU-first startup with measured current behavior
-before choosing changes. Preserve one graph and one operation under the
+Use existing Debug provenance and selected-path events before adding runtime
+counters. Separate emitted candidates, actual connection attempts, successful
+paths and timeouts; keep observations scoped to connection generations and
+exclude raw endpoints. Establish survey response visibility without treating
+local listener binding as proof of public reachability. The
+[NAT evidence](./research/nat-traversal.md#gateway-and-survey-limits) owns the
+dependency and observation limits. Compare current P2P/SFU handoffs, including
+background P2P attempts behind working SFU media, before choosing changes.
+Preserve one graph and one operation under the
 [routing contract](./product/routing-transport.md) and
 [ADR-0005](./adr/0005-automatic-hybrid-media-routing.md). Prior ownership audits do
 not establish better connection success or speed; this note adds no retry policy.
@@ -82,17 +95,21 @@ Host is paused. No preservation policy has been accepted for that transition.
    direction with original Piik assets. Assess extension boundaries and cost
    before scheduling any theme/plugin API. Design experiments remain in Git
    history, outside the main source tree.
-8. **Community translations.** Prepare the existing locale catalogs for
-   community contributions when scheduled. No new translation framework is
-   needed for the current Chinese, English and optional pure-visual modes.
-9. **First-share startup quality.** Verify that the existing five-frame startup
-    protection for `motion + balanced` still takes effect on every active sender
-    and shared-encoding path. Compare with the documented
-    [startup regression](./research/realtime-quality-adaptation.md) and check
-    whether later audits or refactors bypassed a necessary guard. Do not remove
-    the workaround without evidence that first-share quality remains correct.
-10. **32-bit App packages.** Deferred until suitable native capture dependencies
+8. **Additional languages.** Review community catalogs and their rendered UI
+   following the [translation guide](./guide/translating.md). Add website,
+   documentation or App console translations as contributed; verify text
+   direction and layout when a language requires it. Before registering the
+   first extra UI language, fix the overflow menu's placement near the viewport
+   bottom: it currently permits zero content height. Check native popover
+   expanded/collapsed accessibility state with the rendered menu.
+9. **32-bit App packages.** Deferred until suitable native capture dependencies
     are available. Windows x86 core compilation alone does not establish App
     support: the pinned capture SDK currently has no Windows x86 package.
     Complete native packaging and real launch/capture acceptance before
     advertising a 32-bit target.
+10. **Ready-to-run Docker distribution.** Publish a maintained image and a short
+    deployment recipe. The existing runtime image already contains Web, room
+    signaling, STUN and optional embedded SFU in one process; the gap is a
+    published image and simple HTTPS, port and persistent-volume setup. Reuse
+    that server artifact and the existing release identity rather than adding
+    another service stack.

@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"io/fs"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -15,6 +17,8 @@ import (
 	"time"
 
 	appconfig "github.com/TNTcraftHIM/Piik/internal/app/config"
+	"github.com/TNTcraftHIM/Piik/internal/app/lan"
+	"github.com/TNTcraftHIM/Piik/internal/diagnostics"
 )
 
 const (
@@ -34,11 +38,24 @@ const (
 )
 
 type Selection struct {
-	Mode                Mode   `json:"mode"`
-	Language            string `json:"language"`
-	Site                string `json:"site,omitempty"`
-	LocalAccessPassword string `json:"localAccessPassword"`
+	Mode                Mode    `json:"mode"`
+	Language            string  `json:"language"`
+	Site                string  `json:"site,omitempty"`
+	LocalAccessPassword string  `json:"localAccessPassword"`
+	Debug               bool    `json:"debug,omitempty"`
+	LANAddress          *string `json:"lanAddress,omitempty"`
 }
+
+type Options struct {
+	Site                string
+	Version             string
+	Revision            string
+	LocalAccessPassword string
+	Debug               bool
+	LANAddress          string
+}
+
+var listLANAddresses = lan.List
 
 type Server struct {
 	ctx                 context.Context
@@ -51,6 +68,8 @@ type Server struct {
 	localAccessPassword string
 	version             string
 	revision            string
+	debug               bool
+	lanAddress          string
 	selection           chan Selection
 	resultReady         chan struct{}
 	handled             chan struct{}
@@ -70,15 +89,14 @@ type Server struct {
 // Start serves the launcher page and its API on a loopback port. assets is the
 // built Browser UI, which the App embeds; a nil file system means the binary
 // carries no build and the launcher cannot run.
-func Start(parent context.Context, assets fs.FS, site, version, revision, localAccessPassword string) (*Server, error) {
+func Start(parent context.Context, assets fs.FS, options Options) (*Server, error) {
 	if parent == nil {
 		parent = context.Background()
 	}
-	normalizedSite, err := appconfig.NormalizeSite(site)
+	normalizedSite, err := appconfig.NormalizeSite(options.Site)
 	if err != nil {
-		return nil, errors.New("App launcher Site is invalid")
+		return nil, fmt.Errorf("App launcher Site is invalid: %w", err)
 	}
-	site = normalizedSite
 	if assets == nil {
 		return nil, errors.New("App launcher assets are unavailable")
 	}
@@ -87,7 +105,7 @@ func Start(parent context.Context, assets fs.FS, site, version, revision, localA
 	}
 	listener, err := net.Listen("tcp4", "127.0.0.1:0")
 	if err != nil {
-		return nil, errors.New("App launcher could not start")
+		return nil, fmt.Errorf("App launcher could not start: %w", err)
 	}
 	ctx, cancel := context.WithCancel(parent)
 	server := &Server{
@@ -96,10 +114,12 @@ func Start(parent context.Context, assets fs.FS, site, version, revision, localA
 		listener:            listener,
 		assets:              assets,
 		static:              http.FileServer(http.FS(assets)),
-		site:                site,
-		localAccessPassword: localAccessPassword,
-		version:             version,
-		revision:            strings.TrimSpace(revision),
+		site:                normalizedSite,
+		localAccessPassword: options.LocalAccessPassword,
+		version:             options.Version,
+		revision:            strings.TrimSpace(options.Revision),
+		debug:               options.Debug,
+		lanAddress:          options.LANAddress,
 		selection:           make(chan Selection, 1),
 		resultReady:         make(chan struct{}),
 		handled:             make(chan struct{}),
@@ -197,12 +217,26 @@ func (server *Server) handleState(response http.ResponseWriter, request *http.Re
 		http.Error(response, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
+	addresses, err := listLANAddresses()
+	if err != nil {
+		slog.DebugContext(request.Context(), "launcher-lan-unavailable", diagnostics.Error(err))
+	}
+	if addresses == nil {
+		addresses = []lan.Address{}
+	}
+	values := make([]string, 0, len(addresses))
+	for _, address := range addresses {
+		values = append(values, address.Address)
+	}
+	selected, _ := lan.Select(values, server.lanAddress)
 	writeJSON(response, http.StatusOK, map[string]any{
 		"site":                server.site,
 		"localAccessPassword": server.localAccessPassword,
 		"version":             server.version,
 		"revision":            server.revision,
 		"packageTarget":       runtime.GOOS + "-" + runtime.GOARCH,
+		"debug":               server.debug,
+		"lan":                 map[string]any{"addresses": addresses, "selected": selected},
 		"defaultMode": func() Mode {
 			if server.site != "" {
 				return ModeSite
@@ -221,13 +255,17 @@ func (server *Server) handleLaunch(response http.ResponseWriter, request *http.R
 	request.Body = http.MaxBytesReader(response, request.Body, maxRequestBytes)
 	selection, err := decodeSelection(request.Body)
 	if err != nil {
-		http.Error(response, "invalid launch request", http.StatusBadRequest)
+		writeJSON(response, http.StatusBadRequest, map[string]string{
+			"error": "invalid launch request", "detail": errorDetail(err),
+		})
 		return
 	}
 	server.mu.Lock()
 	if server.selected {
 		server.mu.Unlock()
-		http.Error(response, "launch already requested", http.StatusConflict)
+		writeJSON(response, http.StatusConflict, map[string]string{
+			"error": "launch already requested", "detail": "Close and reopen Piik before starting again.",
+		})
 		return
 	}
 	server.selected = true
@@ -256,13 +294,25 @@ func (server *Server) handleLaunch(response http.ResponseWriter, request *http.R
 	server.mu.Unlock()
 	if !resultSet || resultErr != nil {
 		writeJSON(response, http.StatusServiceUnavailable, map[string]string{
-			"error": "Piik App could not start",
+			"error": "Piik App could not start", "detail": errorDetail(resultErr),
 		})
 		server.markHandled()
 		return
 	}
 	writeJSON(response, http.StatusOK, map[string]string{"target": target})
 	server.markHandled()
+}
+
+func errorDetail(err error) string {
+	if err == nil {
+		return ""
+	}
+	// Redact before truncation so a long credential cannot lose its delimiter.
+	detail := []rune(diagnostics.SafeText(err.Error()))
+	if len(detail) > 2048 {
+		return string(detail[:2048]) + "..."
+	}
+	return string(detail)
 }
 
 func (server *Server) markHandled() {
@@ -304,6 +354,16 @@ func decodeSelection(reader io.Reader) (Selection, error) {
 	}
 	if selection.Language != "zh" && selection.Language != "en" && selection.Language != "vis" {
 		return Selection{}, errors.New("invalid launch language")
+	}
+	if selection.LANAddress != nil {
+		if selection.Mode != ModeLocal {
+			return Selection{}, errors.New("only Local launch can select a LAN invitation address")
+		}
+		value := strings.TrimSpace(*selection.LANAddress)
+		if ip := net.ParseIP(value); ip == nil || ip.To4() == nil {
+			return Selection{}, errors.New("Local invitation address must be an active IPv4 address")
+		}
+		selection.LANAddress = &value
 	}
 	switch selection.Mode {
 	case ModeLocal, ModeLink:

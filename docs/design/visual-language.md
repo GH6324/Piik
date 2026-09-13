@@ -39,6 +39,17 @@ order and interaction ownership consistent across languages, themes and viewport
 sizes. Reflow or bounded scrolling must not hide a primary action, truncate an
 essential value, overlap controls or change meaning.
 
+Keep the application language control's segmented Chinese, English and visual
+shortcuts. When additional catalogs exist, insert one language menu
+after the visual shortcut; all extra languages share that slot. Show the
+selected language's short label there and native names inside the menu. Reuse
+the sliding selection, rounded paper panels and control motion. The native
+popover owns visibility, outside-click dismissal and Escape; the language
+control owns menu navigation, focus and viewport placement. Keep touch rows
+large and long lists scrollable. Locale labels belong to the shared registry.
+Use a globe and chevron for the unselected picker, and each language's own full
+name in the menu, following [W3C language-navigation guidance](https://www.w3.org/International/questions/qa-navigation-select).
+
 Help-only indicators toggle their guidance on click or tap and dismiss on a
 second activation, outside tap, Escape or focus leaving. Action controls keep
 their direct click action and offer touch guidance on long-press. `Tooltip`

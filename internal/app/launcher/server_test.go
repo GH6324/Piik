@@ -3,6 +3,7 @@ package launcher
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"io/fs"
 	"net/http"
 	"runtime"
@@ -10,6 +11,8 @@ import (
 	"testing"
 	"testing/fstest"
 	"time"
+
+	"github.com/TNTcraftHIM/Piik/internal/app/lan"
 )
 
 // appAssets stands in for the embedded Vite build the App ships.
@@ -34,10 +37,11 @@ func TestLauncherServesStateAndCompletesOneSelection(t *testing.T) {
 		DefaultMode         Mode   `json:"defaultMode"`
 		Version             string `json:"version"`
 		Revision            string `json:"revision"`
+		Debug               *bool  `json:"debug"`
 	}
 	if response.StatusCode != http.StatusOK || json.NewDecoder(response.Body).Decode(&state) != nil ||
 		state.Site != "https://share.example" || state.DefaultMode != ModeSite ||
-		state.Version != "development" || state.Revision != "" || state.LocalAccessPassword != "" {
+		state.Version != "development" || state.Revision != "" || state.LocalAccessPassword != "" || state.Debug == nil || *state.Debug {
 		t.Fatalf("launcher state = %d, %+v", response.StatusCode, state)
 	}
 
@@ -47,7 +51,7 @@ func TestLauncherServesStateAndCompletesOneSelection(t *testing.T) {
 		response, err := http.Post(
 			origin+"/api/client-launcher/launch",
 			"application/json",
-			bytes.NewBufferString(`{"mode":"link","language":"vis"}`),
+			bytes.NewBufferString(`{"mode":"link","language":"vis","debug":true}`),
 		)
 		if err != nil {
 			requestErr <- err
@@ -58,7 +62,7 @@ func TestLauncherServesStateAndCompletesOneSelection(t *testing.T) {
 
 	select {
 	case selection := <-server.Selection():
-		if selection != (Selection{Mode: ModeLink, Language: "vis"}) {
+		if selection != (Selection{Mode: ModeLink, Language: "vis", Debug: true}) {
 			t.Fatalf("selection = %+v", selection)
 		}
 		server.SetResult("http://localhost:8787/#piik-client=1", nil)
@@ -102,6 +106,76 @@ func TestLauncherIncludesTheInjectedBuildVersionAndRevision(t *testing.T) {
 		state.Version != version || state.Revision != revision ||
 		state.PackageTarget != runtime.GOOS+"-"+runtime.GOARCH || state.DefaultMode != ModeLink {
 		t.Fatalf("launcher build = %d, %+v", response.StatusCode, state)
+	}
+}
+
+func TestLauncherLANChoicesUseCurrentAddressesAndTheExplicitPreference(t *testing.T) {
+	for _, test := range []struct {
+		name, preferred, selected string
+		addresses                 []lan.Address
+	}{
+		{name: "one", selected: "192.168.1.4", addresses: []lan.Address{{Address: "192.168.1.4", Name: "Wi-Fi"}}},
+		{name: "one-private", selected: "192.168.1.4", addresses: []lan.Address{{Address: "192.168.1.4", Name: "Wi-Fi"}, {Address: "198.18.0.1", Name: "Tunnel"}}},
+		{name: "ambiguous", addresses: []lan.Address{{Address: "10.0.0.2", Name: "Ethernet"}, {Address: "192.168.1.4", Name: "Wi-Fi"}}},
+		{name: "cli-preferred", preferred: "192.168.1.4", selected: "192.168.1.4", addresses: []lan.Address{{Address: "10.0.0.2", Name: "Ethernet"}, {Address: "192.168.1.4", Name: "Wi-Fi"}}},
+		{name: "stale-preference", preferred: "192.168.1.4", addresses: []lan.Address{{Address: "10.0.0.2", Name: "Ethernet"}}},
+		{name: "unavailable"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			original := listLANAddresses
+			t.Cleanup(func() { listLANAddresses = original })
+			listLANAddresses = func() ([]lan.Address, error) {
+				if test.addresses == nil {
+					return nil, errors.New("interfaces are unavailable")
+				}
+				return test.addresses, nil
+			}
+			server, err := Start(t.Context(), appAssets(), Options{Site: "https://share.example", LANAddress: test.preferred})
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(func() { _ = server.Close() })
+			response, err := http.Get(strings.TrimSuffix(server.URL(), "/client") + "/api/client-launcher")
+			if err != nil {
+				t.Fatal(err)
+			}
+			defer response.Body.Close()
+			var state struct {
+				DefaultMode Mode
+				LAN         *struct {
+					Addresses []lan.Address
+					Selected  string
+				}
+			}
+			if err := json.NewDecoder(response.Body).Decode(&state); err != nil || response.StatusCode != http.StatusOK ||
+				state.DefaultMode != ModeSite || state.LAN == nil || state.LAN.Addresses == nil ||
+				state.LAN.Selected != test.selected || len(state.LAN.Addresses) != len(test.addresses) {
+				t.Fatalf("LAN choices = %+v, status %d, %v", state, response.StatusCode, err)
+			}
+			for index, address := range state.LAN.Addresses {
+				if address != test.addresses[index] {
+					t.Fatalf("LAN interface label lost: %+v", address)
+				}
+			}
+		})
+	}
+}
+
+func TestLauncherPassesTheChosenLANAddressToTheApp(t *testing.T) {
+	server := startFixture(t, "")
+	server.SetResult("http://localhost:8787/#piik-client=1", nil)
+	response, err := http.Post(strings.TrimSuffix(server.URL(), "/client")+"/api/client-launcher/launch",
+		"application/json", strings.NewReader(`{"mode":"local","language":"en","lanAddress":"192.168.1.4"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode != http.StatusOK {
+		t.Fatalf("selection status = %d", response.StatusCode)
+	}
+	selection := <-server.Selection()
+	if selection.LANAddress == nil || *selection.LANAddress != "192.168.1.4" {
+		t.Fatalf("selected invitation address was lost: %+v", selection)
 	}
 }
 
@@ -162,17 +236,17 @@ func TestLauncherPreservesAnOptionalLocalPassword(t *testing.T) {
 }
 
 func TestLauncherRejectsAnInvalidSavedSite(t *testing.T) {
-	if _, err := Start(t.Context(), appAssets(), "https://example.test/path", "development", "", ""); err == nil {
+	if _, err := Start(t.Context(), appAssets(), Options{Site: "https://example.test/path", Version: "development"}); err == nil {
 		t.Fatal("launcher accepted a Site path")
 	}
 }
 
 // A binary built without the Browser build has nothing to launch.
 func TestLauncherRequiresTheEmbeddedBrowserBuild(t *testing.T) {
-	if _, err := Start(t.Context(), nil, "", "development", "", ""); err == nil {
+	if _, err := Start(t.Context(), nil, Options{Version: "development"}); err == nil {
 		t.Fatal("launcher started without embedded assets")
 	}
-	if _, err := Start(t.Context(), fstest.MapFS{}, "", "development", "", ""); err == nil {
+	if _, err := Start(t.Context(), fstest.MapFS{}, Options{Version: "development"}); err == nil {
 		t.Fatal("launcher started without an index document")
 	}
 }
@@ -186,6 +260,13 @@ func TestLauncherRejectsInvalidSelections(t *testing.T) {
 		"site-password":    `{"mode":"site","language":"en","site":"https://share.example","localAccessPassword":"valid-pass"}`,
 		"unknown-field":    `{"mode":"local","language":"en","extra":true}`,
 		"password-type":    `{"mode":"local","language":"en","localAccessPassword":123}`,
+		"debug-type":       `{"mode":"local","language":"en","debug":"true"}`,
+		"lan-type":         `{"mode":"local","language":"en","lanAddress":123}`,
+		"lan-invalid":      `{"mode":"local","language":"en","lanAddress":"bad-address"}`,
+		"lan-ipv6":         `{"mode":"local","language":"en","lanAddress":"::1"}`,
+		"link-lan":         `{"mode":"link","language":"en","lanAddress":"192.168.1.4"}`,
+		"link-lan-empty":   `{"mode":"link","language":"en","lanAddress":""}`,
+		"site-lan":         `{"mode":"site","language":"en","site":"https://share.example","lanAddress":"192.168.1.4"}`,
 		"missing-language": `{"mode":"local"}`,
 		"unknown-language": `{"mode":"local","language":"other"}`,
 	} {
@@ -204,7 +285,44 @@ func TestLauncherRejectsInvalidSelections(t *testing.T) {
 			if response.StatusCode != http.StatusBadRequest {
 				t.Fatalf("status = %d", response.StatusCode)
 			}
+			var failure struct{ Error, Detail string }
+			if err := json.NewDecoder(response.Body).Decode(&failure); err != nil || failure.Detail == "" {
+				t.Fatalf("invalid selection lost its reason: %+v, %v", failure, err)
+			}
 		})
+	}
+}
+
+func TestLauncherReportsSafeBoundedFailureDetails(t *testing.T) {
+	server, err := Start(t.Context(), appAssets(), Options{Version: "development", Debug: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = server.Close() })
+	origin := strings.TrimSuffix(server.URL(), "/client")
+	response, err := http.Get(origin + "/api/client-launcher")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var state struct{ Debug bool }
+	if err := json.NewDecoder(response.Body).Decode(&state); err != nil || !state.Debug {
+		t.Fatalf("CLI debug was not advertised: %+v, %v", state, err)
+	}
+	_ = response.Body.Close()
+	server.SetResult("", errors.New("public tunnel failed: token=private-secret "+strings.Repeat("network unavailable ", 200)))
+	response, err = http.Post(origin+"/api/client-launcher/launch", "application/json",
+		strings.NewReader(`{"mode":"link","language":"en"}`))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer response.Body.Close()
+	var failure struct{ Error, Detail string }
+	if err := json.NewDecoder(response.Body).Decode(&failure); err != nil || response.StatusCode != http.StatusServiceUnavailable {
+		t.Fatalf("failure response = %d, %v", response.StatusCode, err)
+	}
+	if failure.Error != "Piik App could not start" || !strings.Contains(failure.Detail, "public tunnel failed") ||
+		strings.Contains(failure.Detail, "private-secret") || len([]rune(failure.Detail)) > 2051 {
+		t.Fatalf("unsafe or missing failure detail: %+v", failure)
 	}
 }
 
@@ -265,7 +383,7 @@ func startFixtureWithBuildAndPassword(
 	site, version, revision, password string,
 ) *Server {
 	t.Helper()
-	server, err := Start(t.Context(), appAssets(), site, version, revision, password)
+	server, err := Start(t.Context(), appAssets(), Options{Site: site, Version: version, Revision: revision, LocalAccessPassword: password})
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -1,6 +1,6 @@
 # Browser And Native NAT Traversal
 
-Last reviewed: 2026-09-02
+Last reviewed: 2026-09-13
 
 This document owns evidence for improving direct ICE without adding a
 new relay or a custom transport. The current product contract remains standard
@@ -75,7 +75,25 @@ the independently mapped-port candidate does not. The switch applies to Host,
 Viewer upstream, and Viewer relay P2P connections. Its exact scope is recorded in
 [ADR-0009](../adr/0009-optional-nat-prediction.md).
 
+Browser and Native candidate adapters use the same generation-scoped predictor;
+Native observations do not need a second Go predictor. Predictions can trickle
+as soon as the third qualifying survey observation arrives. Route scheduling
+continues to use the operation deadline in ADR-0005, independently of whether
+prediction produces candidates.
+On an ICE restart, discard the old prediction batch rather than emitting an
+unscoped end marker into the new generation. The real gathering owner supplies
+completion, following [Trickle ICE generation rules](https://www.rfc-editor.org/rfc/rfc8838.html#section-13).
+An earlier remote description is not readiness for a new generation's candidates.
+Native event delivery can precede its offer/answer response; the existing
+negotiation queue retains those candidates until the matching answer is applied.
+
 ### Native Shared-Socket Preflight
+
+Native requests one dual-stack wildcard UDP socket through Go and Pion's existing
+UDP mux. IPv4 remains usable on IPv4-only systems, and concrete IPv4 bindings
+remain IPv4-only. Usable IPv6 interfaces can supply direct ICE candidates on the
+same port; IPv4 discovery, prediction and gateway mapping retain their current
+owners. IPv6 does not remove firewall restrictions or prove a reachable peer.
 
 On 2026-09-05, the unmodified Pion srflx gatherer contacted three public STUN
 destinations from three different temporary local ports, despite the media
@@ -96,9 +114,44 @@ mapping for that same socket. The returned port is advertised as a
 lower-priority candidate using a public address already observed by ordinary
 STUN. This is additive and bounded; a VPN, double NAT, or absent mapping service
 can make it unusable without delaying or replacing ordinary ICE.
+Gateway preparation runs alongside ordinary gathering. Each survey destination
+resolves and sends Binding independently within one shared deadline; an unhealthy
+DNS target cannot withhold a healthy target's result. End-of-candidates follows
+both the ordinary gatherer and the bounded supplemental work, and retirement
+discards that gathering generation's late output.
 A local UDP-forwarding gate then withheld every ordinary Host candidate and
 connected Pion ICE/DTLS in 1.26 seconds through the advertised `mp1` endpoint.
 That proves the same-socket ICE mechanism, not rescue through a physical NAT.
+
+### Gateway And Survey Limits
+
+The pinned `go-nat` NAT-PMP adapter ignores context cancellation. Its underlying
+client can retry each proposed port for about 128 seconds, with several port
+proposals per call. Piik bounds the mapping caller's wait to three seconds;
+an abandoned worker may continue to the dependency's own retry limit. Failed
+attempts are not relaunched by later edges. Cleanup must not call Delete while
+that worker still owns the adapter's unsynchronized port bookkeeping.
+
+NAT-PMP Delete in this dependency clears only its local bookkeeping; it sends
+no router deletion. A successful mapping can therefore remain until its requested
+two-hour lease expires, including a late success after Piik stops waiting.
+Caller timeout and router lease expiry are distinct lifecycle boundaries.
+The same adapter discards the gateway's `MappedExternalPort` response and returns
+its requested port. A gateway may assign a different port under
+[RFC 6886](https://www.rfc-editor.org/rfc/rfc6886.html#section-3.3), making that
+optional mapped candidate incorrect. Ordinary ICE candidates remain available.
+Fix this inside the dependency so its combined NAT-PMP/PCPv6 adapter retains
+IPv6 pinholes; a second mapping writer would add another failure and lease owner.
+
+Binding all three STUN listeners proves local startup, not public reachability.
+A local self-probe also cannot prove traversal through an operator's firewall.
+Missing prediction may reflect unreachable survey destinations or insufficient
+distinct mappings. Library packet logs remain disabled because they expose
+remote addresses; future health summaries must retain that privacy boundary.
+Candidate provenance, selected paths and connection outcomes already have Debug
+owners. Count emitted candidates separately from successful connections; zero
+predicted selections alone does not establish a broken predictor or a success
+rate. Further observation work belongs to [TODO](../todo.md).
 
 ### Independent Observation And Attribution Preflight
 
@@ -125,12 +178,11 @@ remained independent. The flagship deployment enables the bounded capability
 to continue attributable field observation without claiming a demonstrated
 reachability gain.
 
-After an SFU commit, the current route controller gives each deferred Peer
-parent one full direct-convergence attempt and then consumes that continuation.
-Further generations come from a new participant session, publication, or share,
-not a periodic retry loop. This bounds current field exposure. A fixed repeat
-budget remains unjustified until attributable runs show that fresh generations
-repeatedly recover a usable arithmetic shape.
+Background P2P acquisition behind SFU uses the same bounded opportunity budget
+as foreground acquisition under [ADR-0005](../adr/0005-automatic-hybrid-media-routing.md).
+Fresh connection attempts do not guarantee a new socket, mapping or predictable
+port sequence; field measurements must attribute the selected path to its actual
+connection generation.
 
 The Browser-only alternatives do not yet have an accepted implementation:
 
@@ -210,4 +262,8 @@ a new Peer route.
 - [coturn listener and auxiliary endpoint reference](https://github.com/coturn/coturn/blob/master/examples/etc/turnserver.conf)
 - [Cloudflare Realtime STUN service](https://developers.cloudflare.com/realtime/turn/)
 - [Pion Universal UDP mux](https://github.com/pion/ice/blob/main/udp_mux_universal.go)
+- [Pion dual-stack candidate enumeration](https://github.com/pion/ice/blob/v4.4.0/udp_mux.go)
+- [Go wildcard socket family selection](https://go.dev/src/net/ipsock_posix.go)
 - [WebRTC selected candidate stats](https://www.w3.org/TR/webrtc-stats/#dom-rtcicecandidatestats-foundation)
+- [Pinned go-nat NAT-PMP adapter](https://github.com/netbirdio/go-nat/blob/6b2c8c5c74e8331ed41811cfd2fdc4c3dd8c3ff0/natpmp.go)
+- [NAT-PMP client timeout and mapping calls](https://github.com/jackpal/go-nat-pmp/blob/v1.0.2/natpmp.go)

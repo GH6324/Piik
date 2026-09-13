@@ -62,11 +62,16 @@ commands and responses retain their strict protocol contract.
 ## Visual Language
 
 Chinese, English, and pure-visual modes are three expressions of the same typed
-state and command catalog. On first use, the App and Server UI follow the
-Browser's primary system language: Chinese uses Chinese text, and other
-languages use English. Pure-visual mode remains an explicit choice. An explicit
-later choice is persisted and takes precedence over that default. Text modes
-use concise copy.
+state and command catalog. On first use, the App and Server UI match the
+Browser's primary system language against registered locales, using English
+when none matches. Current catalogs cover Simplified Chinese and English.
+Both Simplified and Traditional Chinese system locales select the current
+Chinese catalog across App, Server UI and website; this includes region and
+script tags such as `zh-CN`, `zh-TW`, `zh-HK`, `zh-Hans` and `zh-Hant`.
+Pure-visual mode remains an explicit choice. An explicit later choice is
+persisted and takes precedence over that default, including App launch handoff.
+The App console uses its own supported presentation languages and falls back
+to English for additional UI languages. Text modes use concise copy.
 
 The [visual language](../design/visual-language.md) is the single owner of
 illustrative roles and objects, semantic colour, panel grammar, motion,
@@ -77,8 +82,10 @@ accessible input and responsive hierarchy.
 One `<video>` element owns Viewer playback and frame proof. The shared playback
 bar reflects that element and provides local play/pause, mute, volume, theater,
 picture-in-picture, fullscreen and the existing reconnect action. It stays reachable while waiting
-or disconnected. Theater and fullscreen are separate modes; fullscreen includes
-the playback bar. Identity, connection details and topology stay in the deck.
+or disconnected. Theater and fullscreen are separate modes. Page-element
+fullscreen includes the playback bar; Safari's video-only fullscreen uses
+system controls and native video events to reflect playback and exit.
+Identity, connection details and topology stay in the deck.
 
 The bar spans the screen's lower edge. Narrow screens separate audio controls
 from window actions into two rows and retain 44px action targets. Playing video hides the bar

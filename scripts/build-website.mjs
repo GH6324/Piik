@@ -19,7 +19,7 @@ await cp(source, output, {
     !path.endsWith("README.md"),
 });
 await cp(new URL("../LICENSE", import.meta.url), new URL("LICENSE", output));
-const [{ WELCOME_LINES }, { catalogs }, { Glyph }] = await Promise.all([
+const [{ WELCOME_LINES }, { locales }, { Glyph }] = await Promise.all([
   "../src/client/components/living/WelcomeLine.tsx",
   "../src/client/locales/index.ts",
   "../src/client/ui/icons.tsx",
@@ -30,8 +30,8 @@ const [{ WELCOME_LINES }, { catalogs }, { Glyph }] = await Promise.all([
 // Reuse the product's paired lines as inert HTML, without a runtime catalog.
 const welcomeLines = WELCOME_LINES.map(({ key }) => renderToStaticMarkup(
   createElement("span", { "data-welcome-key": key },
-    createElement("span", { lang: "en" }, `“${catalogs.en[key]}”`),
-    createElement("span", { lang: "zh-CN" }, `“${catalogs.zh[key]}”`),
+    createElement("span", { lang: "en" }, `“${locales.en.copy[key]}”`),
+    createElement("span", { lang: "zh-CN" }, `“${locales.zh.copy[key]}”`),
   ),
 ));
 let homepage = (await readFile(new URL("index.html", source), "utf8"))
@@ -45,8 +45,8 @@ if (process.env.PIIK_WEBSITE_RELEASE_DATA) {
       const href = provider === 'github' ? item?.url : item?.mirrorURL;
       if (!href) return original;
       if (provider === 'gitee') content = content
-        .replace(/<span lang="en">[\s\S]*?<\/span\s*>/, `<span lang="en">Gitee alternative · ${release.version} ZIP</span>`)
-        .replace(/<span lang="zh-CN">[\s\S]*?<\/span\s*>/, `<span lang="zh-CN">Gitee 备用 · ${release.version} ZIP</span>`);
+        .replace(/<span lang="en">[\s\S]*?<\/span\s*>/, '<span lang="en">Gitee alternative · ZIP</span>')
+        .replace(/<span lang="zh-CN">[\s\S]*?<\/span\s*>/, '<span lang="zh-CN">Gitee 备用 · ZIP</span>');
       return `<a${attributes.replace(/href="[^"]*"/, `href="${href}"`)}>${content}</a>`;
     });
 }

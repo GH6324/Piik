@@ -46,7 +46,7 @@ export function LauncherForm({
   onSiteChange,
   localAccessPassword,
   onLocalAccessPasswordChange,
-  error,
+  lan,
   onSubmit,
   children,
 }: {
@@ -56,7 +56,11 @@ export function LauncherForm({
   onSiteChange: (site: string) => void;
   localAccessPassword: string;
   onLocalAccessPasswordChange: (password: string) => void;
-  error: boolean;
+  lan?: {
+    addresses: readonly { address: string; name: string }[];
+    selected: string;
+    onChange: (address: string) => void;
+  };
   onSubmit: (event: FormEvent<HTMLFormElement>) => void;
   children?: ReactNode;
 }) {
@@ -126,6 +130,26 @@ export function LauncherForm({
         })}
       </div>
 
+      {mode === "local" && lan && (lan.addresses.length !== 1 || !lan.selected) ? (
+        <fieldset className="lr-client-lan">
+          <legend className={vis ? "visually-hidden" : undefined}>{t("client.launch.lanAddress")}</legend>
+          {lan.addresses.length === 0 ? (
+            <Pill icon="alert" comic="warning" label={t("client.launch.lanUnavailable")} />
+          ) : <>
+            {vis ? null : <p className="lr-client-lan-hint">{t("client.launch.lanHint")}</p>}
+            <div className="lr-client-lan-options">
+              {lan.addresses.map(({ address, name }) => (
+                <label key={address} className={`lr-btn lr-client-lan-option${lan.selected === address ? " is-on" : ""}`}>
+                  <input type="radio" name="lan-address" value={address}
+                    checked={lan.selected === address} onChange={() => lan.onChange(address)} />
+                  <span><strong>{name}</strong><small>{address}</small></span>
+                </label>
+              ))}
+            </div>
+          </>}
+        </fieldset>
+      ) : null}
+
       {mode === "site" ? (
         <label className="lr-input lr-client-site">
           <Glyph name="link" size={18} />
@@ -153,15 +177,6 @@ export function LauncherForm({
         </Tooltip>
       ) : null}
 
-      {error ? (
-        <Pill
-          icon="alert"
-          tone="bad"
-          label={t("client.launch.error")}
-          alert
-          comic="warning"
-        />
-      ) : null}
       <Btn
         icon="arrowRight"
         title="client.launch.go"
@@ -169,7 +184,8 @@ export function LauncherForm({
         tone="primary"
         type="submit"
         hint={MODES.find((choice) => choice.mode === mode)?.comic}
-        disabled={mode === "site" && !site.trim()}
+        disabled={(mode === "site" && !site.trim()) ||
+          (mode === "local" && lan !== undefined && !lan.selected)}
       />
     </form>
   );
