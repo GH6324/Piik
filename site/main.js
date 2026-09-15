@@ -20,7 +20,6 @@ function syncFilmPreferences() {
   target.searchParams.set('lang', root.lang);
   target.searchParams.set('theme', theme.value);
   filmLink.href = target.href;
-  document.querySelector('[data-film-page]').href = target.href;
   filmFrame.contentWindow?.postMessage({type:'piik-film-preferences',lang:root.lang,theme:theme.value}, location.origin);
 }
 const copy = {
@@ -47,6 +46,9 @@ function setLanguage(lang) {
   document.title = current.title;
   description.content = current.description;
   roomIllustration.alt = current.image;
+  document.querySelector('.site-header nav').setAttribute('aria-label', chinese ? '主导航' : 'Main');
+  document.querySelector('.guide-links').setAttribute('aria-label', chinese ? '教程目录' : 'Guides');
+  filmFrame.title = chinese ? 'Piik 宣传片' : 'Piik introduction';
   for (const option of theme.options) option.textContent = current.themes[option.value];
   syncFilmPreferences();
 }

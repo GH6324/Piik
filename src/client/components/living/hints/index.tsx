@@ -7,13 +7,15 @@
 // by the tsx preview harness, which uses the classic JSX runtime.
 
 import { createElement, memo, type CSSProperties } from "react";
-import type { HintKind, HintScene } from "../../../ui/visual-kinds";
+import type { HintKind, HintScene, MetricHintKind } from "../../../ui/visual-kinds";
 import { SET1_SCENES } from "./set1";
 import { SET2_SCENES } from "./set2";
 import { SET3_SCENES } from "./set3";
 import { SET4_SCENES } from "./set4";
 import { PLAYBACK_SCENES } from "./playback";
 import { CONTROL_SCENES } from "./controls";
+import { METRIC_SCENES } from "./metrics";
+import { ADMISSION_SCENES } from "./admission";
 import { comicStyle, getComicPresentation, type ComicTone, type ComicMotion } from "../comic-presentation";
 
 export type { HintKind, HintScene };
@@ -24,19 +26,26 @@ export const HINT_KINDS: readonly HintKind[] = [
   "hint-pause",
   "hint-resume",
   "hint-switch-source",
+  "hint-refresh-sources",
+  "hint-source-picker",
+  "hint-no-sources",
   "hint-reconnect",
   "hint-copy-code",
   "hint-shuffle-code",
   "hint-copy-invite",
+  "hint-invite-link",
   "hint-client-link",
   "hint-rotate-invite",
   "hint-revoke-invite",
-  "hint-policy-open",
-  "hint-policy-private",
   "hint-password",
+  "hint-admission-code",
+  "hint-admission-password",
+  "hint-admission-invite",
   "hint-quality",
   "hint-audio-quality",
   "hint-degrade-pref",
+  "hint-prefer-resolution",
+  "hint-prefer-framerate",
   "hint-codec",
   "hint-advanced",
   "hint-details",
@@ -50,6 +59,8 @@ export const HINT_KINDS: readonly HintKind[] = [
   "hint-collapse",
   "hint-password-show",
   "hint-password-hide",
+  "hint-password-remove",
+  "hint-source-audio",
   "hint-share-audio",
   "hint-stop-audio",
   "hint-share-audio-fixed",
@@ -80,6 +91,7 @@ export const HINT_KINDS: readonly HintKind[] = [
   "hint-pip",
   "hint-pip-exit",
   "hint-pip-unavailable",
+  ...Object.keys(METRIC_SCENES) as MetricHintKind[],
 ];
 
 export const HINT_SCENES: Record<HintKind, HintScene> = {
@@ -89,6 +101,8 @@ export const HINT_SCENES: Record<HintKind, HintScene> = {
   ...SET4_SCENES,
   ...PLAYBACK_SCENES,
   ...CONTROL_SCENES,
+  ...METRIC_SCENES,
+  ...ADMISSION_SCENES,
 };
 
 const HINT_KIND_SET: ReadonlySet<string> = new Set(HINT_KINDS);
@@ -121,6 +135,7 @@ export const HintComic = memo(function HintComic({
   return createElement(
     "svg",
     {
+      key: kind,
       viewBox: "0 0 320 96",
       "data-comic-tone": resolvedTone,
       "data-comic-motion": resolvedMotion,
@@ -129,6 +144,6 @@ export const HintComic = memo(function HintComic({
       focusable: false,
       xmlns: "http://www.w3.org/2000/svg",
     },
-    HINT_SCENES[kind]({ theme: "paper" }),
+    createElement("g", { className: "lr-comic-content" }, HINT_SCENES[kind]({ theme: "paper" })),
   );
 });

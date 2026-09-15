@@ -12,28 +12,41 @@ import { deriveParticipantStatus } from "../src/client/ui/media-status";
 
 afterEach(() => setCopy({ lang: "zh", vis: false }));
 
-it("keeps presence and readiness available in participant descriptions", () => {
+it("keeps participant identity and actual Viewer readiness in their descriptions", () => {
   setCopy({ lang: "en", vis: true });
-  const render = (online: boolean) => renderToStaticMarkup(createElement(Couch, {
-    view: online ? "viewer" : "host",
-    host: { key: "host", name: "Host name", online, you: !online },
+  const render = (view: "host" | "viewer") => renderToStaticMarkup(createElement(Couch, {
+    view,
+    host: { key: "host", name: "Host name", you: view === "host" },
     entries: [{
       key: "viewer", name: "Viewer name",
-      status: deriveParticipantStatus({ mediaReady: false, upstream: { kind: "none" } }, true), you: online,
+      status: deriveParticipantStatus({ mediaReady: false, upstream: { kind: "none" } }, true), you: view === "viewer",
     }],
   }));
-  const offline = render(false);
-  expect(offline).toContain('aria-label="Host name · Host · you · Offline"');
-  expect(offline).toContain('class="lr-pawn-led" data-tone="busy"');
-  const online = render(true);
-  expect(online).toContain('aria-label="Host name · Host · Online"');
-  expect(online).toContain('aria-label="Viewer name · you · Routing"');
-  expect(online).not.toContain('class="lr-pawn-led"');
-  expect(online).toContain('is-waiting');
+  const hostView = render("host");
+  expect(hostView).toContain('aria-label="Host name · Host · you"');
+  expect(hostView).toContain('class="lr-pawn-led" data-tone="busy"');
+  const viewerView = render("viewer");
+  expect(viewerView).toContain('aria-label="Host name · Host"');
+  expect(viewerView).toContain('aria-label="Viewer name · you · Routing"');
+  expect(viewerView).not.toContain('class="lr-pawn-led"');
+  expect(viewerView).toContain('is-waiting');
   setCopy({ vis: false });
-  const textMode = render(true);
-  expect(textMode).toContain('aria-label="Host name · Host · Online"');
+  const textMode = render("viewer");
+  expect(textMode).toContain('aria-label="Host name · Host"');
   expect(textMode).toContain('aria-label="Viewer name · you · Routing"');
+});
+
+it.each([
+  ["zh", "房主", "你"],
+  ["en", "Host", "you"],
+] as const)("does not repeat the default Host name or invent presence in %s", (lang, name, self) => {
+  setCopy({ lang, vis: false });
+  const html = renderToStaticMarkup(createElement(Couch, {
+    view: "host", host: { key: "host", name, you: true }, entries: [],
+  }));
+  expect(html).toContain(`aria-label="${name} · ${self}"`);
+  expect(html).not.toContain(`${name} · ${name}`);
+  expect(html).not.toMatch(/Offline|离线|has-comic|tabindex="0"/);
 });
 
 describe("RouteTree", () => {
@@ -189,7 +202,7 @@ describe("RouteTree", () => {
         viewers,
       }),
     );
-    const visibleLabels = [...html.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map(
+    const visibleLabels = [...html.matchAll(/<span class="lr-route-label[^>]*>([^<]*)<\/span>/g)].map(
       (match) => match[1]!,
     );
     const firstDuplicate = visibleLabels.find((label) =>
@@ -237,12 +250,12 @@ describe("RouteTree", () => {
       }),
     );
 
-    expect(html).toContain(">Alice</text>");
-    expect(html).toContain(">Bob</text>");
+    expect(html).toContain(">Alice</span>");
+    expect(html).toContain(">Bob</span>");
     expect(html).not.toContain("<title");
   });
 
-  it("centers visual default IDs without repeating the pawn role", () => {
+  it("preserves emoji nicknames that resemble a default role label", () => {
     const hostPeerId = "host-abc123";
     const viewerPeerId = "viewer-def456";
     const { host, viewers } = labelParticipantSnapshot([
@@ -276,11 +289,11 @@ describe("RouteTree", () => {
       }),
     );
 
-    expect(html).toContain(">abc123</text>");
-    expect(html).toContain(">def456</text>");
-    expect(html).toContain(">👤-custom</text>");
-    expect(html).not.toContain(">🎮 (abc123)</text>");
-    expect(html).not.toContain(">👤 (def456)</text>");
+    expect(html).toContain(">🎮 (abc123)</span>");
+    expect(html).toContain(">👤 (def456)</span>");
+    expect(html).toContain(">👤-custom</span>");
+    expect(html).not.toContain(">abc123</span>");
+    expect(html).not.toContain(">def456</span>");
     expect(html).toContain("scale(0.82)");
   });
 
@@ -323,7 +336,7 @@ describe("RouteTree", () => {
         viewers,
       }),
     );
-    const visibleLabels = [...html.matchAll(/<text[^>]*>([^<]*)<\/text>/g)].map(
+    const visibleLabels = [...html.matchAll(/<span class="lr-route-label[^>]*>([^<]*)<\/span>/g)].map(
       (match) => match[1]!,
     );
 
@@ -335,7 +348,7 @@ describe("RouteTree", () => {
     expect(html).toContain(hostName);
   });
 
-  it("distinguishes ready, recovering, pending, and selected viewers", () => {
+  it("distinguishes ready, pending, and selected viewers", () => {
     const { host, viewers } = labelParticipantSnapshot([
       {
         role: "host",
@@ -352,8 +365,8 @@ describe("RouteTree", () => {
       },
       {
         role: "viewer",
-        peerId: "recovering",
-        displayName: "Recovering",
+        peerId: "awaiting-media",
+        displayName: "Awaiting media",
         upstream: { kind: "peer", peerId: "host" },
       },
       {
@@ -369,20 +382,20 @@ describe("RouteTree", () => {
         hostPeerId: host?.peerId ?? null,
         hostLabel: host?.label ?? "Host",
         viewers,
-        selectedPeerId: "recovering",
+        selectedPeerId: "awaiting-media",
       }),
     );
 
     expect(html).toContain('class="lr-route-edge is-p2p"');
-    expect(html).toContain('class="lr-route-edge is-p2p is-recovering"');
+    expect(html).toContain('class="lr-route-edge is-p2p is-pending"');
     expect(html).toContain('class="lr-route-edge is-pending"');
     expect(html).toContain(
-      'class="lr-route-node is-recovering is-selected"',
+      'class="lr-route-node is-pending is-selected"',
     );
     expect(html).toContain(
       'class="lr-route-selection" x="1" y="2" width="38" height="46" rx="8"',
     );
-    expect(html).toContain("Recovering");
+    expect(html).toContain("Awaiting media");
     expect(html).toContain("← Host");
   });
 
@@ -420,9 +433,37 @@ describe("RouteTree", () => {
     );
 
     expect(html.match(/class="lr-route-hit"/g)).toHaveLength(1);
-    expect(html).toContain('role="button"');
+    expect(html).toContain('<button class="lr-route-hit" type="button"');
     expect(html).toContain('aria-label="Bob · 显示连接详情"');
     expect(html).not.toContain('aria-label="Alice · 显示连接详情"');
+  });
+
+  it("keeps truncated Host, unselectable and pending names in visible tooltip targets", () => {
+    const name = "这是一个需要完整查看而不是只能读省略号的参与者名字";
+    const html = renderToStaticMarkup(createElement(RouteTree, {
+      hostPeerId: "host", hostLabel: `${name}房主`,
+      viewers: labelParticipantSnapshot([
+        { role: "viewer", peerId: "ready", displayName: `${name}观众`, upstream: { kind: "peer", peerId: "host" }, mediaReady: true },
+        { role: "viewer", peerId: "pending", displayName: `${name}等待`, upstream: { kind: "none" } },
+      ]).viewers,
+      selectablePeerIds: ["pending"], onSelectPeer: () => undefined,
+    }));
+    const targets = [...html.matchAll(/<foreignObject[^>]*>(.*?)<\/foreignObject>/g)].map(match => match[1]!);
+    expect(targets).toHaveLength(3);
+    for (const [index, suffix] of ["房主", "观众", "等待"].entries()) {
+      // The hidden topology list retains every full identity before client
+      // layout measures clipping; generic static spans must not be named.
+      expect(html).toContain(`${name}${suffix}`);
+      if (index === 2) expect(targets[index]).toContain(`aria-label="${name}${suffix} · 显示连接详情"`);
+      else expect(targets[index]).not.toContain("aria-label=");
+      expect(targets[index]).toMatch(/class="lr-route-label lr-route-name[^>]*>[^<]*…<\/span>/);
+      expect(targets[index]).toContain('popover="manual"');
+      expect(targets[index]).not.toContain("data-comic-motion");
+    }
+    expect(targets[0]).not.toContain("<button");
+    expect(targets[1]).not.toContain("<button");
+    expect(targets[2]).toContain('<button class="lr-route-hit"');
+    expect(targets[2]).toContain('class="lr-route-label lr-route-name is-pending"');
   });
 
   it("keeps every person and parent edge in a full-room relay chain within the panel", () => {

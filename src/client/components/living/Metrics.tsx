@@ -1,20 +1,35 @@
 // Connection metrics as living-room meter cells: glyph + value, plus the
 // label in text modes. Secondary metrics expand behind a chevron.
-import { useId, useState, type ReactNode } from "react";
+import { useId, useState } from "react";
 import { Glyph, type GlyphName } from "../../ui/icons";
 import { useCopy, type CopyKey } from "../../ui/copy";
 import { Tooltip } from "./Tooltip";
 import { Pill } from "./primitives";
 import type { ConnectionMetrics } from "../../types";
 import { formatPacketLossPercent } from "../connection-details";
+import { METRIC_PRESENTATION, type MetricLabel } from "./metric-presentation";
+import type { ComicKind, HintKind } from "../../ui/visual-kinds";
+import type { ComicTone } from "./comic-presentation";
 
 interface MetricValue {
-  icon: GlyphName;
-  label: CopyKey;
+  icon?: GlyphName;
+  label: MetricLabel;
   value: string;
+  hint?: ComicKind | HintKind;
+  tone?: ComicTone;
   /** Visual mode shows the glyph alone; the value stays in the a11y name. */
   glyphOnly?: boolean;
 }
+
+// One display for each observed sender reason. Unknown reasons remain explicit;
+// none describes this field, not a verdict about the whole connection.
+const QUALITY_REASONS = {
+  none: { valueKey: "stats.quality.normal", icon: "check", hint: "hint-metric-quality", tone: "off" },
+  bandwidth: { valueKey: "stats.quality.bandwidth", icon: "gauge", hint: "bandwidth-limited", tone: "warn" },
+  cpu: { valueKey: "stats.quality.cpu", icon: "cpu", hint: "encoder-limited", tone: "warn" },
+  other: { valueKey: "stats.quality.other", icon: "alert", hint: "hint-metric-quality", tone: "warn" },
+  unclassified: { valueKey: "stats.quality.unclassified", icon: "alert", hint: "hint-metric-quality", tone: "warn" },
+} satisfies Record<string, { valueKey: CopyKey; icon: GlyphName; hint: ComicKind | HintKind; tone: ComicTone }>;
 
 export function codecContractWarnings(
   metrics: ConnectionMetrics,
@@ -43,50 +58,33 @@ function secondaryMetrics(
   const readable = (value: number | null, digits = 0): string =>
     value === null || !Number.isFinite(value) ? t("stats.unknown") : value.toFixed(digits);
   const addNumber = (
-    label: CopyKey,
-    icon: GlyphName,
+    label: MetricLabel,
     value: number | null,
     unit: string,
     digits = 0,
   ) => {
     if (value !== null && Number.isFinite(value)) {
-      values.push({ icon, label, value: `${readable(value, digits)} ${unit}` });
+      values.push({ label, value: `${readable(value, digits)} ${unit}` });
     }
   };
-  const qualityReason = (value: string): string => {
-    const keys: Record<string, CopyKey> = {
-      none: "stats.quality.normal",
-      bandwidth: "stats.quality.bandwidth",
-      cpu: "stats.quality.cpu",
-      other: "stats.quality.other",
-    };
-    return t(keys[value] ?? "stats.quality.unclassified");
-  };
-  const qualityReasonIcon = (value: string): GlyphName =>
-    value === "none"
-      ? "check"
-      : value === "bandwidth"
-        ? "gauge"
-        : value === "cpu"
-          ? "cpu"
-          : "alert";
-
-  addNumber("stats.rtt", "clock", metrics.rttMs, "ms");
+  addNumber("stats.rtt", metrics.rttMs, "ms");
   if (metrics.codec) {
     values.push({
-      icon: "cpu",
       label: "stats.codec",
       value: metrics.codec.split("/").at(-1) ?? metrics.codec,
     });
   }
 
   if (direction === "send") {
-    addNumber("stats.outgoing", "gauge", metrics.availableOutgoingKbps, "kbps");
+    addNumber("stats.outgoing", metrics.availableOutgoingKbps, "kbps");
     if (metrics.qualityLimitationReason) {
+      const { valueKey, ...presentation } = Object.hasOwn(QUALITY_REASONS, metrics.qualityLimitationReason)
+        ? QUALITY_REASONS[metrics.qualityLimitationReason as keyof typeof QUALITY_REASONS]
+        : QUALITY_REASONS.unclassified;
       values.push({
-        icon: qualityReasonIcon(metrics.qualityLimitationReason),
+        ...presentation,
         label: "stats.qualityState",
-        value: qualityReason(metrics.qualityLimitationReason),
+        value: t(valueKey),
         // A limitation reason is a sentence, not a measured value: visual
         // mode states it with the glyph and keeps the words for AT.
         glyphOnly: true,
@@ -110,12 +108,11 @@ function secondaryMetrics(
       }
     }
     if (captureParts.length > 0) {
-      values.push({ icon: "expand", label: "stats.capture", value: captureParts.join(" · ") });
+      values.push({ label: "stats.capture", value: captureParts.join(" · ") });
     }
-    addNumber("stats.inputFps", "wave", metrics.mediaSourceFramesPerSecond, "fps", 1);
+    addNumber("stats.inputFps", metrics.mediaSourceFramesPerSecond, "fps", 1);
     if (metrics.encoderImplementation) {
       values.push({
-        icon: "cpu",
         label: "stats.encoder",
         value: `${metrics.encoderImplementation}${
           metrics.powerEfficientEncoder === true
@@ -126,40 +123,65 @@ function secondaryMetrics(
         }`,
       });
     }
-    addNumber("stats.encodeMs", "clock", metrics.intervalEncodeMs, "ms", 1);
+    addNumber("stats.encodeMs", metrics.intervalEncodeMs, "ms", 1);
   } else {
-    addNumber("stats.jitter", "wave", metrics.jitterMs, "ms", 1);
-    addNumber("stats.dropped", "drop", metrics.framesDropped, "", 0);
-    addNumber("stats.decodeMs", "clock", metrics.intervalDecodeMs, "ms", 1);
-    addNumber("stats.freezeCount", "alert", metrics.intervalFreezeCount, "", 0);
-    addNumber("stats.freezeDuration", "clock", metrics.intervalFreezeDurationMs, "ms", 1);
+    addNumber("stats.jitter", metrics.jitterMs, "ms", 1);
+    addNumber("stats.dropped", metrics.intervalFramesDropped, "", 0);
+    addNumber("stats.decodeMs", metrics.intervalDecodeMs, "ms", 1);
+    addNumber("stats.freezeCount", metrics.intervalFreezeCount, "", 0);
+    addNumber("stats.freezeDuration", metrics.intervalFreezeDurationMs, "ms", 1);
   }
 
-  addNumber("stats.audio", "speaker", metrics.audioBitrateKbps, "kbps");
+  addNumber("stats.audio", metrics.audioBitrateKbps, "kbps");
   if (metrics.audioPacketLossPercent !== null) {
     values.push({
-      icon: "drop",
       label: "stats.audioLoss",
       value: formatPacketLossPercent(metrics.audioPacketLossPercent, t("stats.unknown")),
     });
   }
-  addNumber("stats.audioJitter", "wave", metrics.audioJitterMs, "ms", 1);
+  addNumber("stats.audioJitter", metrics.audioJitterMs, "ms", 1);
 
   if (direction === "receive") {
-    addNumber("stats.playoutDelta", "clock", metrics.audioVideoPlayoutDeltaMs, "ms", 1);
-    addNumber("stats.videoBuffer", "clock", metrics.videoJitterBufferDelayMs, "ms", 1);
-    addNumber("stats.audioBuffer", "clock", metrics.audioJitterBufferDelayMs, "ms", 1);
+    addNumber("stats.playoutDelta", metrics.audioVideoPlayoutDeltaMs, "ms", 1);
+    addNumber("stats.videoBuffer", metrics.videoJitterBufferDelayMs, "ms", 1);
+    addNumber("stats.audioBuffer", metrics.audioJitterBufferDelayMs, "ms", 1);
     if (metrics.audioConcealedSamplesPercent !== null) {
       values.push({
-        icon: "drop",
         label: "stats.audioConcealedRate",
         value: formatPacketLossPercent(metrics.audioConcealedSamplesPercent, t("stats.unknown")),
       });
     }
-    addNumber("stats.audioConcealed", "speaker", metrics.intervalAudioConcealmentEvents, "", 0);
+    addNumber("stats.audioConcealed", metrics.intervalAudioConcealmentEvents, "", 0);
   }
 
   return values;
+}
+
+export function MetricCell({ icon, label, value, glyphOnly, hint, tone = "off" }: MetricValue) {
+  const { t, vis } = useCopy();
+  const display = vis && value === t("stats.unknown") ? "—" : value;
+  return (
+    <Tooltip toggleOnClick kind={hint ?? METRIC_PRESENTATION[label].hint} tone={tone} motion={tone === "warn" ? "still" : "demo"}
+      text={vis ? undefined : `${t(label)} · ${display}`}>
+    <button type="button" className="lr-meter-cell" aria-label={`${t(label)} · ${display}`}
+      style={{ border: 0, color: "inherit", font: "inherit", textAlign: "start", cursor: "help" }}>
+      <Glyph name={icon ?? METRIC_PRESENTATION[label].icon} size={16} />
+      {vis ? (
+        <>
+          {glyphOnly ? null : <b>{display}</b>}
+          <span className="visually-hidden">
+            {glyphOnly ? [t(label), display].join(" · ") : t(label)}
+          </span>
+        </>
+      ) : (
+        <span className="lr-meter-text">
+          <b>{display}</b>
+          <small>{t(label)}</small>
+        </span>
+      )}
+    </button>
+    </Tooltip>
+  );
 }
 
 export function MetricCells({
@@ -174,45 +196,21 @@ export function MetricCells({
   onToggle: (expanded: boolean) => void;
 }) {
   const { t, vis } = useCopy();
-  const cell = ({ icon, label, value, glyphOnly }: MetricValue): ReactNode => {
-    const display = vis && value === t("stats.unknown") ? "—" : value;
-    return (
-    <span className="lr-meter-cell" key={label + display}>
-      <Glyph name={icon} size={16} />
-      {vis ? (
-        <>
-          {glyphOnly ? null : <b>{display}</b>}
-          <span className="visually-hidden">
-            {glyphOnly ? [t(label), display].join(" · ") : t(label)}
-          </span>
-        </>
-      ) : (
-        <span className="lr-meter-text">
-          <b>{display}</b>
-          <small>{t(label)}</small>
-        </span>
-      )}
-    </span>
-    );
-  };
-
   const primary: MetricValue[] = [
-    { icon: "expand", label: "stats.resolution", value: metrics.resolution ?? t("stats.unknown") },
+    { label: "stats.resolution", value: metrics.resolution ?? t("stats.unknown") },
     {
-      icon: "wave",
       label: "stats.fps",
       value: metrics.framesPerSecond === null || !Number.isFinite(metrics.framesPerSecond)
         ? t("stats.unknown")
         : `${metrics.framesPerSecond.toFixed(1)} fps`,
     },
     {
-      icon: "gauge",
       label: "stats.bitrate",
       value: metrics.bitrateKbps === null || !Number.isFinite(metrics.bitrateKbps)
         ? t("stats.unknown")
         : `${metrics.bitrateKbps.toFixed(0)} kbps`,
     },
-    { icon: "drop", label: "stats.loss", value: formatPacketLossPercent(metrics.packetLossPercent, t("stats.unknown")) },
+    { label: "stats.loss", value: formatPacketLossPercent(metrics.packetLossPercent, t("stats.unknown")) },
   ];
   const secondary = secondaryMetrics(metrics, direction, t);
   const warnings = codecContractWarnings(metrics, t);
@@ -239,7 +237,7 @@ export function MetricCells({
   return (
     <>
       <div className="lr-meter" role="group" aria-label={t("stats.title")}>
-        {primary.map(cell)}
+        {primary.map((value) => <MetricCell key={value.label} {...value} />)}
       </div>
       {secondary.length > 0 ? (
         <>
@@ -248,7 +246,7 @@ export function MetricCells({
           </Tooltip>
           {expanded ? (
             <div id={secondaryId} className="lr-meter" role="group" aria-label={t("stats.more")}>
-              {secondary.map(cell)}
+              {secondary.map((value) => <MetricCell key={value.label} {...value} />)}
             </div>
           ) : null}
         </>

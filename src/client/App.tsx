@@ -21,18 +21,14 @@ import {
   takeClientLaunchBootstrap,
 } from "./lib/session";
 import { AppHeader } from "./components/living/Header";
-import { BrandLoader } from "./components/living/BrandMark";
 import { Btn, Pill } from "./components/living/primitives";
 import { Comic, type ComicKind } from "./components/living/Comic";
 import { Glyph } from "./ui/icons";
-import { setCopy, useCopy } from "./ui/copy";
+import { applyLaunchCopy, useCopy } from "./ui/copy";
 import { consoleLanguage } from "./locales";
 import { initTheme } from "./ui/theme";
 import { installBrowserDebug, withBrowserDebug } from "./lib/debug";
 
-const OverlayPreviewPage = import.meta.env.DEV
-  ? lazy(() => import("./pages/OverlayPreviewPage").then((module) => ({ default: module.OverlayPreviewPage })))
-  : null;
 const TooltipPreviewPage = import.meta.env.DEV
   ? lazy(() => import("./pages/TooltipPreviewPage").then((module) => ({ default: module.TooltipPreviewPage })))
   : null;
@@ -49,9 +45,11 @@ const clientLaunchBootstrap =
   appRoute.kind === "host" || appRoute.kind === "viewer"
     ? takeClientLaunchBootstrap()
     : null;
-initTheme(clientLaunchBootstrap?.presentation?.theme);
+initTheme(clientLaunchBootstrap?.presentation?.theme,
+  clientLaunchBootstrap?.presentation?.explicit?.includes("theme") ?? false);
 if (clientLaunchBootstrap?.presentation) {
-  setCopy(clientLaunchBootstrap.presentation);
+  applyLaunchCopy(clientLaunchBootstrap.presentation,
+    clientLaunchBootstrap.presentation.explicit?.includes("copy") ?? false);
 }
 const clientAccessBootstrap = clientLaunchBootstrap?.accessToken ?? null;
 const viewerRoute = appRoute.kind === "viewer" ? readViewerRoute() : null;
@@ -150,9 +148,6 @@ function AppRoute() {
   if (StatusPreviewPage && window.location.pathname === "/__status-preview") {
     return <StatusPreviewPage />;
   }
-  if (OverlayPreviewPage && window.location.pathname === "/__overlay-preview") {
-    return <OverlayPreviewPage />;
-  }
   if (TooltipPreviewPage && window.location.pathname === "/__tooltip-preview") {
     return <TooltipPreviewPage />;
   }
@@ -177,7 +172,7 @@ function AppRoute() {
   }
   return appRoute.kind === "malformed-room" ? (
     <StaticRoute
-      comic="room-not-found"
+      comic="room-code-invalid"
       titleKey="gate.malformed"
       hintKey="gate.malformedHint"
       action="join"
@@ -196,15 +191,15 @@ function RouteLoader() {
         <div
           className="lr-loading"
           role="status"
-          aria-label={t("gate.checking")}
+          aria-label={t("common.loading")}
         >
-          <BrandLoader />
+          <Comic kind="signal-connecting" theme="paper" />
           {vis ? null : (
             <span
               className="lr-tv-msg"
               style={{ color: "var(--ink)", textShadow: "none" }}
             >
-              {t("gate.checking")}
+              {t("common.loading")}
             </span>
           )}
         </div>
@@ -230,7 +225,7 @@ function StaticRoute({
       <AppHeader />
       <main className="lr-join">
         <div className="lr-join-panel">
-          <Comic kind={comic} theme="paper" />
+          <Comic kind={comic} theme="paper" tone="bad" />
           {vis ? null : (
             <div className="lr-access-text">
               <h1>{t(titleKey)}</h1>
@@ -253,6 +248,7 @@ function StaticRoute({
               icon="refresh"
               title="common.refresh"
               cap="common.refresh"
+              hint="page-refresh"
               onClick={() => window.location.reload()}
             />
           ) : null}
@@ -413,7 +409,7 @@ function SiteAccessGate({
             role="status"
             aria-label={t("gate.checking")}
           >
-            <BrandLoader />
+            <Comic kind="signal-connecting" theme="paper" />
             {vis ? null : (
               <span className="lr-tv-msg" style={{ color: "var(--ink)", textShadow: "none" }}>
                 {t("gate.checking")}
@@ -422,9 +418,7 @@ function SiteAccessGate({
           </div>
         ) : access.kind === "unavailable" ? (
           <div className="lr-join-panel">
-            <span className="lr-tv-big" style={{ borderColor: "var(--ink)", color: "var(--ink)", background: "var(--paper)" }}>
-              <Glyph name="wifiOff" size={30} />
-            </span>
+            <Comic kind="signal-failed" theme="paper" />
             {vis ? (
               <span className="visually-hidden" role="alert">{access.message}</span>
             ) : (
@@ -433,13 +427,11 @@ function SiteAccessGate({
                 <p role="alert">{access.message}</p>
               </div>
             )}
-            <Btn icon="refresh" title="common.retry" cap="common.retry" onClick={() => void retry()} />
+            <Btn icon="refresh" title="common.retry" cap="common.retry" hint="signal-connecting" hintTone="off" hintMotion="demo" onClick={() => void retry()} />
           </div>
         ) : (
           <form className="lr-join-panel" onSubmit={(event) => void submit(event)}>
-            <span className="lr-tv-big" style={{ borderColor: "var(--ink)", color: "var(--ink)", background: "var(--paper)" }}>
-              <Glyph name="key" size={30} draw="gate-key" />
-            </span>
+            <Comic kind="site-access" theme="paper" />
             {vis ? null : (
               <div className="lr-access-text">
                 <h1>{t("gate.title")}</h1>
@@ -447,7 +439,7 @@ function SiteAccessGate({
               </div>
             )}
             <span className="lr-input" style={{ minWidth: 240 }}>
-              <Glyph name="lock" size={17} />
+              <Glyph name="key" size={17} />
               <input
                 type="password"
                 value={password}
@@ -460,7 +452,7 @@ function SiteAccessGate({
               />
             </span>
             {access.error ? (
-              <Pill icon="alert" tone="bad" label={access.error} alert comic="warning" />
+              <Pill icon="alert" tone="bad" label={access.error} alert comic="access-denied" />
             ) : null}
             <Btn
               icon="arrowRight"

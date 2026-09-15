@@ -3,17 +3,18 @@ import { useCallback, useEffect, useId, useRef, useState } from "react";
 import type { NativeCaptureTarget } from "../../native/wire";
 import { nativeCaptureTargetKey } from "../../native/capture-selection";
 import { useCopy } from "../../ui/copy";
-import { Glyph } from "../../ui/icons";
+import { Glyph, type GlyphName } from "../../ui/icons";
 import { Tooltip } from "./Tooltip";
+import { HintComic } from "./hints";
 import { Pill } from "./primitives";
 
 const SOURCE_TABS = ["browser", "window", "display"] as const;
 type SourceTab = (typeof SOURCE_TABS)[number];
 const SOURCE_ICONS = {
   browser: "globe",
-  window: "switchSource",
-  display: "tv",
-};
+  window: "window",
+  display: "display",
+} satisfies Record<SourceTab, GlyphName>;
 
 export type NativeSourceList =
   | { kind: "loading" }
@@ -54,13 +55,17 @@ export function CaptureSourcePicker({
 }) {
   const { vis, t } = useCopy();
   const pickerId = useId();
+  const panelRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<SourceTab>(initialTab);
   const [shareAudio, setShareAudio] = useState(initialAudio);
   const activeTab = tab === "browser" && !browserAvailable ? "window" : tab;
 
   useEffect(() => {
     const cancelOnEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onCancel();
+      if (event.key !== "Escape" || event.defaultPrevented ||
+          !panelRef.current?.contains(event.target as Node | null)) return;
+      event.preventDefault();
+      onCancel();
     };
     window.addEventListener("keydown", cancelOnEscape);
     return () => window.removeEventListener("keydown", cancelOnEscape);
@@ -123,9 +128,9 @@ export function CaptureSourcePicker({
 
   return (
     <div
+      ref={panelRef}
       className={`lr-tv-overlay lr-source-picker${vis ? " is-visual" : ""}`}
       role="dialog"
-      aria-modal="true"
       aria-label={t("host.sourcePicker.title")}
     >
       <div className="lr-source-picker-panel">
@@ -138,11 +143,12 @@ export function CaptureSourcePicker({
               <strong>{t("host.sourcePicker.title")}</strong>
             </span>
           )}
-          {vis ? refreshButton : (
-            <Tooltip text={refreshLabel} place="below" align="end">
-              {refreshButton}
-            </Tooltip>
-          )}
+          <Tooltip kind="hint-refresh-sources" text={vis ? undefined : refreshLabel}
+            tone={nativeSources.kind === "loading" ? "busy" : undefined}
+            motion={nativeSources.kind === "loading" ? "progress" : undefined}
+            place="below" align="end">
+            {refreshButton}
+          </Tooltip>
           <Tooltip kind="hint-close" text={vis ? undefined : t("common.cancel")} place="below" align="end">
             {closeButton}
           </Tooltip>
@@ -289,7 +295,7 @@ export function CaptureSourcePicker({
               role="status"
               aria-label={t("host.sourcePicker.loading")}
             >
-              <Glyph name="loader" size={18} className="lr-spin" />
+              <HintComic kind="hint-refresh-sources" size={240} tone="busy" motion="progress" />
               {vis ? null : <span>{t("host.sourcePicker.loading")}</span>}
             </span>
           ) : sources.length === 0 ? (
@@ -298,7 +304,7 @@ export function CaptureSourcePicker({
               role="status"
               aria-label={t("host.sourcePicker.empty")}
             >
-              <Glyph name="eyeOff" size={22} />
+              <HintComic kind="hint-no-sources" size={240} />
               {vis ? null : t("host.sourcePicker.empty")}
             </span>
           ) : null}
@@ -369,7 +375,7 @@ function CaptureSourceOption({
         );
 
   return (
-    <Tooltip text={title} className="lr-source-option-hint">
+    <Tooltip kind={target.kind === "picker" ? "hint-source-picker" : target.kind === "display" ? "hint-capture-display" : "hint-capture-window"} text={title} className="lr-source-option-hint">
       <button
         ref={buttonRef}
         type="button"
@@ -388,7 +394,7 @@ function CaptureSourceOption({
           {preview ? (
             <img src={preview} alt="" />
           ) : (
-            <Glyph name={target.kind === "window" ? "share" : "tv"} size={23} />
+            <Glyph name={target.kind === "picker" ? "share" : target.kind} size={23} />
           )}
         </span>
       </button>

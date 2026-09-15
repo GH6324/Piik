@@ -19,7 +19,6 @@ export interface CouchEntry {
 export interface CouchHostEntry {
   key: string;
   name: string;
-  online: boolean;
   you?: boolean;
   selected?: boolean;
   controls?: string;
@@ -32,16 +31,14 @@ export function Couch({
   entries,
   selectedKey,
   onSelect,
-  emptyHint,
 }: {
   view: "host" | "viewer";
   host?: CouchHostEntry | null;
   entries: CouchEntry[];
   selectedKey?: string | null;
   onSelect?: (key: string) => void;
-  emptyHint?: string;
 }) {
-  const { vis, t } = useCopy();
+  const { t } = useCopy();
   const [couchRef, containerWidth] = useElementWidth();
   const count = entries.length + (host ? 1 : 0);
   const capacity = Math.max(2, Math.min(8, Math.floor((containerWidth - 64) / 72)));
@@ -54,7 +51,8 @@ export function Couch({
     return { gridRow: row + 1, gridColumn: `${(index % columns) * 2 + 1 + columns - inRow} / span 2` };
   };
   const hostLabel = host
-    ? `${host.name} · ${t("common.host")}${host.you ? ` · ${t("common.you")}` : ""} · ${t(host.online ? "state.presence.online" : "state.presence.offline")}`
+    ? [host.name, host.name === t("common.host") ? null : t("common.host"),
+        host.you ? t("common.you") : null].filter(Boolean).join(" · ")
     : undefined;
 
   return (
@@ -78,7 +76,7 @@ export function Couch({
           aria-label={`${t("common.host")} · ${t("common.viewers")}`}
         >
           {host ? (
-            <span className="lr-seat" style={seatStyle(0)}><Tooltip text={vis ? host.name : hostLabel}>
+            <span className="lr-seat" style={seatStyle(0)}><Tooltip overflow={{ text: host.name, selector: ".lr-pawn-name" }}>
               {host.onSelect ? (
                   <button
                     type="button"
@@ -96,7 +94,6 @@ export function Couch({
                     className={`lr-pawn is-host is-static${host.you ? " is-you" : ""}`}
                     role="img"
                     aria-label={hostLabel}
-                    tabIndex={0}
                   >
                     <PawnSvg color={participantColor(host.key)} identity={host.key} host />
                     <span className="lr-pawn-name">{host.name}</span>
@@ -106,7 +103,6 @@ export function Couch({
           ) : null}
           {entries.map((entry, index) => {
             const stateLabel = t(entry.status.labelKey);
-            const hint = entry.status.tooltip ?? entry.status.comic;
             const label = `${entry.name}${entry.you ? ` · ${t("common.you")}` : ""} · ${stateLabel}`;
             const inner = (
               <>
@@ -126,7 +122,6 @@ export function Couch({
                 className={className}
                 role="img"
                 aria-label={label}
-                tabIndex={0}
               >
                 {inner}
               </span>
@@ -142,12 +137,7 @@ export function Couch({
               </button>
             );
             return (
-              <span key={entry.key} className="lr-seat" style={seatStyle(index + (host ? 1 : 0))}><Tooltip
-                kind={hint}
-                tone={entry.status.tone}
-                motion={entry.status.pulse ? "progress" : undefined}
-                text={vis ? hint ? undefined : entry.name : label}
-              >
+              <span key={entry.key} className="lr-seat" style={seatStyle(index + (host ? 1 : 0))}><Tooltip overflow={{ text: entry.name, selector: ".lr-pawn-name" }}>
                 {pawn}
               </Tooltip></span>
             );
@@ -163,7 +153,7 @@ export function Couch({
         <div
           className="lr-couch-empty"
           role="img"
-          aria-label={emptyHint ?? t("host.viewers.empty")}
+          aria-label={t("host.viewers.empty")}
         >
           <Glyph name="users" size={22} />
         </div>

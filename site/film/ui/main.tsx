@@ -25,7 +25,13 @@ import {
   VisGlyph,
 } from "../../../src/client/components/living/primitives";
 import { setCopy, useCopy } from "../../../src/client/ui/copy";
-import { deriveParticipantStatus } from "../../../src/client/ui/media-status";
+import { deriveHostStatus, deriveParticipantStatus, deriveViewerStatus } from "../../../src/client/ui/media-status";
+import {
+  deriveViewerPresentation,
+  INITIAL_VIEWER_PRESENTATION_STATE,
+  reduceViewerPresentation,
+  type ViewerPresentationAction,
+} from "../../../src/client/media/viewer-presentation";
 import { gameMarkup, createGame } from "../../assets/game.js";
 import { sketchMarkup } from "../../assets/sketch.js";
 import { BEAT, INVITE_CUES } from "../score.js";
@@ -47,6 +53,20 @@ const status = deriveParticipantStatus(
   { mediaReady: true, upstream: { kind: "peer", peerId: host } },
   true,
 );
+const viewerActions: ViewerPresentationAction[] = [
+  { type: "access", access: "ready" },
+  { type: "signal", signal: "connected" },
+  { type: "host", host: "online" },
+  { type: "route", revision: 1, phase: "active", kind: "p2p" },
+  { type: "media-bound", generation: 1, revision: 1 },
+  { type: "connection", revision: 1, connection: "connected" },
+  { type: "frame-presented", generation: 1, proofEpoch: 0, revision: 1 },
+];
+const viewerTelevision = deriveViewerStatus(
+  deriveViewerPresentation(viewerActions.reduce(reduceViewerPresentation, INITIAL_VIEWER_PRESENTATION_STATE)),
+  "connected",
+  "p2p",
+).television;
 let drawGame: ((time: number) => void) | undefined;
 function Game() {
   const ref = useRef<SVGSVGElement>(null);
@@ -131,6 +151,12 @@ function Screen({ shot }: { shot: Shot }) {
   const launcher = shot === "local" || shot === "link";
   const chat = shot === "chat" || shot === "draft" || shot === "sent";
   const live = shot === "host" || shot === "copied" || shot === "viewer" || chat;
+  const hostStatus = deriveHostStatus({
+    phase: live ? "live" : "idle",
+    paused: false,
+    signal: live ? "connected" : "offline",
+    roomReady: true,
+  });
   const name = lang === "zh" ? "摸鱼办主任" : "ThisIsFine";
   const names =
     lang === "zh" ? ["派大星", "大聪明", "咸鱼突刺"] : ["Leeroy", "Kenobi", "NotABot"];
@@ -140,10 +166,9 @@ function Screen({ shot }: { shot: Shot }) {
         led={
           launcher ? undefined : (
             <LedStrip
-              state={live ? "live" : "off"}
-              label={t(
-                live ? "state.presence.online" : "state.presence.offline",
-              )}
+              state={hostStatus.connection.tone}
+              comic={hostStatus.connection.comic}
+              label={t(hostStatus.connection.labelKey)}
             />
           )
         }
@@ -167,7 +192,7 @@ function Screen({ shot }: { shot: Shot }) {
               live={live}
               hasEntry={!live}
               label={t("host.stageAria")}
-              indicator={live ? <StatusIndicator status={status} /> : undefined}
+              indicator={<StatusIndicator status={shot === "viewer" ? viewerTelevision : hostStatus.television} />}
             >
               {live ? <Game /> : <StaticNoise />}
               {shot === "picker" && (
@@ -211,7 +236,7 @@ function Screen({ shot }: { shot: Shot }) {
             <div className="lr-stage-notices" />
             <Couch
               view={shot === "viewer" ? "viewer" : "host"}
-              host={{ key: host, name, online: true, you: shot !== "viewer" }}
+              host={{ key: host, name, you: shot !== "viewer" }}
               entries={
                 shot === "viewer"
                   ? guests.map((key, i) => ({
@@ -232,24 +257,26 @@ function Screen({ shot }: { shot: Shot }) {
               </RowGroup>
               <span className="lr-spacer" />
               <NameTag name={shot === "viewer" ? names[0] : name} identity={shot === "viewer" ? guests[0] : host} />
-              <Btn icon="pencil" cap="common.edit" title="host.nameEdit" />
-              <Btn icon="gauge" cap="host.details" title="host.details" />
+              <Btn icon="pencil" cap="common.edit" title="host.nameEdit" hint="hint-rename" />
+              <Btn icon="gauge" cap="host.details" title="host.details" hint="hint-details" />
               <Btn
                 icon="network"
                 cap="host.topology"
                 title="host.topology.show"
+                hint="hint-topology"
               />
             </Row>
             {live && shot !== "viewer" ? (
               <>
                 <Row>
-                  <Btn icon="pause" cap="host.pause" title="host.pause" />
-                  <Btn icon="square" cap="host.stop" title="host.stop" />
+                  <Btn icon="pause" cap="host.pause" title="host.pause" hint="hint-pause" />
                   <Btn
-                    icon="share"
+                    icon="switchSource"
                     cap="host.switchSource"
                     title="host.switchSource"
+                    hint="hint-switch-source"
                   />
+                  <Btn icon="stop" tone="danger" cap="host.stop" title="host.stop" hint="hint-share-stop" />
                 </Row>
                 <Row label={t("host.invite")}>
                   <RowGroup actions>
@@ -259,16 +286,21 @@ function Screen({ shot }: { shot: Shot }) {
                       title={
                         shot === "copied" || chat ? "common.copied" : "host.invite.copy"
                       }
+                      hint="hint-copy-invite"
+                      hintTone={shot === "copied" || chat ? "live" : undefined}
+                      hintMotion={shot === "copied" || chat ? "still" : undefined}
                     />
                     <Btn
                       icon="refresh"
                       cap="host.invite.rotateShort"
                       title="host.invite.rotate"
+                      hint="hint-rotate-invite"
                     />
                     <Btn
                       icon="linkOff"
                       cap="host.invite.revokeShort"
                       title="host.invite.revoke"
+                      hint="hint-revoke-invite"
                     />
                   </RowGroup>
                   <input

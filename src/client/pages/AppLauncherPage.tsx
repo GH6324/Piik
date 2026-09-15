@@ -1,16 +1,17 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { z } from "zod";
 
-import { BrandLoader, BrandMark } from "../components/living/BrandMark";
+import { BrandMark } from "../components/living/BrandMark";
+import { Comic } from "../components/living/Comic";
 import { Tooltip } from "../components/living/Tooltip";
 import { AppHeader } from "../components/living/Header";
 import { LauncherForm, type AppMode } from "../components/living/LauncherForm";
 import { Btn, Pill } from "../components/living/primitives";
 import { Glyph } from "../ui/icons";
-import { useCopy, type CopyKey } from "../ui/copy";
+import { hasCopyPreference, useCopy, type CopyKey } from "../ui/copy";
 import { consoleLanguage } from "../locales";
 import { currentThemePreference } from "../ui/theme";
-import { clientLaunchURL } from "../lib/session";
+import { clientLaunchURL, type ClientLaunchPresentation } from "../lib/session";
 import { browserDebugEnabled } from "../lib/debug";
 import {
   checkReleaseUpdate,
@@ -87,7 +88,14 @@ export function AppLauncherPage() {
       (mode === "local" && lan !== undefined && !lan.selected)) return;
     setStarting(true);
     setError(null);
-    const presentation = { lang, vis, theme: currentThemePreference() };
+    const theme = currentThemePreference();
+    const presentation: ClientLaunchPresentation = {
+      lang, vis, theme,
+      explicit: [
+        ...(hasCopyPreference() ? ["copy" as const] : []),
+        ...(theme !== null ? ["theme" as const] : []),
+      ],
+    };
     try {
       const response = await fetch("/api/client-launcher/launch", {
         method: "POST",
@@ -139,7 +147,7 @@ export function AppLauncherPage() {
     <div className="lr-app">
       <AppHeader homeHref="/client" diagnosticControl={appDebug === undefined ? null : (
         <Btn icon="cpu" title="client.launch.debugHint" cap="client.launch.debug"
-          pressed={debug} tone={debug ? "on" : undefined} hint="hint-details"
+          pressed={debug} tone={debug ? "on" : undefined} hint="debug-start"
           disabled={appDebug || loading || starting || error !== null}
           onClick={() => setDebug((value) => !value)} />
       )} />
@@ -149,13 +157,13 @@ export function AppLauncherPage() {
             className="lr-loading"
             role="status"
             aria-label={t(
-              starting ? "client.launch.starting" : "gate.checking",
+              starting ? "client.launch.starting" : "common.loading",
             )}
           >
-            <BrandLoader />
+            <Comic kind="signal-connecting" theme="paper" />
             {vis ? null : (
               <span className="lr-client-launch-status">
-                {t(starting ? "client.launch.starting" : "gate.checking")}
+                {t(starting ? "client.launch.starting" : "common.loading")}
               </span>
             )}
           </div>
@@ -167,7 +175,7 @@ export function AppLauncherPage() {
               tone="bad"
               label={t(error.kind === "load" ? "client.launch.loadFailed" : "client.launch.error")}
               alert
-              comic="warning"
+              comic="signal-failed"
             />
             {error.kind === "launch" ? <>
               {error.detail && <p className="lr-client-launch-detail">{error.detail}</p>}
@@ -176,6 +184,7 @@ export function AppLauncherPage() {
               icon="refresh"
               title="common.refresh"
               cap="common.refresh"
+              hint="page-refresh"
               onClick={() => window.location.reload()}
             />}
           </div>
@@ -190,12 +199,7 @@ export function AppLauncherPage() {
             lan={lan && { ...lan, onChange: (selected) => setLan({ ...lan, selected }) }}
             onSubmit={launch}
           >
-            {updateLink &&
-              (vis ? (
-                updateLink
-              ) : (
-                <Tooltip text={updateText}>{updateLink}</Tooltip>
-              ))}
+            {update && updateLink && <Tooltip kind="update-available" text={vis ? update.version : updateText}>{updateLink}</Tooltip>}
           </LauncherForm>
         )}
       </main>

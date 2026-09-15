@@ -6,6 +6,7 @@
 
 import { memo, type CSSProperties, type ReactNode } from "react";
 import { HostMark } from "./HostMark";
+import { Glyph } from "../../ui/icons";
 import { PersonShape } from "./Pawn";
 import { comicStyle, getComicPresentation, type ComicMotion, type ComicTone } from "./comic-presentation";
 import type { ComicKind, ComicTheme } from "../../ui/visual-kinds";
@@ -19,6 +20,27 @@ const DEFAULT_THEME: Record<ComicKind, ComicTheme> = {
   "signal-connecting": "paper",
   "signal-recovering": "paper",
   "signal-offline": "paper",
+  "signal-connected": "paper",
+  "signal-failed": "paper",
+  "media-playing": "stage",
+  "media-ready": "paper",
+  "share-live": "stage",
+  "share-ended": "stage",
+  "room-closed": "paper",
+  "room-code-invalid": "paper",
+  "page-refresh": "paper",
+  "site-access": "paper",
+  "source-switching": "stage",
+  "source-starting": "stage",
+  "preview-paused": "stage",
+  "update-available": "paper",
+  "debug-start": "paper",
+  "debug-export-failed": "paper",
+  "copy-failed": "paper",
+  "source-failed": "stage",
+  "settings-failed": "paper",
+  "name-invalid": "paper",
+  "transport-connected": "paper",
   "tap-to-play": "stage",
   "host-paused": "stage",
   recovering: "stage",
@@ -41,7 +63,7 @@ const DEFAULT_THEME: Record<ComicKind, ComicTheme> = {
  * ------------------------------------------------------------------ */
 
 /* Control hints reuse these scene objects and stable identity colours. */
-export const YOU = "#2fa66a";
+export const YOU = "var(--you)";
 export const LIVE = "var(--live)";
 export const WARN = "var(--warn)";
 export const DANGER = "var(--danger)";
@@ -120,7 +142,8 @@ export function Pawn({
   className?: string;
 }) {
   const scale = s / 16;
-  const inner = <g transform={`translate(${r2(x - 24 * scale)} ${r2(yb - 50 * scale)}) scale(${scale})`} fill={color}>
+  const inner = <g transform={`translate(${r2(x - 24 * scale)} ${r2(yb - 50 * scale)}) scale(${scale})`} fill={color}
+    style={{ "--comic-blink-delay": `${Math.round(x * .8)}ms` } as CSSProperties}>
     <PersonShape eyes={eyes} gaze={gaze} eyeClassName={eyeClassName} host={host} />
   </g>;
   return className ? <g className={className}>{inner}</g> : inner;
@@ -177,6 +200,17 @@ export function BrowserWindow({ x, y, w, h, children }: {
     </g>
     {children}
   </>;
+}
+
+/** Invitation URL: the same 24-unit chain as the link control icon. */
+export function InviteLink({ x, y, size = 24, className }: {
+  x: number; y: number; size?: number; className?: string;
+}) {
+  return <g className={className}>
+    <g transform={`translate(${x} ${y})`} color="var(--ink)">
+      <Glyph name="link" size={size} />
+    </g>
+  </g>;
 }
 
 /** Crescent moon (host not live / room asleep). Static; safe to transform. */
@@ -380,13 +414,14 @@ export function Static({
   );
 }
 
-/** Settled and reduced-motion scenes share the same informative poses. */
-export function rmBlock(kills: string[], pins: Array<readonly [string, string]>): string {
+/** Hold operation results in settled scenes; decorative subject motion may opt
+ * out. System and preview reduced motion always use the explicit final pose. */
+export function rmBlock(kills: string[], pins: Array<readonly [string, string]>, holdOnStill = true): string {
   const rules = [...kills.map((c) => [`.${c}`, "animation:none"] as const), ...pins];
   const block = (scope: string) => rules.map(([selectors, styles]) =>
     `${selectors.split(",").map((selector) => scope + selector.trim()).join(",")}{${styles}}`,
   ).join("");
-  return `${block('svg[data-comic-motion="still"] ')}@media (prefers-reduced-motion:reduce){${block("")}}`;
+  return `${holdOnStill ? block('svg[data-comic-motion="still"] ') : ""}${block('[data-comic-reduced-motion] ')}@media (prefers-reduced-motion:reduce){${block("")}}`;
 }
 
 /* ------------------------------ scenes ------------------------------ */
@@ -396,34 +431,29 @@ function SceneWaiting({ theme }: { theme: ComicTheme }) {
   return (
     <>
       <style>{`
-.vls-wf-moon{transform-box:fill-box;transform-origin:center;animation:vlsWfMoon var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-wf-z1{animation:vlsWfZ var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-wf-z2{animation:vlsWfZ var(--comic-duration,3.2s) ease-in-out .45s var(--comic-repeat,1) both}
-.vls-wf-z3{animation:vlsWfZ var(--comic-duration,3.2s) ease-in-out .9s var(--comic-repeat,1) both}
-.vls-wf-eyes{transform-box:fill-box;transform-origin:center;animation:vlsWfBlink var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-wf-led{animation:vlsWfLed var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-@keyframes vlsWfMoon{0%,100%{transform:translateY(0)}50%{transform:translateY(-2px)}}
-@keyframes vlsWfZ{0%{opacity:0;transform:translateY(3px)}8%{opacity:.9}20%,100%{opacity:0;transform:translateY(-3px)}}
-@keyframes vlsWfBlink{0%,66%,74%,100%{transform:scaleY(1)}70%{transform:scaleY(.12)}}
-@keyframes vlsWfLed{0%,100%{opacity:1}50%{opacity:.35}}
+.vls-wf-z1{animation:vlsWfZNear var(--comic-duration,3.2s) ease-out 1 both}
+.vls-wf-z2{animation:vlsWfZFar var(--comic-duration,3.2s) ease-out 1 both}
+@keyframes vlsWfZNear{0%{opacity:.85;transform:translate(-5px,10px)}42%,100%{opacity:.65;transform:none}}
+@keyframes vlsWfZFar{0%,6%{opacity:.75;transform:translate(-12px,14px)}48%,100%{opacity:.55;transform:none}}
 ${rmBlock(
-  ["vls-wf-moon", "vls-wf-z1", "vls-wf-z2", "vls-wf-z3", "vls-wf-eyes", "vls-wf-led"],
-  [[".vls-wf-z1,.vls-wf-z2,.vls-wf-z3", "opacity:.55"], [".vls-wf-led", "opacity:1"]],
+  ["vls-wf-z1", "vls-wf-z2"],
+  [[".vls-wf-z1", "opacity:.65;transform:none"], [".vls-wf-z2", "opacity:.55;transform:none"]],
+  false,
 )}
 `}</style>
       <Frame x={4} w={312} theme={theme} result />
       <Floor x1={24} x2={296} />
-      <Pawn x={69} yb={76} s={11} eyes gaze={2} eyeClassName="vls-wf-eyes" />
+      <Pawn x={69} yb={76} s={11} eyes gaze={2} />
       <MiniTv x={206} y={28} w={64} h={42} />
-      <g className="vls-wf-moon">
-        <Moon x={229} y={48} />
+      <Moon x={229} y={48} />
+      <g stroke={LINE} strokeWidth={2.5} strokeLinecap="round" fill="none">
+        <path className="vls-wf-z1" opacity={0.65} d="M246 40h8l-8 6h8" />
+        <g className="vls-wf-z2" opacity={0.55}>
+          <path d="M258 28h9l-9 7h9" />
+          <path d="M273 14h10l-10 8h10" />
+        </g>
       </g>
-      <g stroke="#a9bcd4" strokeWidth={2} strokeLinecap="round" fill="none">
-        <path className="vls-wf-z1" opacity={0.55} d="M244 51h6l-6 4h6" />
-        <path className="vls-wf-z2" opacity={0.55} d="M251 44h7l-7 5h7" />
-        <path className="vls-wf-z3" opacity={0.55} d="M258 36h8l-8 6h8" />
-      </g>
-      <circle className="vls-wf-led" cx={238} cy={76} r={3.5} fill={WARN} />
+      <circle cx={238} cy={76} r={3.5} fill={WARN} />
     </>
   );
 }
@@ -505,29 +535,33 @@ ${rmBlock(kills, pins)}
 }
 
 /** The page's control link, not a media path: no TV or video packets here. */
-function SceneSignal({ theme, state }: {
+function SceneSignal({ theme, state, peer = false }: {
   theme: ComicTheme;
-  state: "connecting" | "recovering" | "offline";
+  state: "connecting" | "recovering" | "offline" | "connected" | "failed";
+  peer?: boolean;
 }) {
-  const color = state === "connecting" ? SKY : state === "recovering" ? WARN : FAINT;
+  const color = "var(--comic-tone, var(--ink))";
   return (
     <>
       <style>{`
 .vls-signal-message{animation:vlsSignalMessage var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 .vls-signal-retry{transform-box:fill-box;transform-origin:center;animation:vlsSignalRetry var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-signal-result{transform-box:fill-box;transform-origin:center;animation:vlsSignalResult var(--comic-duration,3.2s) ease-out 1 both}
 @keyframes vlsSignalMessage{0%{transform:translateX(0);opacity:0}8%{opacity:1}40%{transform:translateX(82px);opacity:1}55%,100%{transform:translateX(82px);opacity:0}}
 @keyframes vlsSignalRetry{0%{transform:rotate(0)}55%,100%{transform:rotate(360deg)}}
+@keyframes vlsSignalResult{0%,8%,42%,100%{transform:none}20%{transform:scale(.9)}30%{transform:scale(1.04)}}
 ${rmBlock(["vls-signal-message", "vls-signal-retry"], [
   [".vls-signal-message", "opacity:1;transform:translateX(41px)"],
   [".vls-signal-retry", "transform:none"],
 ])}
+${rmBlock(["vls-signal-result"], [[".vls-signal-result", "transform:none"]], false)}
 `}</style>
       <Frame x={4} w={312} theme={theme} result />
       <BrowserWindow x={24} y={23} w={96} h={50}>
         <circle cx={37} cy={43} r={3} fill={color} />
         <path d="M47 43h56 M34 55h36 M77 55h26 M34 64h69" stroke={LINE} strokeWidth={2} strokeLinecap="round" />
       </BrowserWindow>
-      <ServerBox x={254} y={25} w={42} h={46} />
+      {peer ? <BrowserWindow x={251} y={25} w={47} h={46} /> : <ServerBox x={254} y={25} w={42} h={46} />}
       <path
         d={state === "connecting" ? "M130 48H244" : "M130 48H164 M204 48H244"}
         stroke={color}
@@ -548,8 +582,12 @@ ${rmBlock(["vls-signal-message", "vls-signal-retry"], [
         <g className="vls-signal-retry" stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" fill="none">
           <path d="M175 43a11 11 0 0 1 19-2l2 3 M190 44h6v-6 M193 53a11 11 0 0 1-19 2l-2-3 M178 52h-6v6" />
         </g>
+      ) : state === "connected" ? (
+        <path className="vls-signal-result" d="M174 48l7 7 14-17" stroke={color} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+      ) : state === "failed" ? (
+        <RedX cx={184} cy={48} arm={8} className="vls-signal-result" />
       ) : (
-        <g stroke={color} strokeWidth={2.5} strokeLinecap="round" fill="none">
+        <g className="vls-signal-result" stroke={color} strokeWidth={2.5} strokeLinecap="round" fill="none">
           <path d="M174 43h5 M174 53h5 M189 43h5 M189 53h5 M176 59l16-22" />
         </g>
       )}
@@ -621,15 +659,15 @@ function ScenePaused({ theme }: { theme: ComicTheme }) {
 @keyframes vlsHpBars{0%,100%{opacity:.55}50%{opacity:1}}
 @keyframes vlsHpLed{0%,100%{opacity:1}50%{opacity:.3}}
 @keyframes vlsHpBlink{0%,44%,52%,100%{transform:scaleY(1)}48%{transform:scaleY(.12)}}
-@keyframes vlsHpSteam{0%{transform:translateY(2px);opacity:0}25%{opacity:.9}55%,100%{transform:translateY(-5px);opacity:0}}
+@keyframes vlsHpSteam{0%{transform:translateY(2px);opacity:.4}20%{opacity:.9}45%,100%{transform:translateY(-2px);opacity:.55}}
 ${rmBlock(
-  ["vls-hp-bars", "vls-hp-led", "vls-hp-eyes", "vls-hp-steam1", "vls-hp-steam2"],
+  ["vls-hp-bars", "vls-hp-led", "vls-hp-eyes", "vls-hp-steam2"],
   [
     [".vls-hp-bars,.vls-hp-led", "opacity:1"],
-    [".vls-hp-steam1", "opacity:.55;transform:translateY(-2px)"],
     [".vls-hp-steam2", "opacity:0"],
   ],
 )}
+${rmBlock(["vls-hp-steam1"], [[".vls-hp-steam1", "opacity:.55;transform:translateY(-2px)"]], false)}
 `}</style>
       <Frame x={4} w={152} theme={theme} />
       <Frame x={164} w={152} theme={theme} result />
@@ -641,7 +679,7 @@ ${rmBlock(
       </g>
       <circle className="vls-hp-led" cx={80} cy={76} r={3.5} fill={WARN} />
       <Floor x1={176} x2={304} y={78} />
-      <Pawn x={216} yb={78} s={14} eyes eyeClassName="vls-hp-eyes" />
+      <Pawn x={216} yb={78} s={14} eyes host eyeClassName="vls-hp-eyes" />
       <rect x={240} y={66} width={12} height={12} rx={3} fill="#e4572e" />
       <path d="M252 69 a5 5 0 0 1 0 6" stroke="#e4572e" strokeWidth={2.5} fill="none" />
       <path className="vls-hp-steam1" d="M243 60 q3 -4 0 -8" stroke={LINE} strokeWidth={2} strokeLinecap="round" fill="none" opacity={0} />
@@ -717,18 +755,18 @@ function SceneRouteFailed({ theme }: { theme: ComicTheme }) {
 .vls-rf-p2{animation-delay:.2s}
 .vls-rf-march{animation:vlsRfMarch var(--comic-duration,3.2s) linear .4s var(--comic-repeat,1) both}
 .vls-rf-x{transform-box:fill-box;transform-origin:center;animation:vlsRfX var(--comic-duration,3.2s) ease-out .8s var(--comic-repeat,1) both}
-.vls-rf-sweat{animation:vlsRfSweat var(--comic-duration,3.2s) ease-in-out 1.2s var(--comic-repeat,1) both}
+.vls-rf-sweat{animation:vlsRfSweat var(--comic-duration,3.2s) ease-in-out 1 both}
 @keyframes vlsRfIn{from{opacity:0;transform:translateY(6px) scale(.9)}}
 @keyframes vlsRfMarch{from{stroke-dashoffset:0}to{stroke-dashoffset:-16}}
 @keyframes vlsRfX{from{opacity:0;transform:scale(1.5)}to{opacity:1;transform:scale(1)}}
-@keyframes vlsRfSweat{0%,65%,100%{opacity:.35;transform:translateY(0)}30%{opacity:1;transform:translateY(3px)}}
+@keyframes vlsRfSweat{0%,50%,100%{opacity:.7;transform:translateY(0)}24%{opacity:1;transform:translateY(3px)}}
 ${rmBlock(
-  ["vls-rf-panel", "vls-rf-march", "vls-rf-x", "vls-rf-sweat"],
+  ["vls-rf-panel", "vls-rf-march", "vls-rf-x"],
   [
     [".vls-rf-x", "opacity:1;transform:none"],
-    [".vls-rf-sweat", "opacity:.7;transform:none"],
   ],
 )}
+${rmBlock(["vls-rf-sweat"], [[".vls-rf-sweat", "opacity:.7;transform:none"]], false)}
 `}</style>
       <g className="vls-rf-panel">
         <Frame x={4} w={152} theme={theme} />
@@ -768,12 +806,13 @@ function ScenePlaybackFailed({ theme }: { theme: ComicTheme }) {
 @keyframes vlsPfTap{0%,16%{transform:translate(0,0)}20%{transform:translate(4px,0)}24%{transform:translate(0,0)}31%{transform:translate(0,0)}35%{transform:translate(4px,0)}39%,100%{transform:translate(0,0)}}
 @keyframes vlsPfRing{0%,55%{opacity:.25}63%{opacity:1}78%,100%{opacity:.25}}
 ${rmBlock(
-  ["vls-pf-s1", "vls-pf-s2", "vls-pf-rip", "vls-pf-pawn", "vls-pf-ring"],
+  ["vls-pf-s2", "vls-pf-rip", "vls-pf-pawn", "vls-pf-ring"],
   [
-    [".vls-pf-s1,.vls-pf-s2,.vls-pf-rip", "opacity:.35;transform:none"],
+    [".vls-pf-s2,.vls-pf-rip", "opacity:.35;transform:none"],
     [".vls-pf-ring", "opacity:1"],
   ],
 )}
+${rmBlock(["vls-pf-s1"], [[".vls-pf-s1", "opacity:.5;transform:none"]], false)}
 `}</style>
       <Frame x={4} w={152} theme={theme} />
       <Frame x={164} w={152} theme={theme} result />
@@ -812,20 +851,21 @@ function SceneHostOffline({ theme }: { theme: ComicTheme }) {
 .vls-ho-plug{transform-box:fill-box;transform-origin:50% 0%;animation:vlsHoSway var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 .vls-ho-pawn{transform-box:fill-box;transform-origin:50% 100%;animation:vlsHoWave var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 .vls-ho-badge{animation:vlsHoBadge var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-@keyframes vlsHoSway{0%{transform:rotate(-6deg)}10%{transform:rotate(6deg)}20%{transform:rotate(-5deg)}30%{transform:rotate(4deg)}40%,100%{transform:rotate(0)}}
+@keyframes vlsHoSway{0%{transform:rotate(-3deg)}14%{transform:rotate(3deg)}28%{transform:rotate(-2deg)}42%,100%{transform:rotate(0)}}
 @keyframes vlsHoWave{0%,10%{transform:rotate(0)}14%{transform:rotate(-8deg)}18%{transform:rotate(8deg)}22%{transform:rotate(-8deg)}26%{transform:rotate(8deg)}30%,100%{transform:rotate(0)}}
 @keyframes vlsHoBadge{0%,30%{opacity:.2}40%{opacity:.7}50%,100%{opacity:.2}}
 ${rmBlock(
-  ["vls-ho-plug", "vls-ho-pawn", "vls-ho-badge"],
-  [[".vls-ho-plug", "transform:none"], [".vls-ho-badge", "opacity:.5"]],
+  ["vls-ho-pawn", "vls-ho-badge"],
+  [[".vls-ho-badge", "opacity:.5"]],
 )}
+${rmBlock(["vls-ho-plug"], [[".vls-ho-plug", "transform:none"]], false)}
 `}</style>
       <Frame x={4} w={152} theme={theme} />
       <Frame x={164} w={152} theme={theme} result />
       <MiniTv x={30} y={22} w={70} h={44} />
       <rect x={36} y={28} width={58} height={30} rx={4} fill="#0a101c" />
-      <path d="M65 66 c0 6 -4 8 -8 10" stroke={TV_EDGE} strokeWidth={2.5} fill="none" strokeLinecap="round" />
-      <Plug x={57} y={76} className="vls-ho-plug" />
+      <path d="M65 66 c0 4 -4 6 -8 7" stroke={TV_EDGE} strokeWidth={2.5} fill="none" strokeLinecap="round" />
+      <Plug x={57} y={73} className="vls-ho-plug" />
       <Floor x1={176} x2={304} y={78} />
       <Pawn x={210} yb={78} s={9} eyes className="vls-ho-pawn" />
       <HostMark x={257} y={43} width={30} dashed className="vls-ho-badge" opacity={0.5} />
@@ -853,16 +893,17 @@ function SceneNoAudio({ theme }: { theme: ComicTheme }) {
 @keyframes vlsNaArc{0%{opacity:.45}12%{opacity:1}26%{opacity:.45}42%,100%{opacity:.8}}
 @keyframes vlsNaArm{0%,8%{opacity:0;transform:translateY(10px)}20%,100%{opacity:1;transform:translateY(0)}}
 @keyframes vlsNaSlash{0%,22%{opacity:0;transform:scale(1.7)}30%,100%{opacity:1;transform:scale(1)}}
-@keyframes vlsNaShake{0%,36%,56%,100%{transform:rotate(0)}40%{transform:rotate(-2.5deg)}44%{transform:rotate(2.5deg)}48%{transform:rotate(-1.8deg)}52%{transform:rotate(1.8deg)}}
+@keyframes vlsNaShake{0%,10%,42%,100%{transform:rotate(0)}16%{transform:rotate(-2.5deg)}22%{transform:rotate(2.5deg)}28%{transform:rotate(-1.8deg)}34%{transform:rotate(1.8deg)}}
 ${rmBlock(
-  ["vls-na-flick", "vls-na-a1", "vls-na-a2", "vls-na-a3", "vls-na-pawn", "vls-na-arm", "vls-na-slash"],
+  ["vls-na-flick", "vls-na-a1", "vls-na-a2", "vls-na-a3", "vls-na-arm", "vls-na-slash"],
   [
     [".vls-na-flick", "opacity:.5"],
     [".vls-na-a1,.vls-na-a2,.vls-na-a3", "opacity:.8"],
     [".vls-na-slash", "opacity:1;transform:none"],
-    [".vls-na-arm,.vls-na-pawn", "transform:none"],
+    [".vls-na-arm", "transform:none"],
   ],
 )}
+${rmBlock(["vls-na-pawn"], [[".vls-na-pawn", "transform:none"]], false)}
 `}</style>
       <Frame x={4} w={152} theme={theme} />
       <Frame x={164} w={152} theme={theme} result />
@@ -880,7 +921,7 @@ ${rmBlock(
         <path className="vls-na-a3" d="M118 26a22 22 0 0 1 0 36" />
       </g>
       {/* panel 2 (after): picture still alive on the mini TV, but the sound
-          arcs arrive dashed and carry a stamped red slash; the pawn raises
+          arcs arrive dashed and carry an unavailable mark; the pawn raises
           two floating round hands toward its ears. */}
       <MiniTv x={172} y={30} w={42} h={30} />
       <path d="M187 37.5 L199 43 L187 48.5 Z" fill={MINT} />
@@ -900,7 +941,7 @@ ${rmBlock(
       <path
         className="vls-na-slash"
         d="M216 29 L250 63"
-        stroke={DANGER}
+        stroke="var(--comic-tone)"
         strokeWidth={3.5}
         strokeLinecap="round"
         fill="none"
@@ -934,9 +975,10 @@ function SceneNotFound({ theme }: { theme: ComicTheme }) {
 @keyframes vlsRnGhost{0%,30%{opacity:0}45%,80%{opacity:.9}92%,100%{opacity:0}}
 @keyframes vlsRnPuff{0%,38%{opacity:0;transform:translateY(3px)}50%{opacity:.6}68%,100%{opacity:0;transform:translateY(-4px)}}
 ${rmBlock(
-  ["vls-rn-knock", "vls-rn-kn", "vls-rn-solid", "vls-rn-ghost", "vls-rn-puff"],
+  ["vls-rn-kn", "vls-rn-solid", "vls-rn-ghost", "vls-rn-puff"],
   [[".vls-rn-solid", "opacity:0"], [".vls-rn-ghost", "opacity:.9"], [".vls-rn-puff,.vls-rn-kn", "opacity:0"]],
 )}
+${rmBlock(["vls-rn-knock"], [[".vls-rn-knock", "transform:none"]], false)}
 `}</style>
       <Frame x={4} w={152} theme={theme} />
       <Frame x={164} w={152} theme={theme} result />
@@ -981,7 +1023,8 @@ function SceneAccessDenied({ theme }: { theme: ComicTheme }) {
 .vls-ad-x{transform-box:fill-box;transform-origin:center;animation:vlsAdX var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
 @keyframes vlsAdShake{0%{transform:translateX(0)}3%{transform:translateX(-3px)}6%{transform:translateX(3px)}9%{transform:translateX(-2px)}12%{transform:translateX(2px)}15%,100%{transform:translateX(0)}}
 @keyframes vlsAdX{0%,18%{opacity:0;transform:scale(1.6) rotate(8deg)}24%,100%{opacity:1;transform:scale(1) rotate(8deg)}}
-${rmBlock(["vls-ad-door", "vls-ad-x"], [[".vls-ad-x", "opacity:1;transform:scale(1) rotate(8deg)"]])}
+${rmBlock(["vls-ad-x"], [[".vls-ad-x", "opacity:1;transform:scale(1) rotate(8deg)"]])}
+${rmBlock(["vls-ad-door"], [[".vls-ad-door", "transform:none"]], false)}
 `}</style>
       <Frame x={4} w={152} theme={theme} />
       <Frame x={164} w={152} theme={theme} result />
@@ -1004,51 +1047,23 @@ ${rmBlock(["vls-ad-door", "vls-ad-x"], [[".vls-ad-x", "opacity:1;transform:scale
   );
 }
 
-/** 13. invalid-invite: 2 paper panels. The ticket is broken. */
+/** 13. invalid-invite: this invitation URL cannot admit the viewer. */
 function SceneInvalidInvite({ theme }: { theme: ComicTheme }) {
   return (
     <>
       <style>{`
-.vls-ii-l{transform-box:fill-box;transform-origin:center;animation:vlsIiL var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-ii-r{transform-box:fill-box;transform-origin:center;animation:vlsIiR var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-ii-x{transform-box:fill-box;transform-origin:center;animation:vlsIiX var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
-@keyframes vlsIiL{0%{transform:translate(0,0) rotate(0)}35%,100%{transform:translate(-3px,1px) rotate(-5deg)}}
-@keyframes vlsIiR{0%{transform:translate(0,0) rotate(0)}35%,100%{transform:translate(3px,-1px) rotate(5deg)}}
-@keyframes vlsIiX{0%,38%{opacity:0;transform:scale(1.6) rotate(8deg)}45%,100%{opacity:1;transform:scale(1) rotate(8deg)}}
-${rmBlock(
-  ["vls-ii-l", "vls-ii-r", "vls-ii-x"],
-  [
-    [".vls-ii-l", "transform:translate(-3px,1px) rotate(-5deg)"],
-    [".vls-ii-r", "transform:translate(3px,-1px) rotate(5deg)"],
-    [".vls-ii-x", "opacity:1;transform:scale(1) rotate(8deg)"],
-  ],
-)}
+.vls-ii-link{animation:vlsIiLink var(--comic-duration,3.2s) ease-in-out 1 both}
+@keyframes vlsIiLink{0%,8%,36%,100%{transform:none}17%{transform:translateX(-4px)}26%{transform:translateX(3px)}}
+${rmBlock(["vls-ii-link"], [[".vls-ii-link", "transform:none"]], false)}
 `}</style>
-      <Frame x={4} w={152} theme={theme} />
-      <Frame x={164} w={152} theme={theme} result />
-      <Pawn x={48} yb={76} s={9} eyes />
-      <rect x={62} y={40} width={20} height={13} rx={2} fill="var(--paper)" stroke="var(--ink)" strokeWidth={2} />
-      <path d="M62 42 L72 48 L82 42" stroke="var(--ink)" strokeWidth={1.5} fill="none" />
-      <Pawn x={186} yb={76} s={9} eyes />
-      <g className="vls-ii-l">
-        <path
-          d="M228 38 H241 L238 42 L242 46 L238 50 L241 54 H228 Z"
-          fill="var(--paper)"
-          stroke="var(--ink)"
-          strokeWidth={2}
-          strokeLinejoin="round"
-        />
-      </g>
-      <g className="vls-ii-r">
-        <path
-          d="M252 38 H241 L244 42 L240 46 L244 50 L241 54 H252 Z"
-          fill="var(--paper)"
-          stroke="var(--ink)"
-          strokeWidth={2}
-          strokeLinejoin="round"
-        />
-      </g>
-      <RedX cx={240} cy={46} arm={6} className="vls-ii-x" />
+      <Frame x={4} w={312} theme={theme} result />
+      <Pawn x={53} yb={81} s={15} eyes gaze={2} />
+      <BrowserWindow x={94} y={15} w={200} h={65}>
+        <rect x={106} y={33} width={176} height={35} rx={5} fill="var(--wall-2)" stroke={FAINT} strokeWidth={1.5} />
+        <InviteLink x={114} y={34} size={32} className="vls-ii-link" />
+        <path d="M160 44h69m-69 12h52" stroke={FAINT} strokeWidth={2} strokeLinecap="round" />
+        <RedX cx={264} cy={51} arm={8} />
+      </BrowserWindow>
     </>
   );
 }
@@ -1080,9 +1095,10 @@ function SceneRoomFull({ theme }: { theme: ComicTheme }) {
 @keyframes vlsFlBob{0%,14%{transform:translate(0,0)}20%{transform:translate(0,-3px)}26%,30%{transform:translate(0,0)}36%{transform:translate(0,-3px)}44%,100%{transform:translate(0,0)}}
 @keyframes vlsFlGhost{0%,45%{opacity:.55}50%{opacity:.15}52%{opacity:.5}55%,100%{opacity:0}}
 ${rmBlock(
-  ["vls-fl-c1", "vls-fl-c2", "vls-fl-c3", "vls-fl-c4", "vls-fl-c5", "vls-fl-c6", "vls-fl-c7", "vls-fl-you", "vls-fl-ghost"],
+  ["vls-fl-c1", "vls-fl-c2", "vls-fl-c3", "vls-fl-c5", "vls-fl-c6", "vls-fl-c7", "vls-fl-you", "vls-fl-ghost"],
   [[".vls-fl-ghost", "opacity:0"]],
 )}
+${rmBlock(["vls-fl-c4"], [[".vls-fl-c4", "transform:none"]], false)}
 `}</style>
       <Frame x={4} w={152} theme={theme} />
       <Frame x={164} w={152} theme={theme} result />
@@ -1133,18 +1149,18 @@ function SceneBandwidthLimited({ theme }: { theme: ComicTheme }) {
 .vls-bw-flow-b{animation:vlsBwFlowB var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 .vls-bw-throat{transform-box:fill-box;transform-origin:center;animation:vlsBwThroat var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 .vls-bw-small{transform-box:fill-box;transform-origin:center;animation:vlsBwSmall var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-@keyframes vlsBwFlowA{0%,12%{transform:translateX(-8px);opacity:0}26%,58%{transform:none;opacity:1}72%,100%{transform:translateX(8px);opacity:0}}
-@keyframes vlsBwFlowB{0%,32%{transform:translateX(-7px);opacity:0}48%,72%{transform:none;opacity:1}86%,100%{transform:translateX(5px);opacity:0}}
+@keyframes vlsBwFlowA{0%,8%{transform:translateX(-6px);opacity:.45}36%,100%{transform:none;opacity:1}}
+@keyframes vlsBwFlowB{0%,18%{transform:translateX(-5px);opacity:.45}46%,100%{transform:none;opacity:1}}
 @keyframes vlsBwThroat{0%,30%,100%{transform:scaleY(1)}48%,76%{transform:scaleY(.62)}}
 @keyframes vlsBwSmall{0%,42%{transform:scale(1)}58%,100%{transform:scale(.82)}}
 ${rmBlock(
-  ["vls-bw-flow-a", "vls-bw-flow-b", "vls-bw-throat", "vls-bw-small"],
+  ["vls-bw-throat", "vls-bw-small"],
   [
-    [".vls-bw-flow-a,.vls-bw-flow-b", "opacity:1;transform:none"],
     [".vls-bw-throat", "transform:scaleY(.62)"],
     [".vls-bw-small", "transform:scale(.82)"],
   ],
 )}
+${rmBlock(["vls-bw-flow-a", "vls-bw-flow-b"], [[".vls-bw-flow-a,.vls-bw-flow-b", "opacity:1;transform:none"]], false)}
 `}</style>
       <Frame x={4} w={152} theme={theme} />
       <Frame x={164} w={152} theme={theme} result />
@@ -1193,16 +1209,17 @@ function SceneEncoderLimited({ theme }: { theme: ComicTheme }) {
 .vls-en-small{transform-box:fill-box;transform-origin:center;animation:vlsEnSmall var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 @keyframes vlsEnFlow{0%,12%{transform:translateX(-7px);opacity:0}28%,60%{transform:none;opacity:1}76%,100%{transform:translateX(8px);opacity:0}}
 @keyframes vlsEnDrop{0%,42%{transform:none;opacity:1}64%,100%{transform:translateY(16px) rotate(12deg);opacity:0}}
-@keyframes vlsEnHeat{0%,34%{transform:translateY(3px);opacity:0}48%,72%{transform:none;opacity:1}86%,100%{opacity:0}}
+@keyframes vlsEnHeat{0%,8%{transform:translateY(3px);opacity:.4}36%,100%{transform:none;opacity:1}}
 @keyframes vlsEnSmall{0%,46%{transform:scale(1)}62%,100%{transform:scale(.82)}}
 ${rmBlock(
-  ["vls-en-frame-a", "vls-en-frame-b", "vls-en-drop", "vls-en-heat", "vls-en-small"],
+  ["vls-en-frame-a", "vls-en-frame-b", "vls-en-drop", "vls-en-small"],
   [
-    [".vls-en-frame-a,.vls-en-frame-b,.vls-en-heat", "opacity:1;transform:none"],
+    [".vls-en-frame-a,.vls-en-frame-b", "opacity:1;transform:none"],
     [".vls-en-drop", "opacity:0;transform:translateY(16px)"],
     [".vls-en-small", "transform:scale(.82)"],
   ],
 )}
+${rmBlock(["vls-en-heat"], [[".vls-en-heat", "opacity:1;transform:none"]], false)}
 `}</style>
       <Frame x={4} w={152} theme={theme} />
       <Frame x={164} w={152} theme={theme} result />
@@ -1255,9 +1272,10 @@ function SceneWarning({ theme }: { theme: ComicTheme }) {
 @keyframes vlsWnRay{0%{opacity:0;transform:translateY(3px)}9%{opacity:1}24%{transform:translateY(-2px)}50%,100%{transform:translateY(-2px);opacity:1}}
 @keyframes vlsWnBlink{0%,66%,74%,100%{transform:scaleY(1)}70%{transform:scaleY(.12)}}
 ${rmBlock(
-  ["vls-wn-ray1", "vls-wn-ray2", "vls-wn-ray3", "vls-wn-eyes"],
-  [[".vls-wn-ray1,.vls-wn-ray2,.vls-wn-ray3", "opacity:1;transform:none"]],
+  ["vls-wn-ray1", "vls-wn-ray3", "vls-wn-eyes"],
+  [[".vls-wn-ray1,.vls-wn-ray3", "opacity:1;transform:none"]],
 )}
+${rmBlock(["vls-wn-ray2"], [[".vls-wn-ray2", "opacity:1;transform:translateY(-2px)"]], false)}
 `}</style>
       <Frame x={4} w={312} theme={theme} result />
       <Floor x1={24} x2={296} />
@@ -1289,6 +1307,177 @@ ${rmBlock(
   );
 }
 
+function SceneMediaStatus({ theme, state }: {
+  theme: ComicTheme; state: "playing" | "ready" | "sharing" | "ended" | "preview-paused";
+}) {
+  const preview = state === "preview-paused";
+  const colour = "var(--comic-tone, var(--ink))";
+  return <>
+    <style>{`
+.vls-media-watcher{transform-origin:54px 77px;animation:vlsMediaWatch var(--comic-duration,3.2s) ease-in-out 1 both}
+.vls-media-ended{animation-name:vlsMediaRest}
+@keyframes vlsMediaWatch{0%{transform:none}18%{transform:translateX(3px) rotate(4deg)}42%,100%{transform:none}}
+@keyframes vlsMediaRest{0%{transform:translateX(5px) rotate(3deg)}28%,100%{transform:none}}
+${rmBlock(["vls-media-watcher"], [], false)}
+`}</style>
+    <Frame x={4} w={312} theme={theme} result />
+    <Floor x1={24} x2={296} />
+    <Pawn x={54} yb={77} s={13} eyes host={state === "sharing" || state === "ended" || preview} gaze={2}
+      className={`vls-media-watcher${state === "ended" ? " vls-media-ended" : ""}`} />
+    {preview ? <>
+      <BrowserWindow x={92} y={18} w={106} h={60}>
+        <MiniTv x={115} y={38} w={60} h={30} />
+        <path d="M137 44v13m8-13v13" stroke={colour} strokeWidth={4} />
+      </BrowserWindow>
+      <path d="M207 49h17m-6-6 6 6-6 6" stroke={LINE} strokeWidth={2} fill="none" />
+      <MiniTv x={234} y={32} w={59} h={35} />
+      <path d="m258 41 13 8-13 8Z" fill={LIVE} />
+    </> : <>
+      <MiniTv x={130} y={21} w={124} h={53} />
+      {state === "ready"
+        ? <path d="m175 47 12 11 24-26" stroke={colour} strokeWidth={4} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        : state === "ended"
+          ? <rect x={182} y={36} width={23} height={23} rx={3} fill={INK_STAGE} />
+          : <path d="m183 32 27 16-27 16Z" fill={colour} />}
+    </>}
+  </>;
+}
+
+function SceneRoomEntry({ theme, state }: {
+  theme: ComicTheme; state: "closed" | "invalid" | "password";
+}) {
+  const colour = "var(--comic-tone, var(--ink))";
+  return <>
+    <style>{`
+.vls-entry-closed{transform-origin:51px 76px;animation:vlsEntryStepBack var(--comic-duration,3.2s) ease-in-out 1 both}
+.vls-entry-invalid{animation:vlsEntryRefuse var(--comic-duration,3.2s) ease-in-out 1 both}
+.vls-entry-key{transform-origin:215px 53px;animation:vlsEntryKey var(--comic-duration,3.2s) ease-in-out 1 both}
+@keyframes vlsEntryStepBack{0%{transform:translateX(6px) rotate(4deg)}30%,100%{transform:none}}
+@keyframes vlsEntryRefuse{0%{transform:none}10%{transform:translateX(-3px)}18%{transform:translateX(3px)}26%,100%{transform:none}}
+@keyframes vlsEntryKey{0%{transform:translateX(10px) rotate(8deg)}32%,100%{transform:none}}
+${rmBlock(["vls-entry-closed", "vls-entry-invalid", "vls-entry-key"], [], false)}
+`}</style>
+    <Frame x={4} w={312} theme={theme} result />
+    <Floor x1={24} x2={296} />
+    <Pawn x={51} yb={76} s={12} eyes gaze={2} className={state === "closed" ? "vls-entry-closed" : undefined} />
+    {state === "password" ? <BrowserWindow x={95} y={15} w={195} h={62}>
+      <rect x={154} y={44} width={30} height={24} rx={4} fill="var(--paper)" stroke={colour} strokeWidth={2.5} />
+      <path d="M161 44v-8a8 8 0 0 1 16 0v8" stroke={colour} strokeWidth={2.5} fill="none" />
+      <g className="vls-entry-key">
+        <circle cx={215} cy={53} r={7} stroke={colour} strokeWidth={2.5} fill="none" />
+        <path d="M222 53h22m-5 0v6m-8-6v4" stroke={colour} strokeWidth={2.5} fill="none" />
+      </g>
+    </BrowserWindow> : state === "invalid" ? <>
+      <g className="vls-entry-invalid">{[104, 133, 162, 191].map((x, index) => <g key={x}>
+        <rect x={x} y={34} width={22} height={29} rx={4} fill="var(--paper)" stroke={index === 3 ? colour : LINE} strokeWidth={2} />
+        {index < 3 && <circle cx={x + 11} cy={48} r={3} fill={LINE} />}
+      </g>)}</g>
+      <RedX cx={251} cy={48} arm={10} />
+    </> : <>
+      <Door x={166} y={18} />
+      <path d="M208 31h51" stroke={colour} strokeWidth={3} />
+      <rect x={221} y={41} width={24} height={24} rx={3} fill={colour} />
+    </>}
+  </>;
+}
+
+function SceneBrowserAction({ theme, action }: {
+  theme: ComicTheme; action: "refresh" | "update" | "debug" | "export-failed" | "copy-failed" | "settings-failed";
+}) {
+  const colour = "var(--comic-tone, var(--ink))";
+  return <>
+    <style>{`
+.vls-browser-refresh{transform-origin:235px 55px;animation:vlsBrowserRefresh var(--comic-duration,3.2s) ease-in-out 1 both}
+.vls-browser-update,.vls-browser-debug{animation:vlsBrowserLift var(--comic-duration,3.2s) ease-in-out 1 both}
+.vls-browser-export-failed,.vls-browser-copy-failed,.vls-browser-settings-failed{animation:vlsBrowserRefuse var(--comic-duration,3.2s) ease-in-out 1 both}
+@keyframes vlsBrowserRefresh{0%{transform:rotate(-360deg) scale(.72)}32%{transform:rotate(-30deg) scale(.72)}44%,100%{transform:none}}
+@keyframes vlsBrowserLift{0%{transform:translateY(6px)}18%{transform:translateY(-2px)}34%,100%{transform:none}}
+@keyframes vlsBrowserRefuse{0%{transform:none}10%{transform:translateX(-3px)}18%{transform:translateX(3px)}26%,100%{transform:none}}
+${rmBlock(["vls-browser-refresh", "vls-browser-update", "vls-browser-debug", "vls-browser-export-failed", "vls-browser-copy-failed", "vls-browser-settings-failed"], [], false)}
+`}</style>
+    <Frame x={4} w={152} theme={theme} />
+    <Frame x={164} w={152} theme={theme} result />
+    <BrowserWindow x={18} y={20} w={113} h={58}>
+      {action === "settings-failed" ? <>
+        <path d="M35 44h68M35 55h68M35 66h68" stroke={LINE} strokeWidth={2.5} />
+        <g fill="var(--paper)" stroke={LINE} strokeWidth={2.5}>
+          <circle cx={54} cy={44} r={4} /><circle cx={82} cy={55} r={4} /><circle cx={65} cy={66} r={4} />
+        </g>
+      </> : action === "debug" || action === "export-failed"
+        ? <path d="M37 63V51m17 12V41m17 22V48m17 15V37" stroke={LINE} strokeWidth={7} strokeLinecap="round" />
+        : <path d="M33 44h63M33 55h47M33 66h63" stroke={LINE} strokeWidth={3} strokeLinecap="round" />}
+    </BrowserWindow>
+    {action === "settings-failed" ? <BrowserWindow x={179} y={20} w={113} h={58}>
+      <path d="M197 44h67M197 55h67M197 66h67" stroke={LINE} strokeWidth={2.5} />
+      <g className="vls-browser-settings-failed" fill="var(--paper)" stroke={LINE} strokeWidth={2.5}>
+        <circle cx={216} cy={44} r={4} /><circle cx={244} cy={55} r={4} /><circle cx={227} cy={66} r={4} />
+      </g>
+      <RedX cx={280} cy={69} arm={9} />
+    </BrowserWindow> : action === "refresh" || action === "debug" ? <BrowserWindow x={179} y={20} w={113} h={58}>
+      {action === "refresh" ? <path className="vls-browser-refresh" d="M218 44a18 18 0 1 1-1 20m1-20h14m-14 0V31" stroke={colour} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" /> : <>
+        <path className="vls-browser-debug" d="M193 64V53m15 11V44m15 20V50" stroke={LINE} strokeWidth={6} strokeLinecap="round" />
+        <circle cx={262} cy={52} r={11} fill="none" stroke={colour} strokeWidth={2.5} />
+        <circle cx={262} cy={52} r={5} fill={colour} />
+      </>}
+    </BrowserWindow> : <>
+      <rect x={199} y={27} width={48} height={50} rx={5} fill="var(--paper)" stroke={LINE} strokeWidth={2.5} />
+      <g className={`vls-browser-${action}`}>
+        <rect x={217} y={15} width={48} height={50} rx={5} fill="var(--paper)" stroke={colour} strokeWidth={2.5} />
+        <path d="M226 31h28M226 42h20M226 53h28" stroke={LINE} strokeWidth={2.5} strokeLinecap="round" />
+      </g>
+      {action === "update"
+        ? <path d="M283 72V35m-8 8 8-8 8 8" stroke={colour} strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        : <RedX cx={273} cy={70} arm={10} />}
+    </>}
+  </>;
+}
+
+function SceneSourceSwitching({ theme, state = "switching" }: {
+  theme: ComicTheme; state?: "switching" | "starting" | "failed";
+}) {
+  return <>
+    <style>{`
+.vls-source-switch{animation:vlsSourceSwitch var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-source-return{animation-name:vlsSourceReturn}
+.vls-source-host{transform-origin:39px 76px;animation:vlsSourceHost var(--comic-duration,3.2s) ease-in-out 1 both}
+@keyframes vlsSourceSwitch{0%{transform:translateX(-5px);opacity:.55}25%{transform:translateX(5px);opacity:1}45%,100%{transform:none;opacity:1}}
+@keyframes vlsSourceReturn{0%{transform:translateX(5px);opacity:.55}25%{transform:translateX(-5px);opacity:1}45%,100%{transform:none;opacity:1}}
+@keyframes vlsSourceHost{0%{transform:translateX(4px) rotate(4deg)}30%,100%{transform:none}}
+${rmBlock(["vls-source-switch"], [[".vls-source-switch", "opacity:1"]])}
+${rmBlock(["vls-source-host"], [], false)}
+`}</style>
+    <Frame x={4} w={312} theme={theme} result />
+    <Pawn x={39} yb={76} s={10} eyes host gaze={2} className={state === "failed" ? "vls-source-host" : undefined} />
+    <BrowserWindow x={75} y={24} w={71} h={47}>
+      <path d="M87 61l18-23 11 14 8-8 12 17Z" fill={SKY} />
+    </BrowserWindow>
+    {state === "switching" ? <BrowserWindow x={225} y={24} w={71} h={47}>
+      <circle cx={260} cy={50} r={11} fill={SKY} />
+    </BrowserWindow> : <MiniTv x={225} y={26} w={71} h={43} />}
+    {state === "failed" ? <RedX cx={185} cy={51} arm={11} /> : <g stroke="var(--comic-tone, var(--action))" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" fill="none">
+      <path className="vls-source-switch" d={state === "switching" ? "M158 42h51m-9-8 9 8-9 8" : "M158 51h51m-9-8 9 8-9 8"} />
+      {state === "switching" && <path className="vls-source-switch vls-source-return" d="M209 61h-51m9-8-9 8 9 8" />}
+    </g>}
+  </>;
+}
+
+function SceneNameInvalid({ theme }: { theme: ComicTheme }) {
+  return <>
+    <style>{`
+.vls-name-card{animation:vlsNameRefuse var(--comic-duration,3.2s) ease-in-out 1 both}
+@keyframes vlsNameRefuse{0%{transform:none}10%{transform:translateX(-3px)}18%{transform:translateX(3px)}26%,100%{transform:none}}
+${rmBlock(["vls-name-card"], [], false)}
+`}</style>
+    <Frame x={4} w={312} theme={theme} result />
+    <Pawn x={71} yb={76} s={16} eyes gaze={2} />
+    <g className="vls-name-card">
+      <rect x={125} y={27} width={136} height={39} rx={10} fill="var(--paper)" stroke={LINE} strokeWidth={2.5} />
+      <path d="M142 40h66M142 52h47" stroke={LINE} strokeWidth={3} strokeLinecap="round" />
+    </g>
+    <RedX cx={246} cy={64} arm={10} />
+  </>;
+}
+
 /* ------------------------------ component ------------------------------ */
 const SCENES: Record<ComicKind, (props: { theme: ComicTheme }) => ReactNode> = {
   "waiting-for-host": SceneWaiting,
@@ -1297,6 +1486,27 @@ const SCENES: Record<ComicKind, (props: { theme: ComicTheme }) => ReactNode> = {
   "signal-connecting": (p) => <SceneSignal {...p} state="connecting" />,
   "signal-recovering": (p) => <SceneSignal {...p} state="recovering" />,
   "signal-offline": (p) => <SceneSignal {...p} state="offline" />,
+  "signal-connected": (p) => <SceneSignal {...p} state="connected" />,
+  "transport-connected": (p) => <SceneSignal {...p} state="connected" peer />,
+  "signal-failed": (p) => <SceneSignal {...p} state="failed" />,
+  "media-playing": (p) => <SceneMediaStatus {...p} state="playing" />,
+  "media-ready": (p) => <SceneMediaStatus {...p} state="ready" />,
+  "share-live": (p) => <SceneMediaStatus {...p} state="sharing" />,
+  "share-ended": (p) => <SceneMediaStatus {...p} state="ended" />,
+  "preview-paused": (p) => <SceneMediaStatus {...p} state="preview-paused" />,
+  "room-closed": (p) => <SceneRoomEntry {...p} state="closed" />,
+  "room-code-invalid": (p) => <SceneRoomEntry {...p} state="invalid" />,
+  "site-access": (p) => <SceneRoomEntry {...p} state="password" />,
+  "page-refresh": (p) => <SceneBrowserAction {...p} action="refresh" />,
+  "update-available": (p) => <SceneBrowserAction {...p} action="update" />,
+  "debug-start": (p) => <SceneBrowserAction {...p} action="debug" />,
+  "debug-export-failed": (p) => <SceneBrowserAction {...p} action="export-failed" />,
+  "copy-failed": (p) => <SceneBrowserAction {...p} action="copy-failed" />,
+  "source-switching": SceneSourceSwitching,
+  "source-starting": (p) => <SceneSourceSwitching {...p} state="starting" />,
+  "source-failed": (p) => <SceneSourceSwitching {...p} state="failed" />,
+  "settings-failed": (p) => <SceneBrowserAction {...p} action="settings-failed" />,
+  "name-invalid": SceneNameInvalid,
   "tap-to-play": SceneTap,
   "host-paused": ScenePaused,
   recovering: SceneRecovering,
@@ -1344,6 +1554,7 @@ export const Comic = memo(function Comic({
   } as CSSProperties;
   return (
     <svg
+      key={kind}
       viewBox="0 0 320 96"
       style={style}
       data-comic-tone={resolvedTone}
@@ -1352,7 +1563,7 @@ export const Comic = memo(function Comic({
       focusable="false"
       xmlns="http://www.w3.org/2000/svg"
     >
-      {SCENES[kind]({ theme: resolvedTheme })}
+      <g className="lr-comic-content">{SCENES[kind]({ theme: resolvedTheme })}</g>
     </svg>
   );
 });

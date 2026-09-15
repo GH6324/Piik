@@ -32,6 +32,10 @@ Browser picker and any exact App-owned native windows. It never chooses a
 window automatically. A reproduced Browser-window, capture, or background
 failure is required before introducing an embedded Web runtime.
 
+Failure to open the system Browser does not retire a ready App service. The
+console keeps its entry address and retry action; service failure and explicit
+exit still own shutdown. Browser-opening errors retain their underlying cause.
+
 Server and App share one control layout and vocabulary. Deployment capabilities
 may fix a control on or off, but do not remove its place in the interface;
 disabled controls explain their reason in text and pure-visual modes. Real
@@ -70,6 +74,9 @@ Chinese catalog across App, Server UI and website; this includes region and
 script tags such as `zh-CN`, `zh-TW`, `zh-HK`, `zh-Hans` and `zh-Hant`.
 Pure-visual mode remains an explicit choice. An explicit later choice is
 persisted and takes precedence over that default, including App launch handoff.
+Explicit launcher choices apply only to the presentation domains the user chose.
+Older launchers cannot distinguish defaults from explicit choices; updated Sites
+preserve their saved preferences when receiving those unmarked hints.
 The App console uses its own supported presentation languages and falls back
 to English for additional UI languages. Text modes use concise copy.
 
@@ -87,9 +94,11 @@ fullscreen includes the playback bar; Safari's video-only fullscreen uses
 system controls and native video events to reflect playback and exit.
 Identity, connection details and topology stay in the deck.
 
-Replacement media bindings do not consult Viewer-local pause: when the Host is
+Replacement video bindings do not consult Viewer-local pause: when the Host is
 playing, they attempt playback subject to browser autoplay permission. There is
 no separate remembered playback intent for source changes or reconnects.
+Adding, replacing or removing audio on the same video binding updates only its
+audio consumer; it preserves current-frame proof and Viewer-local playback.
 
 The bar spans the screen's lower edge. Narrow screens separate audio controls
 from window actions into two rows and retain 44px action targets. Playing video hides the bar

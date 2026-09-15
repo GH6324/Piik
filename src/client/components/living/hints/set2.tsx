@@ -1,25 +1,32 @@
-// Hint set 2 — room & invite: code copy/shuffle, invite copy/rotate/revoke, policy open/private, password.
+// Hint set 2 — room & invite: code copy/shuffle, invite copy/rotate/revoke, password.
 // Scenes follow ../Comic.tsx conventions: 320x96 canvas, 2-panel
 // before→after idiom (Frame x={4} w={152} + Frame x={164} w={152}), vls-
 // prefixed keyframes in an inline <style>, rmBlock for reduced motion.
 // Paper idioms: var(--ink)/var(--wall-2)/var(--paper) carry the drawing;
 // room codes are always 4 abstract digit slots, never real digits.
 import {
-  Door,
+  BrowserWindow,
   FAINT,
   Frame,
   INK_STAGE,
-  LIVE,
+  InviteLink,
   Pawn,
-  RedX,
   SKY,
   Spark,
   Star,
-  STAR_GOLD,
   TV_SCREEN,
   rmBlock,
 } from "../Comic";
 import type { HintScene, Set2Kind } from "../../../ui/visual-kinds";
+
+// A settled card or held link rests in place; it does not repeat its operation.
+function RoomResultMotion() {
+  return <style>{`
+:where(svg[data-comic-motion="still"]) .vls-room-result{transform-box:fill-box;transform-origin:center;animation:vlsRoomResult var(--comic-duration,3.2s) ease-out 1 both}
+@keyframes vlsRoomResult{0%,8%{transform:translateY(-4px) rotate(-4deg)}30%,100%{transform:none}}
+${rmBlock(["vls-room-result"], [[".vls-room-result", "transform:none"]], false)}
+`}</style>;
+}
 
 /* LCD code card: pale body, dark screen, 4 abstract digit slots at +12/+27/
    +42/+57 inside the 78x46 body. */
@@ -72,67 +79,12 @@ function LcdSlots({
   return className ? <g className={className}>{slots}</g> : slots;
 }
 
-/** One chain link: a stadium ring, optionally tilted (static transform). */
-function LinkRing({
-  x,
-  y,
-  w,
-  h,
-  tilt = 0,
-}: {
-  x: number;
-  y: number;
-  w: number;
-  h: number;
-  tilt?: number;
-}) {
-  const ring = (
-    <rect
-      x={x}
-      y={y}
-      width={w}
-      height={h}
-      rx={h / 2}
-      fill="var(--paper)"
-      stroke="var(--ink)"
-      strokeWidth={2.5}
-    />
-  );
-  return tilt ? <g transform={`rotate(${tilt} ${x + w / 2} ${y + h / 2})`}>{ring}</g> : ring;
-}
-
-/** Open doorway: warm lit frame + leaf swung open on the left hinge. */
-function OpenDoorway({ x, y }: { x: number; y: number }) {
-  return (
-    <>
-      <rect
-        x={x}
-        y={y}
-        width={32}
-        height={56}
-        rx={5}
-        fill={STAR_GOLD}
-        opacity={0.3}
-        stroke="var(--ink)"
-        strokeWidth={2.5}
-      />
-      <path
-        d={`M${x} ${y} L${x - 12} ${y + 6} L${x - 12} ${y + 62} L${x} ${y + 56} Z`}
-        fill="var(--wall-2)"
-        stroke="var(--ink)"
-        strokeWidth={2.5}
-        strokeLinejoin="round"
-      />
-      <circle cx={x - 8} cy={y + 32} r={1.8} fill="var(--ink)" />
-    </>
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /* hint-copy-code: tap the code card → a second copy + star.           */
 /* ------------------------------------------------------------------ */
 const SceneCopyCode: HintScene = ({ theme }) => (
   <>
+    <RoomResultMotion />
     <style>{`
 .vls-copy-pawn{transform-box:fill-box;transform-origin:50% 100%;animation:vlsCopyLean var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 .vls-copy-ring{transform-box:fill-box;transform-origin:center;animation:vlsCopyRing var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
@@ -166,10 +118,10 @@ ${rmBlock(
     />
     <Pawn x={38} yb={76} s={9} eyes className="vls-copy-pawn" />
     <LcdBase x={210} y={18} />
-    <g className="vls-copy-front">
+    <g className="vls-room-result"><g className="vls-copy-front">
       <LcdBase x={190} y={32} />
       <LcdSlots x={190} y={32} />
-    </g>
+    </g></g>
     <Star x={292} y={22} r={7} className="vls-copy-star" baseOpacity={0} />
   </>
 );
@@ -179,6 +131,7 @@ ${rmBlock(
 /* ------------------------------------------------------------------ */
 const SceneShuffleCode: HintScene = ({ theme }) => (
   <>
+    <RoomResultMotion />
     <style>{`
 .vls-shuf-slots{opacity:.45}
 .vls-shuf-roll{animation:vlsShufRoll var(--comic-duration,3.2s) linear var(--comic-repeat,1) both}
@@ -197,6 +150,7 @@ ${rmBlock(
     <Frame x={164} w={152} theme={theme} result />
     <LcdBase x={41} y={25} />
     <LcdSlots x={41} y={25} />
+    <g className="vls-room-result">
     <LcdBase x={201} y={25} />
     <LcdSlots x={201} y={25} className="vls-shuf-slots" />
     <g className="vls-shuf-roll" fill={INK_STAGE} opacity={0.9}>
@@ -208,72 +162,69 @@ ${rmBlock(
         </g>
       ))}
     </g>
+    </g>
     <Spark x={288} y={30} className="vls-shuf-spark" />
   </>
 );
 
 /* ------------------------------------------------------------------ */
-/* hint-copy-invite: pawn balancing a link → link arcs to a friend.    */
+/* Copy writes a link to this device's clipboard; it sends no invitation. */
 /* ------------------------------------------------------------------ */
 const SceneCopyInvite: HintScene = ({ theme }) => (
   <>
+    <RoomResultMotion />
     <style>{`
-.vls-cinv-eyes{transform-box:fill-box;transform-origin:center;animation:vlsCinvBlink var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-cinv-fly{animation:vlsCinvFly var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-cinv-arc{animation:vlsCinvArc var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-cinv-star{transform-box:fill-box;transform-origin:center;animation:vlsCinvStar var(--comic-duration,3.2s) cubic-bezier(.3,1.5,.5,1) var(--comic-repeat,1) both}
-@keyframes vlsCinvBlink{0%,60%,68%,100%{transform:scaleY(1)}64%{transform:scaleY(.12)}}
-@keyframes vlsCinvFly{0%,6%{transform:translate(-92px,0);opacity:0}10%{opacity:1}32%{transform:translate(-46px,-20px)}50%{transform:translate(0,0)}56%{transform:translate(0,-3px)}62%,100%{transform:translate(0,0)}}
-@keyframes vlsCinvArc{0%,10%{opacity:0}20%{opacity:.7}55%{opacity:.7}72%,100%{opacity:0}}
-@keyframes vlsCinvStar{0%,50%{opacity:0;transform:scale(0)}58%{opacity:1;transform:scale(1.25)}66%,100%{opacity:1;transform:scale(1)}}
-${rmBlock(
-  ["vls-cinv-eyes", "vls-cinv-fly", "vls-cinv-arc", "vls-cinv-star"],
-  [
-    [".vls-cinv-fly", "transform:none;opacity:1"],
-    [".vls-cinv-arc", "opacity:.35"],
-    [".vls-cinv-star", "opacity:1"],
-  ],
-)}
+.vls-cinv-copy{animation:vlsCinvCopy var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+@keyframes vlsCinvCopy{0%,8%{transform:translate(-12px,-13px);opacity:.25}36%,100%{transform:none;opacity:1}}
+${rmBlock(["vls-cinv-copy"], [[".vls-cinv-copy", "transform:none;opacity:1"]])}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
     <Frame x={164} w={152} theme={theme} result />
-    <Pawn x={62} yb={76} s={10} eyes host eyeClassName="vls-cinv-eyes" />
-    <LinkRing x={50} y={27.5} w={24} h={13} tilt={-12} />
-    <path
-      className="vls-cinv-arc"
-      d="M196 50 Q242 14 288 50"
-      stroke={FAINT}
-      strokeWidth={2}
-      strokeDasharray="4 4"
-      fill="none"
-      opacity={0}
-    />
-    <Pawn x={196} yb={76} s={8.5} eyes host />
-    <Pawn x={288} yb={76} s={8.5} eyes color={SKY} />
-    <g className="vls-cinv-fly" opacity={0}>
-      <LinkRing x={278} y={31.5} w={20} h={11} tilt={-12} />
-    </g>
-    <Star x={288} y={16} r={6} className="vls-cinv-star" baseOpacity={0} />
+    <BrowserWindow x={24} y={21} w={104} h={54}>
+      <rect x={34} y={39} width={84} height={24} rx={4} fill="var(--wall-2)" stroke={FAINT} strokeWidth={1.5} />
+      <InviteLink x={44} y={37} size={28} />
+      <path d="M93 51h15" stroke={FAINT} strokeWidth={2} strokeLinecap="round" />
+    </BrowserWindow>
+    <rect x={205} y={21} width={76} height={60} rx={7} fill="var(--wall-2)" stroke="var(--ink)" strokeWidth={2.5} />
+    <rect x={227} y={15} width={32} height={12} rx={4} fill="var(--paper)" stroke="var(--ink)" strokeWidth={2.5} />
+    <g className="vls-room-result"><g className="vls-cinv-copy">
+      <InviteLink x={226} y={33} size={34} />
+    </g></g>
   </>
 );
 
-// The App's public-link choice reuses the established invite animation and
-// adds one small globe mark so the destination is clear without text.
-const HintClientLink: HintScene = ({ theme }) => (
-  <>
-    <SceneCopyInvite theme={theme} />
-    <g fill="none" stroke={LIVE} strokeWidth={1.8}>
-      <circle cx={180} cy={18} r={7} />
-      <path d="M173 18h14M180 11c3 3 3 11 0 14M180 11c-3 3-3 11 0 14" />
-    </g>
-  </>
-);
+// A link identifies its room; the App mode also exposes a public web entry.
+// Neither diagram claims clipboard access, delivery to a friend or media relay.
+function InviteLinkHint({ theme, publicEntry = false }: Parameters<HintScene>[0] & { publicEntry?: boolean }) {
+  return <>
+    <style>{`
+.vls-link-address{animation:vlsLinkAddress var(--comic-duration,3.2s) ease-out 1 both}
+@keyframes vlsLinkAddress{0%,8%{transform:translateY(-7px)}34%,100%{transform:none}}
+${rmBlock(["vls-link-address"], [[".vls-link-address", "transform:none"]], false)}
+`}</style>
+    <Frame x={4} w={312} theme={theme} result />
+    <BrowserWindow x={24} y={22} w={123} h={53}>
+      <g className="vls-link-address">
+        <InviteLink x={40} y={39} size={30} />
+        <path d="M89 50h44m-44 10h32" stroke={FAINT} strokeWidth={2} strokeLinecap="round" />
+      </g>
+    </BrowserWindow>
+    <path d="M157 49h39" stroke={FAINT} strokeWidth={2} strokeDasharray="3 4" />
+    {publicEntry ? <g stroke="var(--ink)" strokeWidth={2.5} fill="none">
+      <circle cx={252} cy={49} r={27} />
+      <ellipse cx={252} cy={49} rx={12} ry={27} />
+      <path d="M225 49h54m-49-14h44m-44 28h44" />
+    </g> : <><LcdBase x={210} y={26} /><LcdSlots x={210} y={26} /></>}
+  </>;
+}
+const HintClientLink: HintScene = (props) => <InviteLinkHint {...props} publicEntry />;
 
 /* ------------------------------------------------------------------ */
 /* hint-rotate-invite: a link → the link spun fresh + spark.           */
 /* ------------------------------------------------------------------ */
 const SceneRotateInvite: HintScene = ({ theme }) => (
   <>
+    <RoomResultMotion />
     <style>{`
 .vls-rinv-ring{transform-box:view-box;transform-origin:240px 48px;animation:vlsRinvSpin var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 .vls-rinv-spark{transform-box:fill-box;transform-origin:center;animation:vlsRinvSpark var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
@@ -286,8 +237,8 @@ ${rmBlock(
 `}</style>
     <Frame x={4} w={152} theme={theme} />
     <Frame x={164} w={152} theme={theme} result />
-    <LinkRing x={65} y={40} w={30} h={16} tilt={-15} />
-    <LinkRing x={225} y={40} w={30} h={16} tilt={-15} />
+    <InviteLink x={60} y={28} size={40} />
+    <g className="vls-room-result"><InviteLink x={222} y={30} size={36} /></g>
     <g
       className="vls-rinv-ring"
       stroke={SKY}
@@ -302,250 +253,44 @@ ${rmBlock(
   </>
 );
 
-/* ------------------------------------------------------------------ */
-/* hint-revoke-invite: intact chain → snapped, ends droop, red-X.      */
-/* ------------------------------------------------------------------ */
+// Revocation disables the same invitation URL; the slash remains visible.
 const SceneRevokeInvite: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-rev-l{transform-box:view-box;transform-origin:223px 52.5px;animation:vlsRevL var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-rev-r{transform-box:view-box;transform-origin:257px 52.5px;animation:vlsRevR var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-rev-x{transform-box:fill-box;transform-origin:center;animation:vlsRevX var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
-@keyframes vlsRevL{0%,10%{transform:translate(9px,-4.5px) rotate(-18deg)}20%{transform:translate(-2px,1px) rotate(5deg)}30%,100%{transform:translate(0,0) rotate(0)}}
-@keyframes vlsRevR{0%,10%{transform:translate(-9px,-4.5px) rotate(18deg)}20%{transform:translate(2px,1px) rotate(-5deg)}30%,100%{transform:translate(0,0) rotate(0)}}
-@keyframes vlsRevX{0%,30%{opacity:0;transform:scale(1.6) rotate(8deg)}38%,100%{opacity:1;transform:scale(1) rotate(8deg)}}
-${rmBlock(
-  ["vls-rev-l", "vls-rev-r", "vls-rev-x"],
-  [[".vls-rev-x", "opacity:1;transform:scale(1) rotate(8deg)"]],
-)}
+.vls-rev-link{transform-box:fill-box;transform-origin:center;animation:vlsRevLink var(--comic-duration,3.2s) ease-out 1 both}
+@keyframes vlsRevLink{0%,8%{transform:rotate(-9deg)}30%,100%{transform:none}}
+${rmBlock(["vls-rev-link"], [[".vls-rev-link", "transform:none"]], false)}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
     <Frame x={164} w={152} theme={theme} result />
-    <LinkRing x={56} y={41} w={28} h={14} />
-    <LinkRing x={76} y={41} w={28} h={14} />
-    <g className="vls-rev-l">
-      <g transform="rotate(18 223 52.5)">
-        <rect
-          x={210}
-          y={46}
-          width={26}
-          height={13}
-          rx={6.5}
-          fill="var(--paper)"
-          stroke="var(--ink)"
-          strokeWidth={2.5}
-        />
-      </g>
-    </g>
-    <g className="vls-rev-r">
-      <g transform="rotate(-18 257 52.5)">
-        <rect
-          x={244}
-          y={46}
-          width={26}
-          height={13}
-          rx={6.5}
-          fill="var(--paper)"
-          stroke="var(--ink)"
-          strokeWidth={2.5}
-        />
-      </g>
-    </g>
-    <RedX cx={240} cy={38} arm={5} className="vls-rev-x" />
+    <InviteLink x={59} y={27} size={42} />
+    <InviteLink x={219} y={27} size={42} className="vls-rev-link" />
+    <path d="m217 24 47 48" stroke="var(--paper)" strokeWidth={8} strokeLinecap="round" />
+    <path d="m217 24 47 48" stroke="var(--ink)" strokeWidth={3} strokeLinecap="round" />
   </>
 );
 
 /* ------------------------------------------------------------------ */
-/* hint-policy-open: shut door → door wide open, two pawns hop in.     */
-/* ------------------------------------------------------------------ */
-const ScenePolicyOpen: HintScene = ({ theme }) => (
-  <>
-    <style>{`
-.vls-open-p1{transform-box:fill-box;transform-origin:50% 100%;animation:vlsOpenHop var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-open-p2{transform-box:fill-box;transform-origin:50% 100%;animation:vlsOpenHop var(--comic-duration,3.2s) ease-in-out .2s var(--comic-repeat,1) both}
-@keyframes vlsOpenHop{0%,6%{transform:translateY(0)}14%{transform:translateY(-5px)}22%{transform:translateY(0)}28%{transform:translateY(-3px)}34%,100%{transform:translateY(0)}}
-${rmBlock(["vls-open-p1", "vls-open-p2"], [])}
-`}</style>
-    <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} result />
-    <Door x={64} y={20} />
-    <OpenDoorway x={224} y={18} />
-    <Pawn x={238} yb={74} s={6.5} eyes className="vls-open-p1" />
-    <Pawn x={206} yb={78} s={5.5} eyes color={SKY} className="vls-open-p2" />
-  </>
-);
-
-/* ------------------------------------------------------------------ */
-/* hint-policy-private: open door → shut + locked, one pawn waits with */
-/* its little invite card.                                             */
-/* ------------------------------------------------------------------ */
-const ScenePolicyPrivate: HintScene = ({ theme }) => (
-  <>
-    <style>{`
-.vls-priv-eyes{transform-box:fill-box;transform-origin:center;animation:vlsPrivBlink var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-priv-card{transform-box:fill-box;transform-origin:center;animation:vlsPrivCard var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-priv-door{transform-box:fill-box;transform-origin:0% 50%;animation:vlsPrivDoor var(--comic-duration,3.2s) cubic-bezier(.3,.8,.35,1) var(--comic-repeat,1) both}
-.vls-priv-lock{transform-box:fill-box;transform-origin:center;animation:vlsPrivLock var(--comic-duration,3.2s) cubic-bezier(.3,1.4,.45,1) var(--comic-repeat,1) both}
-.vls-priv-click{transform-box:fill-box;transform-origin:center;animation:vlsPrivClick var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
-@keyframes vlsPrivBlink{0%,52%,60%,100%{transform:scaleY(1)}56%{transform:scaleY(.12)}}
-@keyframes vlsPrivCard{0%,8%{transform:translateY(2px) rotate(-3deg)}18%{transform:translateY(-3px) rotate(4deg)}28%,100%{transform:none}}
-@keyframes vlsPrivDoor{0%,10%{transform:scaleX(.18);opacity:.45}28%,100%{transform:scaleX(1);opacity:1}}
-@keyframes vlsPrivLock{0%,24%{transform:translateY(-6px);opacity:0}34%{transform:translateY(1px);opacity:1}40%,100%{transform:none;opacity:1}}
-@keyframes vlsPrivClick{0%,32%{opacity:0;transform:scale(.45)}38%{opacity:1;transform:scale(1.12)}48%,100%{opacity:0;transform:scale(1)}}
-${rmBlock(
-  ["vls-priv-eyes", "vls-priv-card", "vls-priv-door", "vls-priv-lock", "vls-priv-click"],
-  [
-    [".vls-priv-card,.vls-priv-door,.vls-priv-lock", "transform:none;opacity:1"],
-    [".vls-priv-click", "opacity:.65;transform:none"],
-  ],
-)}
-`}</style>
-    <Frame x={4} w={152} theme={theme} />
-    <Frame x={164} w={152} theme={theme} result />
-    <OpenDoorway x={64} y={18} />
-    <Pawn x={204} yb={76} s={8} eyes eyeClassName="vls-priv-eyes" />
-    <g className="vls-priv-card">
-      <g transform="rotate(-10 202 44)">
-        <rect
-          x={195}
-          y={39}
-          width={14}
-          height={10}
-          rx={2}
-          fill="var(--paper)"
-          stroke="var(--ink)"
-          strokeWidth={1.5}
-        />
-        <path
-          d="M197.5 42.5 h4 M197.5 45.5 h6"
-          stroke="var(--ink)"
-          strokeWidth={1.2}
-          strokeLinecap="round"
-        />
-      </g>
-    </g>
-    <Door x={224} y={18} className="vls-priv-door" />
-    <g className="vls-priv-lock">
-      <path
-        d="M235 38 v-5 a5.5 5.5 0 0 1 11 0 v5"
-        stroke="var(--ink)"
-        strokeWidth={2.5}
-        fill="none"
-        strokeLinecap="round"
-      />
-      <rect
-        x={232}
-        y={38}
-        width={16}
-        height={13}
-        rx={3}
-        fill={STAR_GOLD}
-        stroke="var(--ink)"
-        strokeWidth={2}
-      />
-      <circle cx={240} cy={44} r={1.8} fill="var(--ink)" />
-    </g>
-    <Spark x={253} y={35} className="vls-priv-click" />
-  </>
-);
-
-/* ------------------------------------------------------------------ */
-/* hint-password: key approaches the lock → shackle up, door ajar.     */
-/* ------------------------------------------------------------------ */
+/* Password entry/configuration uses the same field; no door opens until
+   the separate admission owner has accepted a credential. */
 const ScenePassword: HintScene = ({ theme }) => (
   <>
+    <RoomResultMotion />
     <style>{`
-.vls-pass-key{animation:vlsPassKey var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-pass-lines{animation:vlsPassLines var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-pass-shackle{transform-box:view-box;transform-origin:190px 44px;animation:vlsPassShackle var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-pass-glow{animation:vlsPassGlow var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-@keyframes vlsPassKey{0%{transform:translateX(0);opacity:0}6%{opacity:1}30%,100%{transform:translateX(26px);opacity:1}}
-@keyframes vlsPassLines{0%,4%{opacity:0}10%{opacity:.9}24%{opacity:.9}32%,100%{opacity:0}}
-@keyframes vlsPassShackle{0%,8%{transform:rotate(34deg)}20%{transform:rotate(-6deg)}28%,100%{transform:rotate(0)}}
-@keyframes vlsPassGlow{0%,30%{opacity:.3}42%{opacity:.65}55%,100%{opacity:.3}}
-${rmBlock(
-  ["vls-pass-key", "vls-pass-lines", "vls-pass-shackle", "vls-pass-glow"],
-  [
-    [".vls-pass-key", "transform:translateX(26px);opacity:1"],
-    [".vls-pass-lines", "opacity:0"],
-    [".vls-pass-glow", "opacity:.45"],
-  ],
-)}
+.vls-pass-input{animation:vlsPassInput var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+@keyframes vlsPassInput{0%,8%{transform:translateX(-12px);opacity:.2}34%,100%{transform:none;opacity:1}}
+${rmBlock(["vls-pass-input"], [[".vls-pass-input", "transform:none;opacity:1"]])}
 `}</style>
     <Frame x={4} w={152} theme={theme} />
     <Frame x={164} w={152} theme={theme} result />
-    <g className="vls-pass-lines" opacity={0}>
-      <path d="M42 42 l-7 -2 M42 52 l-7 2" stroke={FAINT} strokeWidth={2} strokeLinecap="round" />
-    </g>
-    <g className="vls-pass-key" opacity={0}>
-      <circle cx={52} cy={47} r={5} fill="var(--paper)" stroke="var(--ink)" strokeWidth={2.5} />
-      <path d="M57 47 h14 M66 47 v4 M70 47 v4" stroke="var(--ink)" strokeWidth={2.5} strokeLinecap="round" />
-    </g>
-    <path
-      d="M92 40 v-5 a6 6 0 0 1 12 0 v5"
-      stroke="var(--ink)"
-      strokeWidth={2.5}
-      fill="none"
-      strokeLinecap="round"
-    />
-    <rect
-      x={88}
-      y={40}
-      width={18}
-      height={14}
-      rx={3}
-      fill={STAR_GOLD}
-      stroke="var(--ink)"
-      strokeWidth={2}
-    />
-    <circle cx={97} cy={47} r={1.8} fill="var(--ink)" />
-    <rect
-      className="vls-pass-glow"
-      x={230}
-      y={16}
-      width={36}
-      height={58}
-      rx={5}
-      fill={SKY}
-      opacity={0.3}
-    />
-    <rect
-      x={230}
-      y={16}
-      width={36}
-      height={58}
-      rx={5}
-      fill="none"
-      stroke="var(--ink)"
-      strokeWidth={2.5}
-    />
-    <path
-      d="M230 16 L260 20 L260 70 L230 74 Z"
-      fill="var(--wall-2)"
-      stroke="var(--ink)"
-      strokeWidth={2.5}
-      strokeLinejoin="round"
-    />
-    <circle cx={254} cy={46} r={1.8} fill="var(--ink)" />
-    <rect
-      x={186}
-      y={44}
-      width={18}
-      height={14}
-      rx={3}
-      fill={STAR_GOLD}
-      stroke="var(--ink)"
-      strokeWidth={2}
-    />
-    <circle cx={195} cy={51} r={1.8} fill="var(--ink)" />
-    <path
-      className="vls-pass-shackle"
-      d="M190 44 v-5 a6 6 0 0 1 11.8 -2.2"
-      stroke="var(--ink)"
-      strokeWidth={2.5}
-      fill="none"
-      strokeLinecap="round"
-    />
+    {[24, 184].map((x, index) => <BrowserWindow key={x} x={x} y={19} w={112} h={61}>
+      <circle cx={x + 18} cy={38} r={4} fill="none" stroke="var(--ink)" strokeWidth={2} />
+      <path d={`M${x + 22} 38h14m-4 0v4`} stroke="var(--ink)" strokeWidth={2} fill="none" />
+      <rect x={x + 12} y={49} width={88} height={22} rx={5} fill="var(--paper)" stroke="var(--ink)" strokeWidth={2} />
+      {index ? <g className="vls-room-result"><g className="vls-pass-input" fill="var(--ink)">
+        {[23, 36, 49, 62, 75, 88].map(offset => <circle key={offset} cx={x + offset} cy={60} r={2.5} />)}
+      </g></g> : <path d={`M${x + 23} 55v10`} stroke="var(--ink)" strokeWidth={2} />}
+    </BrowserWindow>)}
   </>
 );
 
@@ -553,10 +298,9 @@ export const SET2_SCENES: Record<Set2Kind, HintScene> = {
   "hint-copy-code": SceneCopyCode,
   "hint-shuffle-code": SceneShuffleCode,
   "hint-copy-invite": SceneCopyInvite,
+  "hint-invite-link": (props) => <InviteLinkHint {...props} />,
   "hint-client-link": HintClientLink,
   "hint-rotate-invite": SceneRotateInvite,
   "hint-revoke-invite": SceneRevokeInvite,
-  "hint-policy-open": ScenePolicyOpen,
-  "hint-policy-private": ScenePolicyPrivate,
   "hint-password": ScenePassword,
 };

@@ -58,6 +58,12 @@ over a reused comic's default; text and pure-visual tooltips retain that context
   PeerConnection errors remain diagnostic observations, not persistent red
   warnings after media recovers. The control menu does not repeat the television
   status or aggregate the first weak outbound edge into a global quality warning.
+  The operation supplies its outcome tone and matching scene together. Neither
+  the presence of an illustration nor a default checkmark proves success;
+  partial application retains a limitation instead of claiming completion.
+- Topology: unready edges use the blue pending treatment. Readiness alone cannot
+  distinguish initial connection from recovery, so this view does not invent a
+  warning. Confirmed interruption remains owned by the status projection.
 - Title: keeps the primary activity, with a compact warning for an applicable
   problem. Losing focus alone never means waiting for media.
 - Recovery: every projection is recomputed from current facts. A warning requires
@@ -95,8 +101,8 @@ Participant status reads the current evidence directly; it adds no stored
 status, timer, threshold or score. Detailed sender/receiver metrics
 remain available in connection details and Debug with their original scope.
 
-The preview labels supplied example quality facts for the displayed stream.
-Examples do not authorize guessing unavailable production facts.
+Previews render the production projection and metric components with explicit
+sample inputs. They do not add quality facts absent from the real workflow.
 
 ## References
 
