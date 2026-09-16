@@ -78,7 +78,7 @@ Room invitations and access settings still apply.
 
 `MAX_VIEWERS_PER_ROOM` sets the room's Viewer limit, excluding the Host. Choose
 `1..20` and restart to apply it. More Viewers can require more network and relay
-resources. See [room capacity](../reference/configuration.md#room-capacity)
+resources. See [room capacity](../standards/configuration.md#room-capacity)
 for defaults and the difference from App rooms.
 
 ### 2. Enable HTTPS
@@ -87,7 +87,7 @@ Use your existing HTTPS reverse proxy to forward to `127.0.0.1:8787` with
 WebSocket support. If you do not have one, [install Caddy](https://caddyserver.com/docs/install)
 and add this to its Caddyfile:
 
-```caddyfile
+```text
 share.example.com {
     reverse_proxy 127.0.0.1:8787
 }
@@ -111,6 +111,8 @@ configuration uses P2P media, so participants need a usable UDP path.
 Add `SFU_UDP_PORT=7882` to `.env`, allow UDP 7882, and restart Piik to enable
 automatic SFU fallback. When the server is behind NAT, also set `SFU_PUBLIC_IP`
 to its reachable public IPv4 address. The same binary provides the fallback.
+The Host must turn off **Privacy mode** before sharing to allow this route.
+Both direct and SFU media need a usable UDP connection.
 
 ## Keep it running and update
 
@@ -119,5 +121,5 @@ Keep `.env` and `rooms.sqlite` across updates. Back up room data while the serve
 stopped, replace the executable with the new release, then restart and check
 health and room access. Read release notes before an upgrade that changes data formats.
 
-[All settings and ports](../reference/configuration.md) ·
+[All settings and ports](../standards/configuration.md) ·
 [Maintainer release tooling](../deployment.md)

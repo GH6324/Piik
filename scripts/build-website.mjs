@@ -5,6 +5,7 @@ import { writeWebLicenseNotices } from "./package-licenses.mjs";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { tsImport } from "tsx/esm/api";
+import { buildDocumentation } from "../site/docs/build.mjs";
 
 const source = new URL("../site/", import.meta.url);
 const output = new URL("../build/site/", import.meta.url);
@@ -13,32 +14,36 @@ await mkdir(output, { recursive: true });
 await cp(source, output, {
   recursive: true,
   filter: (path) =>
+    path !== fileURLToPath(new URL("docs", source)) &&
     !path.endsWith(".ts") &&
     !path.endsWith(".tsx") &&
     !path.endsWith("tsconfig.json") &&
     !path.endsWith("README.md"),
 });
 await cp(new URL("../LICENSE", import.meta.url), new URL("LICENSE", output));
-const [{ WELCOME_LINES }, { locales }, { Glyph }] = await Promise.all([
-  "../src/client/components/living/WelcomeLine.tsx",
+const [{ locales }, { Glyph }] = await Promise.all([
   "../src/client/locales/index.ts",
   "../src/client/ui/icons.tsx",
 ].map(path => tsImport(path, {
   parentURL: import.meta.url,
   tsconfig: fileURLToPath(new URL("../src/tsconfig.json", import.meta.url)),
 })));
-// Reuse the product's paired lines as inert HTML, without a runtime catalog.
-const welcomeLines = WELCOME_LINES.map(({ key }) => renderToStaticMarkup(
-  createElement("span", { "data-welcome-key": key },
-    createElement("span", { lang: "en" }, `“${locales.en.copy[key]}”`),
-    createElement("span", { lang: "zh-CN" }, `“${locales.zh.copy[key]}”`),
-  ),
-));
+// Independent locale pools stay inert HTML; the first entry is also the no-JS fallback.
+const welcomePools = [locales.en, locales.zh].map(locale => locale.playful.welcome.map(({ text }) =>
+  renderToStaticMarkup(createElement("span", { lang: locale.tag }, `“${text}”`))));
 const homepage = (await readFile(new URL("index.html", source), "utf8"))
-  .replace(/<p id="welcome-line">.*?<\/p>/, `<p id="welcome-line">${welcomeLines[0]}</p>`);
+  .replace(/<p id="welcome-line">.*?<\/p>/, `<p id="welcome-line">${welcomePools.map(pool => pool[0] ?? "").join("")}</p>`);
 await writeFile(new URL("index.html", output), homepage.replace(
-  '</body>', `<template id="welcome-lines">${welcomeLines.join('')}</template></body>`,
+  '</body>', `<template id="welcome-lines">${welcomePools.flat().join('')}</template></body>`,
 ));
+// The page shares only the small, DOM-based rotation owner with the product UI.
+await build({
+  entryPoints: [fileURLToPath(new URL("main.js", source))],
+  outfile: fileURLToPath(new URL("main.js", output)),
+  bundle: true,
+  format: "esm",
+  minify: true,
+});
 // The opening shot uses the current homepage, with only its film clock adapter
 // substituted for the ordinary page script. Keep its layout and copy in one place.
 await writeFile(new URL("film/ui/website.html", output),
@@ -85,6 +90,7 @@ await build({
     js: "const piikFilmBuild = { url: document.currentScript.src, env: { DEV: false } };",
   },
 });
+await buildDocumentation();
 console.log(
   "Website built in build/site (static files, including the shared product UI).",
 );

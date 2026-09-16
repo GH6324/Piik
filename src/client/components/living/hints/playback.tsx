@@ -3,7 +3,8 @@ import {
 } from "../Comic";
 import type { HintScene, PlaybackHintKind } from "../../../ui/visual-kinds";
 
-// One action, a small response, then rest. Reduced motion keeps the result.
+// Play the action forward, hold its result, then repeat while the hint is shown.
+// Reduced motion keeps the informative result.
 function PlaybackMotion() {
   return <style>{`
 .vls-pb-cue{transform-box:fill-box;transform-origin:center;animation:vlsPbCue var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
@@ -25,13 +26,13 @@ function PlaybackMotion() {
 .vls-pb-popout,.vls-pb-popin{transform-box:fill-box;transform-origin:center}
 .vls-pb-popout{animation:vlsPbPopout var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
 .vls-pb-popin{animation:vlsPbPopin var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
-.vls-pb-unavailable{animation:vlsPbUnavailable var(--comic-duration,3.2s) ease-in-out 1 both}
+.vls-pb-unavailable{animation:vlsPbUnavailable var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 @keyframes vlsPbCue{0%,8%,34%,100%{transform:scale(1)}16%{transform:scale(.86)}25%{transform:scale(1.08)}}
 @keyframes vlsPbPlay{0%,18%{transform:translateX(-12px)}40%,100%{transform:none}}
 @keyframes vlsPbFreeze{0%{transform:translateX(-12px)}18%,100%{transform:none}}
 @keyframes vlsPbWave{0%,12%{stroke-dashoffset:1;opacity:.2}30%,100%{stroke-dashoffset:0;opacity:1}}
 @keyframes vlsPbSilence{0%,8%{stroke-dashoffset:0;opacity:1}26%,100%{stroke-dashoffset:1;opacity:0}}
-@keyframes vlsPbCross{0%,14%{opacity:0;transform:scale(.7)}30%,100%{opacity:1;transform:none}}
+@keyframes vlsPbCross{0%,30%,100%{transform:none}14%{transform:scale(.82)}22%{transform:scale(1.05)}}
 @keyframes vlsPbListen{0%,26%,44%,100%{transform:rotate(0)}35%{transform:rotate(-5deg)}}
 @keyframes vlsPbExpand{0%,8%{transform:translate(12px,9px) scale(.62)}34%,100%{transform:none}}
 @keyframes vlsPbContract{0%,8%{transform:none}34%,100%{transform:translate(12px,9px) scale(.62)}}

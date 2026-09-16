@@ -83,8 +83,7 @@ var forbiddenDisplayNameCharacters = regexp.MustCompile(
 	`[\p{Cc}\p{Zl}\p{Zp}\x{061c}\x{200b}\x{200e}\x{200f}\x{202a}-\x{202e}` +
 		`\x{2060}\x{2066}-\x{2069}\x{feff}]`)
 
-// NormalizeDisplayName ports normalizeDisplayName. The second result is false
-// where the TypeScript returns null.
+// NormalizeDisplayName returns false where the shared TypeScript normalizer returns null.
 func NormalizeDisplayName(value string) (string, bool) {
 	if forbiddenDisplayNameCharacters.MatchString(value) {
 		return "", false
@@ -169,7 +168,12 @@ func ValidDisplayName(value string) bool {
 func hasUnpairedSurrogateEscape(token []byte) bool {
 	text := string(token)
 	for index := 0; index+6 <= len(text); index++ {
-		if text[index] != '\\' || text[index+1] != 'u' {
+		if text[index] != '\\' {
+			continue
+		}
+		if text[index+1] != 'u' {
+			// Consume the whole escape, including \\, before looking for \u.
+			index++
 			continue
 		}
 		unit, err := strconv.ParseUint(text[index+2:index+6], 16, 32)
@@ -188,6 +192,8 @@ func hasUnpairedSurrogateEscape(token []byte) bool {
 			index += 11
 		case unit >= 0xdc00 && unit <= 0xdfff:
 			return true
+		default:
+			index += 5
 		}
 	}
 	return false

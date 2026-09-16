@@ -6,7 +6,7 @@
   <a href="https://github.com/TNTcraftHIM/Piik/releases">Download</a> ·
   <a href="https://gitee.com/TNTcraftHIM/Piik/releases">Gitee mirror</a> ·
   <a href="https://demo.piik.tv">Use online</a> ·
-  <a href="./docs/README.md">Documentation</a>
+  <a href="https://piik.tv/docs/?lang=en">Documentation</a>
 </p>
 <p align="center">
   <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-36564f?style=flat-square" alt="License: MIT"></a>
@@ -57,7 +57,7 @@ you can also create a room in the online version.
 | --- | --- |
 | [Use Piik online](https://demo.piik.tv) | Open it in a desktop browser to create a room and share. |
 | [Download Piik App](https://piik.tv/#download) | Extract and open the App, choose **Public invite**, then **Open Piik** to create a temporary room. |
-| Use an existing Piik site | Open the address your friend or administrator provides. [Hosting your own](./docs/operations/self-hosting.md) is an advanced option. |
+| [Host your own site](./docs/operations/self-hosting.md) | Advanced: deploy Piik Server on a Linux x64 server with your own domain, then connect through Piik App or a browser. |
 
 <p align="center"><img src="./docs/assets/quickstart.svg" width="640" alt="Choose a screen, send an invitation, watch together."></p>
 
@@ -99,14 +99,14 @@ Open `http://localhost:8787` to try it locally. For a public site, configure you
 domain, HTTPS reverse proxy and STUN address. Room data is stored in SQLite.
 For containers, use the [Docker Compose setup](./docs/operations/self-hosting.md#docker-compose).
 
-[**Deploy your own site →**](./docs/operations/self-hosting.md) · [Configuration](./docs/reference/configuration.md) · [Run from source](./docs/README.md#run-from-source)
+[**Deploy your own site →**](./docs/operations/self-hosting.md) · [Configuration](./docs/standards/configuration.md) · [Run from source](./docs/README.md#run-from-source)
 
 ## Contributing
 
 Bug reports, translations, documentation improvements and pull requests are welcome.
 See [ways to contribute](./CONTRIBUTING.md#ways-to-help) or
 [help translate Piik](./docs/guide/translating.md). Use the
-[repository layout](./docs/reference/engineering.md#repository-layout) to find your way around.
+[repository layout](./docs/standards/engineering.md#repository-layout) to find your way around.
 
 ## License
 

@@ -16,8 +16,8 @@ import type { HintScene, Set3Kind } from "../../../ui/visual-kinds";
 // Settings explain a choice; they do not predict delivered quality.
 const hintQuality: HintScene = ({ theme }) => <>
   <style>{`
-.vls-quality-choice{animation:vlsQualityChoice var(--comic-duration,3.2s) ease-in-out 1 both}
-.vls-quality-size{stroke-dasharray:1;animation:vlsQualitySize var(--comic-duration,3.2s) ease-out 1 both}
+.vls-quality-choice{animation:vlsQualityChoice var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-quality-size{stroke-dasharray:1;animation:vlsQualitySize var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
 @keyframes vlsQualityChoice{0%,8%{transform:translateX(-43px)}30%,100%{transform:none}}
 @keyframes vlsQualitySize{0%,18%{stroke-dashoffset:1}42%,100%{stroke-dashoffset:0}}
 ${rmBlock(["vls-quality-choice"], [[".vls-quality-choice", "transform:none"]])}
@@ -37,7 +37,7 @@ ${rmBlock(["vls-quality-size"], [[".vls-quality-size", "stroke-dashoffset:0"]], 
 
 const hintAudioQuality: HintScene = ({ theme }) => <>
   <style>{`
-.vls-audio-quality-wave{stroke-dasharray:1;animation:vlsAudioQualityWave var(--comic-duration,3.2s) ease-out 1 both}
+.vls-audio-quality-wave{stroke-dasharray:1;animation:vlsAudioQualityWave var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
 @keyframes vlsAudioQualityWave{0%,8%{stroke-dashoffset:1}38%,100%{stroke-dashoffset:0}}
 ${rmBlock(["vls-audio-quality-wave"], [[".vls-audio-quality-wave", "stroke-dashoffset:0"]], false)}
 `}</style>
@@ -61,7 +61,7 @@ function PreferenceHint({ theme, preference }: Parameters<HintScene>[0] & {
   const motion = preference === "framerate";
   return <>
     <style>{`
-.vls-pref-${preference}{transform-box:view-box;transform-origin:237px 42px;animation:vlsPref${preference} var(--comic-duration,3.2s) ease-in-out 1 both}
+.vls-pref-${preference}{transform-box:view-box;transform-origin:237px 42px;animation:vlsPref${preference} var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 @keyframes vlsPref${preference}{0%,8%{transform:rotate(${detail ? 12 : -12}deg)}24%{transform:rotate(${motion ? 3 : -3}deg)}40%,100%{transform:none}}
 ${rmBlock([`vls-pref-${preference}`], [[`.vls-pref-${preference}`, "transform:none"]])}
 `}</style>
@@ -85,8 +85,8 @@ const hintDegradePref: HintScene = props => <PreferenceHint {...props} preferenc
 
 const hintCodec: HintScene = ({ theme }) => <>
   <style>{`
-.vls-codec-piece{animation:vlsCodecPiece var(--comic-duration,3.2s) ease-in-out 1 both}
-.vls-codec-packets{transform-box:fill-box;transform-origin:left;animation:vlsCodecPackets var(--comic-duration,3.2s) ease-out 1 both}
+.vls-codec-piece{animation:vlsCodecPiece var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-codec-packets{transform-box:fill-box;transform-origin:left;animation:vlsCodecPackets var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
 @keyframes vlsCodecPiece{0%,8%{transform:translateX(-10px)}28%,100%{transform:none}}
 @keyframes vlsCodecPackets{0%,18%{transform:scaleX(0)}42%,100%{transform:none}}
 ${rmBlock(["vls-codec-piece", "vls-codec-packets"], [[".vls-codec-piece,.vls-codec-packets", "transform:none"]])}
@@ -99,7 +99,7 @@ ${rmBlock(["vls-codec-piece", "vls-codec-packets"], [[".vls-codec-piece,.vls-cod
 </>;
 
 /** hint-advanced: closed cabinet door with a sliders glyph → door swings
- * open revealing 3 slider tracks with set knobs; pawn hops. Demonstrates once, then holds. */
+ * open revealing 3 slider tracks with set knobs; the open controls are the resting pose. */
 const hintAdvanced: HintScene = ({ theme }) => (
   <>
     <style>{`
@@ -147,7 +147,7 @@ ${rmBlock(
 );
 
 /** hint-details: a plain row of meter bars → magnifier pops over the bars,
- * enlarged inside the lens; pawn peeks. Demonstrates once, then holds. */
+ * enlarged inside the lens; the lens returns to a readable resting pose. */
 const hintDetails: HintScene = ({ theme }) => (
   <>
     <style>{`
@@ -198,7 +198,7 @@ ${rmBlock(
 );
 
 /** hint-more-metrics: one meter row + chevron-down (beckons) → three rows
- * unfold with overshoot + chevron-up. Demonstrates once, then holds. */
+ * unfold with overshoot + chevron-up. The rows rest expanded. */
 const hintMoreMetrics: HintScene = ({ theme }) => (
   <>
     <style>{`

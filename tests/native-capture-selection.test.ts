@@ -62,6 +62,18 @@ describe("native capture source selection", () => {
     ).toBe("display:2");
   });
 
+  it.each(["browser", "window"] as const)("only adds waiting copy to the pending %s source list", initialTab => {
+    setCopy({ lang: "en", vis: false });
+    const html = renderToStaticMarkup(createElement(CaptureSourcePicker, {
+      nativeSources: { kind: "loading" }, initialTab,
+      onBrowser: () => {}, onNative: () => {}, onPreview: async () => null,
+      onRefresh: () => {}, onCancel: () => {},
+    }));
+    expect(html.includes('class="lr-waiting-caption"')).toBe(initialTab === "window");
+    expect(html).not.toContain("lr-brand-loader");
+    expect(html).not.toMatch(/class="lr-source-picker-close"[^>]*disabled=""/);
+  });
+
   it("separates windows from displays and locks Browser switching during native sharing", () => {
     const html = renderToStaticMarkup(createElement(CaptureSourcePicker, {
       nativeSources: {
@@ -101,6 +113,18 @@ describe("native capture source selection", () => {
     }));
     expect(html).toContain('data-native-source="picker:1"');
     expect(html).toContain('aria-checked="true"');
+  });
+
+  it.each(["browser", "window"] as const)("blocks %s confirmation during owning page work while retaining cancel", (initialTab) => {
+    setCopy({ lang: "en", vis: false });
+    const html = renderToStaticMarkup(createElement(CaptureSourcePicker, {
+      nativeSources: { kind: "ready", sources: [game], processAudio: false, systemAudio: false },
+      initialTab, selectionDisabled: true,
+      onBrowser: () => {}, onNative: () => {}, onPreview: async () => null,
+      onRefresh: () => {}, onCancel: () => {},
+    }));
+    expect(html).toMatch(/class="lr-source-option(?: is-browser)?"[^>]*disabled=""/);
+    expect(html).not.toMatch(/class="lr-source-picker-close"[^>]*disabled=""/);
   });
 });
 

@@ -35,7 +35,7 @@ func stunListenAddresses(host string, prediction bool) ([]string, error) {
 	return listeners, nil
 }
 
-// NATPredictionStunURLs ports natPredictionStunUrls: the two auxiliary
+// NATPredictionStunURLs returns the two auxiliary
 // listeners derived from the first ordinary STUN authority on UDP 3478.
 func NATPredictionStunURLs(stunURLs []string) []string {
 	for _, stunURL := range stunURLs {
@@ -45,12 +45,6 @@ func NATPredictionStunURLs(stunURLs []string) []string {
 			continue
 		}
 		port := authority.Port()
-		// The WHATWG parser drops a port equal to the scheme default, so
-		// "stun:host:80" reaches the TypeScript's `: NAT_PREDICTION_BASE_PORT`
-		// fallback and counts as a base listener.
-		if port == defaultSchemePort("http") {
-			port = ""
-		}
 		if port != "" {
 			number, err := strconv.Atoi(port)
 			if err != nil || number != natPredictionBasePort {
@@ -72,7 +66,6 @@ func NATPredictionStunURLs(stunURLs []string) []string {
 	return nil
 }
 
-// IceConfig ports createIceConfig.
 func IceConfig(c Config) protocol.IceConfig {
 	// A configured empty list (Local without prediction) is kept as-is; only an
 	// absent one is derived, so nil and empty differ here.

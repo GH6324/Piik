@@ -15,7 +15,7 @@ suggestion does not require a development environment.
 ## Make your first correction
 
 1. Try the affected screen and read the nearby controls. Check both existing
-   languages when helpful; the [terminology and voice guide](../reference/naming.md#voice-and-terminology)
+   languages when helpful; the [terminology and voice guide](../standards/naming.md#voice-and-terminology)
    owns names and writing style.
 2. Fork Piik and work on a branch from current `main`, following
    [Contributing](../../CONTRIBUTING.md#lean-workflow). Small text edits can also
@@ -41,17 +41,28 @@ suggestion does not require a development environment.
 | Surface | Editable source |
 | --- | --- |
 | App launcher and shared Browser/App UI, including tooltips and accessible labels | [English](../../src/client/locales/en.ts), [Chinese](../../src/client/locales/zh.ts) |
-| Welcome lines and changing browser-tab titles | `welcome.*` messages and the title-frame catalog at the end of those same files |
+| Welcome lines, waiting captions and changing browser-tab titles | The `enPlayful` / `zhPlayful` pools and title-frame catalogs in those same files; website welcome lines reuse these pools |
 | Website | [Page markup](../../site/index.html) and [interactive labels](../../site/main.js); text is paired by `en` and `zh-CN` |
 | Introduction film | [Film sources](../../site/film/README.md); captions, artwork and playback labels have their own bilingual text |
 | App console window | `consoleCopy` in [console.go](../../internal/app/console.go); entries are ordered English, Chinese, visual; retain the third slot even when empty |
-| README and entry guides | [README pair](../../README.md), [getting started](./getting-started.md) and [self-hosting](../operations/self-hosting.md), each with a `.zh-CN.md` counterpart |
+| README and entry guides | [README pair](../../README.md), [documentation home](./README.md), [getting started](./getting-started.md), [troubleshooting](./troubleshooting.md) and [self-hosting](../operations/self-hosting.md), each with a `.zh-CN.md` counterpart |
 
 The App and Server serve the same web UI. Edit source files; build output and
 release packages are generated. Translating an App message does not also
 translate a website caption. Update related instructions when an action name
 changes. Technical references keep one shared version; see
-[documentation ownership](../maintenance.md).
+[documentation ownership](../standards/documentation.md).
+
+Language catalogs are bundled with the web assets; a new language also needs
+the registry import described below. Rebuild and publish the App or Server that
+serves the affected UI after an edit. Installed packages do not load external
+language files. When the App connects to a remote site, that site serves its UI,
+so updating the site's web translations does not require reinstalling the App.
+The website has its own build and deployment workflow.
+The documentation website renders those same Markdown sources; editing a guide
+updates its web page on the next website publication. Its navigation and search
+labels live in `site/docs/`. Use the [website preview](../operations/website.md#preview)
+to check the generated page as well as GitHub's Markdown view.
 
 ## Preserve meaning and syntax
 
@@ -91,16 +102,18 @@ start an issue with its language tag, intended coverage and any terminology or
 layout questions, so contributors can coordinate work and review.
 
 1. Copy `src/client/locales/en.ts` to a file such as `fr.ts`. Translate the
-   messages and title frames, rename the two exports, and retain the
-   `Record<CopyKey, string>` and `TitleFrameCatalog` types imported from `zh.ts`.
+   messages and title labels, write natural [playful entries](#playful-copy), and
+   rename the three exports. Retain `Record<CopyKey, string>`, `TitleFrameCatalog`
+   and `PlayfulCatalog` from `zh.ts`.
    Chinese currently defines the key set; either existing language can provide
    context. Complete all keys rather than spreading an English catalog over
    missing translations.
 2. Import the exports in [locales/index.ts](../../src/client/locales/index.ts)
-   and add one registry entry. For example, **after translating** the two exports:
+   and add one registry entry. For example, **after translating** the catalogs:
 
    ```ts
-   fr: { name: "Français", short: "FR", tag: "fr", copy: fr, titleFrames: frTitleFrames },
+   fr: { name: "Français", short: "FR", tag: "fr", copy: fr,
+     titleFrames: frTitleFrames, playful: frPlayful },
    ```
 
    Use an ASCII locale filename/key, the language's own name in `name`, a compact
@@ -113,12 +126,12 @@ layout questions, so contributors can coordinate work and review.
    language's short label appears on that slot, with its full name in the menu.
    Initial selection matches a registered tag or key, then its base language;
    unregistered languages use English. A saved choice takes precedence.
-   The shared [system-language policy](../product/presentation-lifecycle.md#visual-language)
+   The shared [system-language policy](../standards/presentation-lifecycle.md#visual-language)
    also covers Chinese script and region variants across App, Server UI and website.
 3. Check complete screens and the launch flow. New UI languages use English in
    the App console until its own translation is added. Console additions also
    require updating the launcher and loopback accepted-language checks together;
-   use the [App module map](../reference/engineering.md#module-map).
+   use the [App module map](../standards/engineering.md#module-map).
 4. State coverage in the PR. Website, film and documentation translations can be
    contributed separately; their existing language controls must be updated when
    adding a language there. For right-to-left scripts, include text direction and
@@ -127,6 +140,34 @@ layout questions, so contributors can coordinate work and review.
 Pure-visual mode is an optional presentation, not another language to translate.
 The small visual scenes are shared with text modes; translate their labels and
 explanations in the normal catalog. Keep the visual option available.
+
+## Playful copy
+
+Each language owns its welcome and waiting arrays, and each playful title has a
+fixed `label` plus a `variations` array. Add or remove entries in that language
+without matching another language's count, order or references. An empty array
+omits the decoration; one entry stays static. Operational keys and title labels
+still require complete translations. Errors, pauses, endings, required actions
+and slogans stay fixed.
+
+Welcome entries carry `text` and two `symbols`, chosen from the existing
+[icon vocabulary](../../src/client/ui/icons.tsx) to express that sentence in the
+visual cipher. For example:
+
+```ts
+{ text: "Your seat is right here.", symbols: ["couch", "heart"] },
+```
+
+Waiting entries are plain strings such as `"Pull up a comfy chair."`. Keep them
+brief and natural in context. Avoid temporary trends, literal borrowed dialogue
+and statements that invent progress, success or remaining time.
+
+All these surfaces show a line immediately and share the
+[playful-copy lifecycle](../standards/visual-language.md#playful-copy-lifecycle).
+Keep timing in that owner. Preview welcome text and its cipher at
+`/__tooltip-preview`; use `/__status-preview` for waiting captions and titles.
+Check both narrow windows and language changes. The website's build picks up
+welcome edits automatically; its other copy remains separate.
 
 ## Preview and check
 

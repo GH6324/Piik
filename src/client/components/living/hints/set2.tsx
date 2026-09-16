@@ -22,8 +22,8 @@ import type { HintScene, Set2Kind } from "../../../ui/visual-kinds";
 // A settled card or held link rests in place; it does not repeat its operation.
 function RoomResultMotion() {
   return <style>{`
-:where(svg[data-comic-motion="still"]) .vls-room-result{transform-box:fill-box;transform-origin:center;animation:vlsRoomResult var(--comic-duration,3.2s) ease-out 1 both}
-@keyframes vlsRoomResult{0%,8%{transform:translateY(-4px) rotate(-4deg)}30%,100%{transform:none}}
+:where(svg[data-comic-motion="still"]) .vls-room-result{transform-box:fill-box;transform-origin:center;animation:vlsRoomResult var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+@keyframes vlsRoomResult{0%,38%,100%{transform:none}14%{transform:translateY(-4px) rotate(-4deg)}}
 ${rmBlock(["vls-room-result"], [[".vls-room-result", "transform:none"]], false)}
 `}</style>;
 }
@@ -136,7 +136,7 @@ const SceneShuffleCode: HintScene = ({ theme }) => (
 .vls-shuf-slots{opacity:.45}
 .vls-shuf-roll{animation:vlsShufRoll var(--comic-duration,3.2s) linear var(--comic-repeat,1) both}
 .vls-shuf-spark{transform-box:fill-box;transform-origin:center;animation:vlsShufSpark var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
-@keyframes vlsShufRoll{0%{transform:translateY(-2px)}8%{transform:translateY(2px)}16%{transform:translateY(-2px)}24%{transform:translateY(2px)}32%{transform:translateY(-1px)}40%,100%{transform:translateY(0)}}
+@keyframes vlsShufRoll{0%{transform:translateY(0)}8%{transform:translateY(2px)}16%{transform:translateY(-2px)}24%{transform:translateY(2px)}32%{transform:translateY(-1px)}40%,100%{transform:translateY(0)}}
 @keyframes vlsShufSpark{0%,8%{opacity:0;transform:scale(.5)}16%{opacity:1;transform:scale(1.1)}22%,70%{opacity:1;transform:scale(1)}82%,100%{opacity:0}}
 ${rmBlock(
   ["vls-shuf-roll", "vls-shuf-spark"],
@@ -198,8 +198,8 @@ ${rmBlock(["vls-cinv-copy"], [[".vls-cinv-copy", "transform:none;opacity:1"]])}
 function InviteLinkHint({ theme, publicEntry = false }: Parameters<HintScene>[0] & { publicEntry?: boolean }) {
   return <>
     <style>{`
-.vls-link-address{animation:vlsLinkAddress var(--comic-duration,3.2s) ease-out 1 both}
-@keyframes vlsLinkAddress{0%,8%{transform:translateY(-7px)}34%,100%{transform:none}}
+.vls-link-address{animation:vlsLinkAddress var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+@keyframes vlsLinkAddress{0%,42%,100%{transform:none}16%{transform:translateY(-7px)}}
 ${rmBlock(["vls-link-address"], [[".vls-link-address", "transform:none"]], false)}
 `}</style>
     <Frame x={4} w={312} theme={theme} result />
@@ -257,8 +257,8 @@ ${rmBlock(
 const SceneRevokeInvite: HintScene = ({ theme }) => (
   <>
     <style>{`
-.vls-rev-link{transform-box:fill-box;transform-origin:center;animation:vlsRevLink var(--comic-duration,3.2s) ease-out 1 both}
-@keyframes vlsRevLink{0%,8%{transform:rotate(-9deg)}30%,100%{transform:none}}
+.vls-rev-link{transform-box:fill-box;transform-origin:center;animation:vlsRevLink var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+@keyframes vlsRevLink{0%,38%,100%{transform:none}14%{transform:rotate(-9deg)}}
 ${rmBlock(["vls-rev-link"], [[".vls-rev-link", "transform:none"]], false)}
 `}</style>
     <Frame x={4} w={152} theme={theme} />

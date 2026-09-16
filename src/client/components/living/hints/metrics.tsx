@@ -8,19 +8,19 @@ type Metric = MetricHintKind extends `hint-metric-${infer Name}` ? Name : never;
 
 function MetricMotion() {
   return <style>{`
-.vls-metric-flow{animation:vlsMetricFlow var(--comic-duration,3.2s) ease-out both}
-.vls-metric-loss{animation:vlsMetricLoss var(--comic-duration,3.2s) ease-out both}
-.vls-metric-sampling{stroke-dasharray:1;animation:vlsMetricSampling var(--comic-duration,3.2s) ease-out both}
-.vls-metric-measure{transform-box:fill-box;transform-origin:center;animation:vlsMetricMeasure var(--comic-duration,3.2s) ease-out both}
-.vls-metric-hand{animation:vlsMetricHand var(--comic-duration,3.2s) ease-out both}
-.vls-metric-outbound{stroke-dasharray:1;animation:vlsMetricOutbound var(--comic-duration,3.2s) ease-out both}
-.vls-metric-return{stroke-dasharray:1;animation:vlsMetricReturn var(--comic-duration,3.2s) ease-out both}
-.vls-metric-drop{animation:vlsMetricDrop var(--comic-duration,3.2s) ease-in-out both}
-.vls-metric-lag{animation:vlsMetricLag var(--comic-duration,3.2s) ease-out both}
+.vls-metric-flow{animation:vlsMetricFlow var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-metric-loss{animation:vlsMetricLoss var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-metric-sampling{stroke-dasharray:1;animation:vlsMetricSampling var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-metric-measure{transform-box:fill-box;transform-origin:center;animation:vlsMetricMeasure var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-metric-hand{animation:vlsMetricHand var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-metric-outbound{stroke-dasharray:1;animation:vlsMetricOutbound var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-metric-return{stroke-dasharray:1;animation:vlsMetricReturn var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
+.vls-metric-drop{animation:vlsMetricDrop var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
+.vls-metric-lag{animation:vlsMetricLag var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
 @keyframes vlsMetricFlow{0%,8%{transform:translateX(-12px)}36%,100%{transform:none}}
-@keyframes vlsMetricLoss{0%,10%{transform:translateY(-6px);opacity:0}38%,100%{transform:none;opacity:1}}
+@keyframes vlsMetricLoss{0%,42%,100%{transform:none}14%{transform:translateY(-4px)}}
 @keyframes vlsMetricSampling{0%,8%{stroke-dashoffset:1}42%,100%{stroke-dashoffset:0}}
-@keyframes vlsMetricMeasure{0%,8%{transform:scale(.78)}38%,100%{transform:none}}
+@keyframes vlsMetricMeasure{0%,46%,100%{transform:none}14%{transform:scale(.88)}}
 @keyframes vlsMetricHand{0%,8%{transform:rotate(-120deg)}46%,100%{transform:none}}
 @keyframes vlsMetricOutbound{0%,8%{stroke-dashoffset:1}24%,100%{stroke-dashoffset:0}}
 @keyframes vlsMetricReturn{0%,24%{stroke-dashoffset:1}49%,100%{stroke-dashoffset:0}}

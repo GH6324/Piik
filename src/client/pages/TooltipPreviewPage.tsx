@@ -2,7 +2,8 @@ import { useState } from "react";
 import { AppHeader } from "../components/living/Header";
 import { Tooltip } from "../components/living/Tooltip";
 import { ControlsPreview } from "./ControlsPreview";
-import { WelcomeLine, WelcomeCipher, WELCOME_LINES } from "../components/living/WelcomeLine";
+import { WelcomeLine, WelcomeCipher } from "../components/living/WelcomeLine";
+import { locales } from "../locales";
 import { HINT_KINDS, HintComic, isHintKind, type HintKind } from "../components/living/hints";
 import { Comic, type ComicKind } from "../components/living/Comic";
 import { COMIC_KINDS, getComicPresentation, type ComicTone, type ComicMotion } from "../components/living/comic-presentation";
@@ -31,17 +32,17 @@ function PreviewCard({ kind, tone, motion, label, text }: {
     const scene = card.querySelector(".lr-tooltip-preview-art > svg");
     if (scene) replaySvgAnimations(scene);
   };
-  return <section className="lr-tooltip-preview-card"
+  return <section id={label ? undefined : kind} className="lr-tooltip-preview-card"
     onPointerEnter={(event) => { if (event.pointerType !== "touch") replay(event.currentTarget); }}
     onPointerDown={(event) => { if (event.pointerType === "touch") replay(event.currentTarget); }}
     onFocusCapture={(event) => replay(event.currentTarget)}>
     <header>
       <code>{label ?? kind}</code>
       <span className="lr-tooltip-preview-actions">
-        {text ? <Tooltip kind={kind} tone={tone} motion={motion} text={text} place="below">
+        {text ? <Tooltip toggleOnClick kind={kind} tone={tone} motion={motion} text={text} place="below">
           <button type="button" aria-label={`Text ${label ?? kind}`} className="lr-tooltip-preview-trigger">Aa</button>
         </Tooltip> : null}
-        <Tooltip kind={kind} tone={tone} motion={motion} place="below">
+        <Tooltip toggleOnClick kind={kind} tone={tone} motion={motion} place="below">
           <button type="button" aria-label={`Preview ${label ?? kind}`} className="lr-tooltip-preview-trigger">✦</button>
         </Tooltip>
       </span>
@@ -64,7 +65,7 @@ export function TooltipPreviewPage() {
       <main className="lr-room lr-tooltip-preview">
         <header className="lr-tooltip-preview-head">
           <h1>{en ? "Piik · UI catalogue" : "Piik · UI 控件大全"}</h1>
-          <p>{en ? "Actual components, sample data. Hover or tap a comic to replay it; use its corner button to open the tooltip." : "正式组件，示例数据。悬停或轻点漫画可重播，角上的按钮可查看实际提示。"}</p>
+          <p>{en ? "Actual components, sample data. Comics loop while displayed. Use the corner buttons to open the same tooltip on hover, focus or tap." : "正式组件，示例数据。漫画在展示期间循环；悬停、聚焦或点击角上的按钮，可查看实际提示。"}</p>
           <label><input type="checkbox" checked={reducedMotion} onChange={event => setReducedMotion(event.target.checked)} />
             {en ? "Reduced motion" : "减少动态效果"}</label>
         </header>
@@ -73,17 +74,18 @@ export function TooltipPreviewPage() {
           <a href="#input-preview">{en ? "Inputs" : "输入与房间号"}</a><a href="#feedback-preview">{en ? "Feedback" : "反馈"}</a>
           <a href="#people-preview">{en ? "People & connections" : "人物、沙发与连接图"}</a><a href="#source-preview">{en ? "Source picker" : "画面选择"}</a>
           <a href="#playback-preview">{en ? "Playback" : "播放栏"}</a><a href="#comic-preview">{en ? "Tooltips & comics" : "提示与漫画"}</a>
+          <a href="#hint-admission-code">{en ? "Room entry" : "房间准入"}</a>
           <a href="#metrics-preview">{en ? "Metrics" : "连接数据"}</a>
-          <a href="#welcome-preview">{en ? "20 opening lines" : "20 句开场白"}</a>
+          <a href="#welcome-preview">{en ? "Opening lines" : "开场白"}</a>
           <a href="/__status-preview">{en ? "Status gallery" : "完整状态预览"}</a>
         </nav>
         <ControlsPreview />
         <MetricPreview />
-        <WelcomeLine />
+        <WelcomeLine still={reducedMotion} />
         <details id="welcome-preview" className="lr-welcome-catalog" open>
-          <summary>20 句开场白 / 20 opening lines</summary>
-          <p>{en ? "One line per visit to the App launcher or the browser's sharing screen. Pure visual mode uses matching pictograms and pixel lettering; switching modes keeps the same line." : "进入 App 启动页或网页版的分享准备画面时，随机选一句。纯视觉模式显示对应的图形与像素暗号；切换模式还是同一句。"}</p>
-          <ol>{WELCOME_LINES.map(({ key }, index) => <li key={key}><span>{t(key)}</span><WelcomeCipher line={index} /></li>)}</ol>
+          <summary>{locales[lang].playful.welcome.length} {en ? "opening lines" : "句开场白"}</summary>
+          <p>{en ? "A line appears immediately, then changes every eight seconds while visible. Each language has its own pool. Pure visual mode uses that entry's pictograms and pixel lettering; switching modes keeps the same entry." : "短句立即出现，可见时每 8 秒换一条。各语言独立维护词库；纯视觉模式显示当前语句对应的图形与像素暗号，切换模式仍是同一句。"}</p>
+          <ol>{locales[lang].playful.welcome.map(({ text, symbols }) => <li key={text}><span>{text}</span><WelcomeCipher symbols={symbols} /></li>)}</ol>
         </details>
         <h2 id="comic-preview">语义规则 / Semantic grammar</h2>
         <p>{en ? "Aa pairs the scene with a caption; ✦ shows the pure-visual version." : "Aa 查看图示与文字说明，✦ 查看纯视觉版本。"}</p>

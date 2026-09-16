@@ -55,9 +55,7 @@ ${rmBlock(
   </>
 );
 
-/* hint-close: [open card] → [card folds away + small RedX stamp]. Demo:
-   card wobbles (10-28%), folds out (40-52%), X stamps once at 56-62% and
-   holds; rest 62-100%. */
+/* hint-close: the card folds away, then the X marks the closed result. */
 const HintClose: HintScene = ({ theme }) => (
   <>
     <style>{`
@@ -91,9 +89,8 @@ ${rmBlock(
   </>
 );
 
-/* hint-rename: [blank name tag] → [pencil writes a squiggle on the tag +
-   spark]. Demo: pencil rides the pen tip left→right wiggling (6-34%)
-   as the line draws, spark pops 38-46%, holds; rest 54%. */
+/* hint-rename: the pencil writes forward on the name tag, then rests beside
+   the completed line. */
 const HintRename: HintScene = ({ theme }) => (
   <>
     <style>{`
@@ -166,9 +163,8 @@ ${rmBlock(
   </>
 );
 
-/* hint-join-go: [pawn beside 4 filled code slots] → [pawn hops through an
-   open door + star]. Demo: blink at 62%, hop-in 8-24%, star 28-42%;
-   rest ~58%. */
+/* hint-join-go: a visitor shows the room code, then hops through the door
+   and rests inside the room. */
 const HintJoinGo: HintScene = ({ theme }) => (
   <>
     <style>{`
@@ -327,7 +323,7 @@ const HintRouteP2pRequired: HintScene = ({ theme }) => (
   <>
     <HintRouteP2p theme={theme} />
     <style>{`
-.vls-p2p-unavailable{animation:vlsP2pUnavailable var(--comic-duration,3.2s) ease-in-out 1 both}
+.vls-p2p-unavailable{animation:vlsP2pUnavailable var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 @keyframes vlsP2pUnavailable{0%,8%,36%,100%{transform:none}16%{transform:translateX(-4px)}26%{transform:translateX(3px)}}
 ${rmBlock(["vls-p2p-unavailable"], [[".vls-p2p-unavailable", "transform:none"]], false)}
 `}</style>
@@ -440,10 +436,10 @@ const HintNatPrediction = ({ theme, available = true }: { theme: ComicTheme; ava
     <style>{`
 .vls-nat-path{stroke-dasharray:1;animation:vlsNatPath var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 .vls-nat-dots{animation:vlsNatDots var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-.vls-nat-unavailable{transform-box:fill-box;transform-origin:center;animation:vlsNatUnavailable var(--comic-duration,3.2s) ease-in-out 1 both}
+.vls-nat-unavailable{transform-box:fill-box;transform-origin:center;animation:vlsNatUnavailable var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 @keyframes vlsNatPath{0%,8%{stroke-dashoffset:1}30%,100%{stroke-dashoffset:0}}
 @keyframes vlsNatDots{0%,32%,100%{opacity:.35}44%{opacity:1}}
-@keyframes vlsNatUnavailable{0%,8%{transform:scale(1.3) rotate(-8deg)}28%,100%{transform:none}}
+@keyframes vlsNatUnavailable{0%,36%,100%{transform:none}12%{transform:scale(1.15) rotate(-8deg)}}
 ${rmBlock(
   ["vls-nat-path", "vls-nat-dots"],
   [[".vls-nat-path", "stroke-dashoffset:0"], [".vls-nat-dots", "opacity:1"]],

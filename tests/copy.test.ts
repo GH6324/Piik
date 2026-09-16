@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { initialLanguage, rememberLanguage } from "../site/assets/language.js";
-import { locales } from "../src/client/locales";
+import { locales, visualTitleFrames } from "../src/client/locales";
 
 import {
   getTitleFrames,
@@ -97,8 +97,12 @@ describe("copy catalog", () => {
           .toEqual(placeholders(locales.zh.copy[key]));
       }
       for (const frames of Object.values(locale.titleFrames)) {
-        expect(frames.length, lang).toBeGreaterThan(0);
-        expect(frames.every((frame: string) => frame.trim().length > 0), lang).toBe(true);
+        expect(frames.label.trim().length, lang).toBeGreaterThan(0);
+        expect(frames.variations.every((frame: string) => frame.trim().length > 0), lang).toBe(true);
+      }
+      for (const pool of [locale.playful.welcome.map(entry => entry.text), locale.playful.waiting]) {
+        expect(pool.every(text => text.trim().length > 0), lang).toBe(true);
+        expect(new Set(pool).size, lang).toBe(pool.length);
       }
     }
   });
@@ -157,17 +161,29 @@ describe("copy catalog", () => {
     const enViewer = getTitleFrames("en", false, "viewerActive");
     const visualViewer = getTitleFrames("zh", true, "viewerActive");
 
-    expect(zhHost[0]).toBe("分享中");
-    expect(zhHost).toContain("小电视上工");
-    expect(enViewer[0]).toBe("Watching");
-    expect(enViewer).toContain("Popcorn ready");
-    expect(visualViewer[0]).toBe("📺");
-    expect(visualViewer).toContain("📺 🍿");
-    expect(getTitleFrames("zh", false, "hostIdle")).toContain("天线在打盹");
-    expect(getTitleFrames("en", false, "viewerWaiting")).toContain(
+    expect(zhHost.label).toBe("分享中");
+    expect(zhHost.variations).toContain("小电视上工");
+    expect(enViewer.label).toBe("Watching");
+    expect(enViewer.variations).toContain("Popcorn ready");
+    expect(visualViewer.label).toBe("📺");
+    expect(visualViewer.variations).toContain("🍿");
+    expect(getTitleFrames("zh", false, "hostIdle").variations).toContain("天线在打盹");
+    expect(getTitleFrames("en", false, "viewerWaiting").variations).toContain(
       "Couch saved you a spot",
     );
-    expect(getTitleFrames("zh", true, "hostReady")).toContain("🛋️ 🍵");
+    expect(getTitleFrames("zh", true, "hostReady").variations).toContain("🍵");
+  });
+
+  it("keeps actionable titles fixed and lets playful pools vary independently", () => {
+    const playful = new Set([
+      "hostActive", "viewerActive", "hostStarting", "hostReady", "hostIdle", "viewerWaiting",
+    ]);
+    for (const catalog of [locales.zh.titleFrames, locales.en.titleFrames, visualTitleFrames]) {
+      for (const [state, frames] of Object.entries(catalog)) {
+        if (!playful.has(state)) expect(frames.variations, state).toEqual([]);
+        expect(new Set(frames.variations).size, state).toBe(frames.variations.length);
+      }
+    }
   });
 
   it("keeps the document language aligned with the selected catalog", () => {

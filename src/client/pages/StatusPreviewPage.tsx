@@ -4,6 +4,7 @@ import { AppHeader, LedStrip } from "../components/living/Header";
 import { StageOverlay, StageTv } from "../components/living/Stage";
 import { Couch } from "../components/living/Couch";
 import { StatusIndicator } from "../components/living/StatusIndicator";
+import { LoadingStatus } from "../components/living/WaitingStatus";
 import { Pill } from "../components/living/primitives";
 import { deriveViewerPresentation } from "../media/viewer-presentation";
 import {
@@ -11,7 +12,8 @@ import {
   type StatusDescriptor,
 } from "../ui/media-status";
 import { Glyph } from "../ui/icons";
-import { useCopy } from "../ui/copy";
+import { useCopy, type CopyKey } from "../ui/copy";
+import { locales, type TitleFrameKey } from "../locales";
 import { composeDocumentTitle, useDocumentTitle } from "../ui/document-title";
 import { HOST_STATUS_SCENARIOS, STATUS_SCENARIOS } from "./status-preview-scenarios";
 import "./status-preview.css";
@@ -27,10 +29,11 @@ function StatusMark({ status }: { status: StatusDescriptor }) {
 }
 
 export function StatusPreviewPage() {
-  const { t, titleFrames } = useCopy();
+  const { lang, vis, t, titleFrames } = useCopy();
   const [selected, setSelected] = useState("playing");
   const [reducedMotion, setReducedMotion] = useState(false);
   const [couchView, setCouchView] = useState<"host" | "viewer">("viewer");
+  const [loadingLabel, setLoadingLabel] = useState<CopyKey | "">("client.launch.starting");
   const scenario = STATUS_SCENARIOS.find((item) => item.id === selected)!;
   const presentation = deriveViewerPresentation(scenario.state);
   const status = deriveViewerStatus(presentation, scenario.state.signal,
@@ -40,9 +43,10 @@ export function StatusPreviewPage() {
     mediaReady: sourceActive, upstream: { kind: "peer", peerId: "preview-host" },
   }, sourceActive);
   const waitingParticipant = deriveParticipantStatus({ upstream: { kind: "none" } }, sourceActive);
-  const frame = titleFrames(status.titleFrameKey)[0];
-  const titleParts = ["6020", [frame, status.titleMarker].filter(Boolean).join(" ")];
-  useDocumentTitle(titleParts);
+  const titleContent = titleFrames(status.titleFrameKey);
+  const title = useDocumentTitle(["6020", titleContent.label, status.titleMarker], titleContent.variations,
+    `${lang}:${vis}:${status.titleFrameKey}`, reducedMotion);
+  const waitingLines = locales[lang].playful.waiting;
 
   function choose(id: string) {
     setSelected(id);
@@ -72,7 +76,7 @@ export function StatusPreviewPage() {
           </nav>
           <section className="sp-stage-panel" aria-label="真实组件组合预览">
             <div className="sp-browser-title"><Glyph name="tv" size={15} />
-              <span>{composeDocumentTitle(...titleParts)}</span><span aria-hidden="true">×</span>
+              <span>{title}</span><span aria-hidden="true">×</span>
             </div>
             <div className="sp-stage-toolbar">
               <span className="sp-room-id">6020</span>
@@ -91,8 +95,8 @@ export function StatusPreviewPage() {
               {status.overlay ? <StageOverlay icon={status.overlay.status.icon}
                 comic={status.overlay.status.comic} message={t(status.overlay.status.labelKey)}
                 tone={status.overlay.status.tone}
-                spin={status.overlay.status.pulse} dim={status.overlay.mode === "blocking"}
-                transition={status.overlay.status.pulse}
+                waiting={status.overlay.waiting} dim={status.overlay.mode === "blocking"}
+                still={reducedMotion}
                 onActivate={presentation.stage === "needs-play" ? () => choose("playing") : undefined} /> : null}
             </StageTv>
             <div className="lr-stage-notices" role="status" aria-live="polite">
@@ -143,7 +147,7 @@ export function StatusPreviewPage() {
           <div className="sp-host-grid">
             {HOST_STATUS_SCENARIOS.map(({ name, facts }) => {
               const host = deriveHostStatus(facts);
-              const hostTitle = [titleFrames(host.titleFrameKey)[0], host.titleMarker].filter(Boolean).join(" ");
+              const hostTitle = [titleFrames(host.titleFrameKey).label, host.titleMarker].filter(Boolean).join(" ");
               return <article key={name}>
                 <h3>{name}</h3><p className="sp-host-title">{composeDocumentTitle("6020", hostTitle)}</p>
                 <div><span>画面</span><StatusMark status={host.television} /></div>
@@ -159,6 +163,35 @@ export function StatusPreviewPage() {
               <StatusIndicator status={item} /><span>{t(item.labelKey)}</span><code>{key}</code>
             </article>)}
           </div>
+        </section>
+        <section className="sp-catalog" id="waiting-preview">
+          <header><h2>加载与等待</h2>
+            <p>通用加载用 mascot，具体媒体状态用对应漫画；文字模式保留真实状态与等待短句。短句立即出现，每 8 秒轮换，隐藏时暂停。切换上方场景可比较等待、错误和操作提示。</p>
+          </header>
+          <label>入口状态 <select value={loadingLabel} onChange={event => setLoadingLabel(event.target.value as CopyKey | "")}>
+            <option value="common.loading">页面加载</option>
+            <option value="gate.checking">站点检查</option>
+            <option value="client.launch.starting">App 启动</option>
+            <option value="">结束等待</option>
+          </select></label>
+          <div className="sp-loading-preview">
+            {loadingLabel ? <LoadingStatus label={loadingLabel} still={reducedMotion} /> : <span>等待组件已卸载。</span>}
+          </div>
+          <details className="sp-title-catalog"><summary>等待短句 · {waitingLines.length} 条</summary>
+            <ol>{waitingLines.map(line => <li key={line}>{line}</li>)}</ol>
+          </details>
+        </section>
+        <section className="sp-catalog">
+          <header><h2>标题彩蛋词库</h2>
+            <p>真实状态与提醒始终保留。六类状态附带独立的彩蛋词库，立即显示、每 8 秒轮换，本轮抽完再重复。暂停、结束和操作提示保持固定。各语言可分别增补短句，不要求数量相同。</p>
+          </header>
+          {(Object.keys(locales.zh.titleFrames) as TitleFrameKey[]).map(key => {
+            const frames = titleFrames(key);
+            return <details key={key} className="sp-title-catalog">
+              <summary><strong>{frames.label}</strong><span>{frames.variations.length ? `${frames.variations.length} 条彩蛋` : "固定提示"} · {key}</span></summary>
+              <ol>{frames.variations.map(frame => <li key={frame}>{frame}</li>)}</ol>
+            </details>;
+          })}
         </section>
         <footer className="sp-footnote">
           <p>这是开发预览：说明固定中文，控件和漫画跟随右上角中 / EN / ✦ 与明暗主题。</p>

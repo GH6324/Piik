@@ -63,6 +63,9 @@ func Start(
 	if parent == nil {
 		parent = context.Background()
 	}
+	if err := parent.Err(); err != nil {
+		return nil, err
+	}
 	if err := validateExecutable(executable); err != nil {
 		return nil, err
 	}
@@ -73,7 +76,10 @@ func Start(
 	if err != nil {
 		return nil, err
 	}
-	ctx, cancel := context.WithCancel(parent)
+	// The caller cancels startup, then explicitly closes a ready tunnel after
+	// sending room-closed and draining its server. Root cancellation cannot
+	// kill that transport ahead of the ordered shutdown.
+	ctx, cancel := context.WithCancel(context.WithoutCancel(parent))
 	child := exec.CommandContext(
 		ctx,
 		executable,
@@ -142,16 +148,18 @@ func Start(
 	go readOutput(stderr)
 	go func() {
 		waitErr := child.Wait()
-		// Wait closes the pipe readers; join them before App closes its recorder.
-		// Do not wait before Wait: that would bypass its bounded pipe shutdown.
-		outputDone.Wait()
-		_ = os.Remove(configPath)
+		// Classify the observed exit before draining logs: later owner cleanup
+		// cannot turn a dependency failure into a successful cancellation.
 		if ctx.Err() != nil {
 			waitErr = nil
 		}
 		process.mu.Lock()
 		process.err = waitErr
 		process.mu.Unlock()
+		// Wait closes the pipe readers; join them before App closes its recorder.
+		// Do not wait before Wait: that would bypass its bounded pipe shutdown.
+		outputDone.Wait()
+		_ = os.Remove(configPath)
 		close(process.done)
 	}()
 
@@ -167,10 +175,11 @@ func Start(
 			cancel()
 			return nil, errors.Join(errors.New("public invitation service exited before connecting; reopen Piik to try again"), process.Err())
 		case <-timer.C:
-			_ = process.Close()
-			return nil, errors.New("public invitation service did not connect within 30 seconds; check your Internet connection and reopen Piik to try again")
+			return nil, errors.Join(errors.New("public invitation service did not connect within 30 seconds; check your Internet connection and reopen Piik to try again"), process.Close())
 		case <-parent.Done():
-			_ = process.Close()
+			if err := process.Close(); err != nil {
+				return nil, errors.Join(parent.Err(), err)
+			}
 			return nil, parent.Err()
 		}
 	}

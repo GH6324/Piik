@@ -73,14 +73,14 @@ SITE_ACCESS_PASSWORD=
 
 `MAX_VIEWERS_PER_ROOM` 可设置每房观众上限，不含房主，支持 `1..20`，修改后重启生效。
 人数越多，对网络和转发资源的需求也可能增加。默认值及 App 房间的区别见
-[人数限制](../reference/configuration.md#room-capacity)。
+[人数限制](../standards/configuration.md#room-capacity)。
 
 ### 2. 配置 HTTPS
 
 如果已有 HTTPS 反向代理，将请求转发到 `127.0.0.1:8787`，并启用 WebSocket 支持。
 如果还没有，可以[安装 Caddy](https://caddyserver.com/docs/install)，在 Caddyfile 中加入：
 
-```caddyfile
+```text
 share.example.com {
     reverse_proxy 127.0.0.1:8787
 }
@@ -103,6 +103,8 @@ TCP 8787 仅供本机反向代理访问。STUN 域名需要直接解析到服务
 在 `.env` 中添加 `SFU_UDP_PORT=7882`，放行 UDP 7882，再重启 Piik，即可启用自动 SFU 兜底。
 如果服务器处于 NAT 后方，还需将 `SFU_PUBLIC_IP` 设置为外部可达的公网 IPv4 地址。
 这项功能由同一个服务端程序提供。
+房主需要在开始分享前关闭 **隐私模式**，才会允许使用这条线路。
+直连和 SFU 媒体都需要可用的 UDP 通路。
 
 ## 长期运行与更新
 
@@ -110,4 +112,4 @@ TCP 8787 仅供本机反向代理访问。STUN 域名需要直接解析到服务
 更新时保留 `.env` 和 `rooms.sqlite`：停止服务、备份房间数据、替换新版程序，再启动并检查健康状态和房间访问。
 涉及数据格式变化的版本，请先阅读发布说明。
 
-[全部配置与端口](../reference/configuration.md) · [维护者发版工具](../deployment.md)
+[全部配置与端口](../standards/configuration.md) · [维护者发版工具](../deployment.md)

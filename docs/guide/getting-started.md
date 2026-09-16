@@ -6,7 +6,7 @@ Piik shares one person's screen with up to 20 invited viewers. This guide covers
 watching, using Piik online, using Piik App and sharing through an existing site.
 
 [Join a room](#join-a-friends-room) · [Use online](#use-piik-online) ·
-[Piik App](#share-with-piik-app) · [Existing site](#share-from-your-browser) ·
+[Piik App](#share-with-piik-app) · [Existing site](#share-from-an-existing-site) ·
 [Troubleshooting](#when-something-gets-in-the-way)
 
 Viewers need a browser and an invitation. To start sharing, download Piik App
@@ -91,13 +91,22 @@ See the [App guide](../../cmd/piik-app/README.md) for package and runtime detail
 | **Public invite** | Friends are elsewhere and you want a temporary invitation. | Needs Internet access. The public address lasts for this App run. |
 | **Connect to Site** | Your group already has a Piik site. | Enter its address; the App adds capture capabilities to the site's sharing page. |
 
+For **Connect to Site**, enter the full site address, such as
+`https://demo.piik.tv`, add its passphrase if required, then choose **Open Piik**.
+After opening the site through the App once, the same browser remembers that
+entry. Keep the App running with that site configured and you can visit the
+address directly. **Start sharing** opens the selector; choose **Apps / Windows**
+or **Screens** for App capture. Allow local-network access if the browser asks.
+In another browser, in a private window, or after clearing site data, enter through
+the App again. For a different site, update the address in the App first.
+
 **A page that opens does not guarantee a video connection.** Public invite gives
 your room a temporary web address; picture and sound still travel between
 participants. This mode has no media-server fallback, and the temporary address
 has no uptime guarantee. All modes need a working UDP media path.
 The [App guide](../../cmd/piik-app/README.md#modes) explains the connection setup.
 
-## Share from your browser
+## Share from an existing site
 
 You need an existing HTTPS site running Piik Server, provided by a friend or
 administrator. You can also use [Piik online](#use-piik-online)
@@ -116,20 +125,16 @@ Screen capture requires an HTTPS site or `localhost`. The sources and audio
 offered by the picker depend on your browser and operating system.
 Invitation links grant access to that room; share them with the people you want there.
 
+To use App capture on that same site, follow [Connect to Site](#choose-an-app-mode).
+The site manages rooms and invitations; the App supplies native capture.
+If its operator has enabled SFU forwarding, turn off **Privacy mode** before
+sharing to allow that fallback. The project's online site uses P2P only.
+
 ## When something gets in the way
 
-| What you see | Try this |
-| --- | --- |
-| Picture but no sound | Unmute the video. The host should choose a source with shareable audio; if sound was disabled, stop and start sharing with it enabled. App window/screen capture keeps that setting when switching sources. |
-| No screen picker | Allow the browser or App to record the screen when the OS asks. Browser capture needs HTTPS or `localhost`; try sharing from a desktop computer. |
-| App startup fails | Read the reason on the page and in the terminal. Reopen the App and enable the chip-shaped **Debug launch** control after the theme button before trying again. A failed startup then exports a report; its path appears in the terminal. |
-| Local invitation will not open | Check that both devices are on the same network and can reach each other. Guest Wi-Fi or firewall rules can block local access. |
-| Page opens but video will not connect | Choose **Reconnect** in the playback bar. If it still fails, check [WebRTC connection settings](../../cmd/piik-app/README.md#chromium-webrtc-connections) or try a site with media fallback. |
-| Sharing stops after sleep or suspension | Wake the device and return to the sharing tab; start sharing again if needed. Browser and OS suspension can interrupt capture or playback. |
+For sound, capture, startup or playback issues, see [Troubleshooting](./troubleshooting.md).
 
-For a bug report, include the version, OS/browser, what you expected, and how
-to reproduce it. [Diagnostics and export](../reference/configuration.md#diagnostics)
-explains how to collect a local report and what to review before sharing it.
+### When video will not connect
 
-Ready to host a site for your group? Follow [self-hosting](../operations/self-hosting.md).
-For everything else, use the [documentation map](../README.md).
+See [connection troubleshooting](./troubleshooting.md#when-video-will-not-connect)
+for “No media route available” and similar connection failures.

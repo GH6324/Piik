@@ -25,7 +25,7 @@ import {
 import { AppHeader, LedStrip } from "../components/living/Header";
 import { Couch, type CouchEntry } from "../components/living/Couch";
 import { participantColor } from "../components/living/participant-color";
-import { MetricCells, useMetricsExpanded } from "../components/living/Metrics";
+import { MetricCells } from "../components/living/Metrics";
 import { PawnDetail, RouteGlyph } from "../components/living/PawnDetail";
 import { Lcd } from "../components/living/RoomChip";
 import { RouteTree } from "../components/living/RouteTree";
@@ -37,6 +37,7 @@ import {
 import { StatusIndicator } from "../components/living/StatusIndicator";
 import { Tooltip } from "../components/living/Tooltip";
 import { PlaybackControls } from "../components/living/PlaybackControls";
+import { LoadingStatus } from "../components/living/WaitingStatus";
 import {
   Btn,
   FieldCap,
@@ -225,11 +226,11 @@ export function ViewerPage({
   // own peer id (mirrors the authenticated message for couch/route-tree).
   const [selectedPawn, setSelectedPawn] = useState<string | null>(null);
   const [selfPeerId, setSelfPeerId] = useState<string | null>(null);
-  const [routeMetricsExpanded, setRouteMetricsExpanded] = useMetricsExpanded();
-  const [relayMetricsExpanded, setRelayMetricsExpanded] = useMetricsExpanded();
+  const [routeMetricsExpanded, setRouteMetricsExpanded] = useState(false);
+  const [relayMetricsExpanded, setRelayMetricsExpanded] = useState(false);
   const [downstreamMetricsExpanded, setDownstreamMetricsExpanded] =
-    useMetricsExpanded();
-  const [pawnMetricsExpanded, setPawnMetricsExpanded] = useMetricsExpanded();
+    useState(false);
+  const [pawnMetricsExpanded, setPawnMetricsExpanded] = useState(false);
 
   const mediaProofGeneration = presentationState.media?.generation ?? null;
   const mediaProofEpoch = presentationState.media?.proofEpoch ?? null;
@@ -312,15 +313,15 @@ export function ViewerPage({
     signalStatus,
     assignedRouteKind,
   );
-  const titleContent = titleFrames(viewerStatus.titleFrameKey).map((frame) =>
-    [frame, viewerStatus.titleMarker].filter(Boolean).join(" "),
-  );
+  const titleContent = titleFrames(viewerStatus.titleFrameKey);
   useDocumentTitle(
     [
       accessState === "ready" ? roomId : null,
-      titleContent[0],
+      titleContent.label,
+      viewerStatus.titleMarker,
     ],
-    titleContent.slice(1),
+    titleContent.variations,
+    `${lang}:${vis}:${viewerStatus.titleFrameKey}:${roomId}`,
   );
   const peerConnectionIdentity = peerRef.current?.getConnectionIdentity() ?? null;
   const reconnectRoute = viewerReconnectRoute(
@@ -2116,14 +2117,7 @@ export function ViewerPage({
         <main className="lr-join">
           {accessState === "checking" ? (
             <div className="lr-join-panel">
-              <span
-                className="lr-viewer-entry-brand"
-                role="status"
-                style={{ display: "grid", justifyItems: "center", gap: 14 }}
-              >
-                <Comic kind="signal-connecting" theme="paper" />
-                <span className={vis ? "visually-hidden" : "lr-tv-msg"}>{t(presentation.messageKey)}</span>
-              </span>
+              <LoadingStatus label={presentation.messageKey} />
             </div>
           ) : (
             <div className="lr-join-panel">
@@ -2330,7 +2324,7 @@ export function ViewerPage({
               <StageOverlay
                 dim
                 icon={viewerStatus.activity.icon}
-                transition={viewerStatus.activity.pulse}
+                waiting={viewerStatus.overlay?.waiting}
                 comic={viewerStatus.activity.comic}
                 tone={viewerStatus.activity.tone}
                 message={stageMessage}
@@ -2361,7 +2355,7 @@ export function ViewerPage({
                   tone={viewerStatus.activity.tone}
                   message={stageMessage}
                   progress={connectionProgress}
-                  spin={viewerStatus.activity.pulse}
+                  waiting={viewerStatus.overlay?.waiting}
                 />
               )}
           </StageTv>

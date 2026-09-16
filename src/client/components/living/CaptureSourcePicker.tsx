@@ -7,6 +7,7 @@ import { Glyph, type GlyphName } from "../../ui/icons";
 import { Tooltip } from "./Tooltip";
 import { HintComic } from "./hints";
 import { Pill } from "./primitives";
+import { WaitingCaption } from "./WaitingStatus";
 
 const SOURCE_TABS = ["browser", "window", "display"] as const;
 type SourceTab = (typeof SOURCE_TABS)[number];
@@ -38,6 +39,7 @@ export function CaptureSourcePicker({
   initialTab = "window",
   initialAudio = true,
   audioLocked = false,
+  selectionDisabled = false,
 }: {
   nativeSources: NativeSourceList;
   onBrowser: () => void;
@@ -52,6 +54,7 @@ export function CaptureSourcePicker({
   initialTab?: SourceTab;
   initialAudio?: boolean;
   audioLocked?: boolean;
+  selectionDisabled?: boolean;
 }) {
   const { vis, t } = useCopy();
   const pickerId = useId();
@@ -233,6 +236,7 @@ export function CaptureSourcePicker({
                 type="button"
                 className="lr-source-option is-browser"
                 aria-label={t("host.sourcePicker.browser")}
+                disabled={selectionDisabled}
                 onClick={onBrowser}
               >
                 <span className="lr-source-option-icon" aria-hidden="true">
@@ -257,7 +261,7 @@ export function CaptureSourcePicker({
                     key={nativeCaptureTargetKey(target)}
                     target={target}
                     disabled={
-                      audioLocked && shareAudio && !supportsAudio(target)
+                      selectionDisabled || (audioLocked && shareAudio && !supportsAudio(target))
                     }
                     onPreview={onPreview}
                     onSelect={() =>
@@ -297,6 +301,7 @@ export function CaptureSourcePicker({
             >
               <HintComic kind="hint-refresh-sources" size={240} tone="busy" motion="progress" />
               {vis ? null : <span>{t("host.sourcePicker.loading")}</span>}
+              <WaitingCaption context="host.sourcePicker.loading" />
             </span>
           ) : sources.length === 0 ? (
             <span

@@ -28,7 +28,6 @@ import {
   CaptureSourcePicker,
   type NativeSourceList,
 } from "../components/living/CaptureSourcePicker";
-import { useMetricsExpanded } from "../components/living/Metrics";
 import { PawnDetail } from "../components/living/PawnDetail";
 import {
   RoomAdmissionBadge,
@@ -63,7 +62,6 @@ import {
   Row,
   RowGroup,
   SwitchItem,
-  VisGlyph,
 } from "../components/living/primitives";
 import { hasPeerRouteEvidence } from "../components/status-badge-model";
 import { Glyph, type GlyphName } from "../ui/icons";
@@ -503,7 +501,7 @@ export function HostPage({
   const [joinRejectedAttempt, setJoinRejectedAttempt] = useState(0);
   const [passwordOpen, setPasswordOpen] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [metricsExpanded, setMetricsExpanded] = useMetricsExpanded();
+  const [metricsExpanded, setMetricsExpanded] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
@@ -921,6 +919,7 @@ export function HostPage({
     }
     activeGenerationRef.current = null;
     generationRef.current += 1;
+    closeCaptureSourcePicker();
     const currentRoom = roomRef.current;
     if (notifyServer && currentRoom) {
       writePreferredRoom(currentRoom.roomId);
@@ -1402,7 +1401,6 @@ export function HostPage({
 
   function startBrowserShareFromPicker(): void {
     void startSharing({ kind: "browser" });
-    closeCaptureSourcePicker();
   }
 
   async function loadNativeSourcePreview(
@@ -1438,13 +1436,9 @@ export function HostPage({
     const path = nativeSourcePathRef.current;
     if (!client || !path) return;
     if (phase === "live" && nativeModeRef.current) {
-      closeCaptureSourcePicker();
       void switchNativeSource(client, target, audio, path);
       return;
     }
-    nativeSourceRequestRef.current = null;
-    nativeSourcePathRef.current = null;
-    setNativeSources(null);
     void startSharing({ kind: "native", client, target, audio, path });
   }
 
@@ -2384,6 +2378,7 @@ export function HostPage({
     generationRef.current = generation;
     activeGenerationRef.current = generation;
     shareGenerationRef.current = shareGeneration;
+    closeCaptureSourcePicker();
     setNoticeValue(null);
     setCopiedInviteUrl(null);
     setPhase("starting");
@@ -2676,6 +2671,7 @@ export function HostPage({
     }
     const token = {};
     sourceSwitchRef.current = token;
+    closeCaptureSourcePicker();
     setSwitchingSource(true);
     setNoticeValue(null);
     try {
@@ -3269,10 +3265,9 @@ export function HostPage({
   });
   // Startup and termination reasons refine the source status. Independent
   // operation results may coexist with it; wording is not a status identity.
-  const titleContent = titleFrames(hostStatus.titleFrameKey).map((frame) =>
-    [frame, hostStatus.titleMarker].filter(Boolean).join(" "),
-  );
-  useDocumentTitle([room?.roomId, titleContent[0]], titleContent.slice(1));
+  const titleContent = titleFrames(hostStatus.titleFrameKey);
+  useDocumentTitle([room?.roomId, titleContent.label, hostStatus.titleMarker], titleContent.variations,
+    `${lang}:${vis}:${hostStatus.titleFrameKey}:${room?.roomId ?? ""}`);
 
   return (
     <div className="lr-app">
@@ -3313,6 +3308,7 @@ export function HostPage({
                 onRefresh={openCaptureSourcePicker}
                 onCancel={closeCaptureSourcePicker}
                 browserAvailable={!nativeActive}
+                selectionDisabled={roomMutating || switchingSource || changingQuality}
                 initialAudio={
                   nativeActive
                     ? (streamRef.current?.getAudioTracks().length ?? 0) > 0
@@ -3335,7 +3331,7 @@ export function HostPage({
                         disabled={roomMutating}
                         onClick={requestSharing}
                       >
-                        <VisGlyph name="cast" size={34} draw="entry-cast" />
+                        <Glyph name="cast" size={34} draw="entry-cast" />
                       </button>
                     </Tooltip>
                     {vis ? null : (
@@ -3352,7 +3348,7 @@ export function HostPage({
                         aria-controls="host-room-code-entry"
                         onClick={() => setJoiningRoom((current) => !current)}
                       >
-                        <VisGlyph name="door" size={30} draw="entry-door" />
+                        <Glyph name="door" size={30} draw="entry-door" />
                       </button>
                     </Tooltip>
                     {vis ? null : (
@@ -3391,7 +3387,7 @@ export function HostPage({
                 icon="refresh"
                 comic="source-switching"
                 tone="busy"
-                spin
+                waiting
                 dim
                 message={t("host.switchingSource")}
               />
@@ -3400,7 +3396,7 @@ export function HostPage({
             ) : phase === "starting" ? (
               <>
                 <StaticNoise />
-                <StageOverlay icon="cast" comic="source-starting" tone="busy" spin message={t("host.starting")} />
+                <StageOverlay icon="cast" comic="source-starting" tone="busy" waiting message={t("host.starting")} />
               </>
             ) : stream && localPreviewPaused ? (
               <StageOverlay
@@ -3773,11 +3769,11 @@ export function HostPage({
                       disabled={roomMutating}
                       onClick={() => void changeCodeEntryPolicy("open")}
                     >
-                      <VisGlyph name="globe" size={19} />
+                      <Glyph name="globe" size={19} />
                       <Cap k="host.policy.open" />
                     </button>
                   </Tooltip>
-                  <Tooltip kind={roomAdmission("private", viewerPasswordEnabled).comic}
+                  <Tooltip kind="hint-policy-private"
                     text={vis ? undefined : `${t("host.policy.private")} · ${t(viewerPasswordEnabled ? "host.policy.privatePasswordHint" : "host.policy.privateHint")}`}>
                     <button
                       type="button"
@@ -3791,7 +3787,7 @@ export function HostPage({
                       disabled={roomMutating}
                       onClick={() => void changeCodeEntryPolicy("private")}
                     >
-                      <VisGlyph name="lock" size={19} />
+                      <Glyph name="lock" size={19} />
                       <Cap k="host.policy.private" />
                     </button>
                   </Tooltip>
@@ -3807,7 +3803,7 @@ export function HostPage({
                       aria-controls="host-password-form"
                       onClick={() => setPasswordOpen((current) => !current)}
                     >
-                      <VisGlyph name="key" size={19} />
+                      <Glyph name="key" size={19} />
                       {viewerPasswordEnabled ? (
                         <i className="lr-chip-dot" aria-hidden="true" />
                       ) : null}
@@ -3955,7 +3951,7 @@ export function HostPage({
                     <span
                       className="lr-door-glyph"
                     >
-                      <VisGlyph name="expand" size={19} />
+                      <Glyph name="expand" size={19} />
                       <Cap k="host.advanced.resolution" />
                     </span>
                     <div
@@ -3985,7 +3981,7 @@ export function HostPage({
                     <span
                       className="lr-door-glyph"
                     >
-                      <VisGlyph name="frames" size={19} />
+                      <Glyph name="frames" size={19} />
                       <Cap k="host.advanced.framerate" />
                     </span>
                     <Tooltip kind="hint-metric-fps" text={vis ? undefined : t("host.advanced.framerate")} className="lr-slider-hint">
@@ -4012,7 +4008,7 @@ export function HostPage({
                     <span
                       className="lr-door-glyph"
                     >
-                      <VisGlyph name="gauge" size={19} />
+                      <Glyph name="gauge" size={19} />
                       <Cap k="host.advanced.bitrate" />
                     </span>
                     <Tooltip kind="hint-metric-bitrate" text={vis ? undefined : t("host.advanced.bitrate")} className="lr-slider-hint">
@@ -4042,7 +4038,7 @@ export function HostPage({
                     <span
                       className="lr-door-glyph"
                     >
-                      <VisGlyph name="mountain" size={19} />
+                      <Glyph name="mountain" size={19} />
                       <Cap k="host.advanced.preference" />
                     </span>
                     <div
@@ -4084,7 +4080,7 @@ export function HostPage({
                     <span
                       className="lr-door-glyph"
                     >
-                      <VisGlyph name="speaker" size={19} />
+                      <Glyph name="speaker" size={19} />
                       <Cap k="host.advanced.audio" />
                     </span>
                     <div
@@ -4126,7 +4122,7 @@ export function HostPage({
                     <span
                       className="lr-door-glyph"
                     >
-                      <VisGlyph name="branch" size={19} />
+                      <Glyph name="branch" size={19} />
                       <Cap k="host.advanced.route" />
                     </span>
                     <div className="lr-row-group">
@@ -4182,7 +4178,7 @@ export function HostPage({
                     <span
                       className="lr-door-glyph"
                     >
-                      <VisGlyph name="puzzle" size={19} />
+                      <Glyph name="puzzle" size={19} />
                       <Cap k="host.advanced.codec" />
                     </span>
                     <div

@@ -78,17 +78,7 @@ func Run(ctx context.Context, options Options) (returnedErr error) {
 	var restoreLogger func()
 	defer func() {
 		cancel()
-		if recorder != nil {
-			slog.Debug("piik-client", "event", "stopped", "failed", returnedErr != nil, diagnostics.Error(returnedErr))
-			if options.console.program == nil || returnedErr != nil {
-				path, err := recorder.Export()
-				options.console.send(consoleExportResult{path: path, err: err})
-				returnedErr = errors.Join(returnedErr, err)
-			}
-			restoreLogger()
-			returnedErr = errors.Join(returnedErr, recorder.Close())
-		}
-		returnedErr = errors.Join(returnedErr, options.console.finish(returnedErr))
+		returnedErr = finishRun(options.console, recorder, restoreLogger, returnedErr)
 	}()
 	enableDiagnostics := func() error {
 		if recorder != nil {
@@ -147,7 +137,7 @@ func Run(ctx context.Context, options Options) (returnedErr error) {
 		return err
 	}
 	slog.Debug("piik-client", "event", "configuration", "siteConfigured", config.Site != "", "localAccessProtected", config.LocalAccessPassword != "")
-	if options.SiteSet || options.Local {
+	if options.SiteSet {
 		if err = appconfig.Save(configPath, config); err != nil {
 			return fmt.Errorf("Piik App configuration is unavailable: %w", err)
 		}
@@ -177,7 +167,7 @@ func Run(ctx context.Context, options Options) (returnedErr error) {
 	if err != nil {
 		return fmt.Errorf("Piik App native control could not start: %w", err)
 	}
-	defer control.Close()
+	defer func() { returnedErr = errors.Join(returnedErr, control.Close()) }()
 	slog.Debug("piik-client", "event", "control-ready")
 	if options.console.machine {
 		if err = printEndpoint(control.Endpoint()); err != nil {
@@ -197,6 +187,24 @@ func Run(ctx context.Context, options Options) (returnedErr error) {
 		})
 	}
 	return runConfigured(ctx, options, config, control)
+}
+
+func finishRun(console *console, recorder *diagnostics.Recorder, restoreLogger func(), err error) error {
+	err = errors.Join(err, console.stop(err))
+	exportPath := ""
+	if recorder != nil {
+		slog.Debug("piik-client", "event", "stopped", "failed", err != nil, diagnostics.Error(err))
+		if console.program == nil || err != nil {
+			path, exportErr := recorder.Export()
+			console.send(consoleExportResult{path: path, err: exportErr})
+			err = errors.Join(err, exportErr)
+		}
+		restoreLogger()
+		err = errors.Join(err, recorder.Close())
+		exportPath = recorder.LastExportPath()
+	}
+	console.finish(err, exportPath)
+	return err
 }
 
 func explicitMode(options Options) bool {
@@ -222,10 +230,10 @@ func runLauncher(
 	config appconfig.Config,
 	control *loopback.Server,
 	configureDiagnostics func(*Options, appconfig.Config) error,
-) error {
+) (returnedErr error) {
 	mode, err := launcher.LoadMode(configPath)
 	if err != nil {
-		slog.Warn("Could not restore the last launcher mode", diagnostics.Error(err))
+		slog.Debug("Could not restore the last launcher mode", diagnostics.Error(err))
 	}
 	launch, err := launcher.Start(
 		ctx,
@@ -250,7 +258,7 @@ func runLauncher(
 		launchAddress.Scheme+"://"+launchAddress.Host,
 	))
 	options.console.show(consoleView{state: "setup", entry: launch.URL()})
-	options.console.send(openBrowser(launch.URL()))
+	options.console.openBrowser(launch.URL())
 
 	var selection launcher.Selection
 	select {
@@ -265,14 +273,13 @@ func runLauncher(
 	}
 	options.console.setLanguage(selection.Language)
 	if err := launcher.SaveMode(configPath, selection.Mode); err != nil {
-		slog.Warn("Could not save the launcher mode", diagnostics.Error(err))
+		slog.Debug("Could not save the launcher mode", diagnostics.Error(err))
 	}
 	if selection.Mode == launcher.ModeSite {
 		config.Site = selection.Site
 	} else {
 		config.LocalAccessPassword = selection.LocalAccessPassword
 	}
-	options.SiteSet = false
 	options.Local = selection.Mode == launcher.ModeLocal
 	options.Link = selection.Mode == launcher.ModeLink
 	options.Debug = options.Debug || selection.Debug
@@ -304,6 +311,7 @@ func runLauncher(
 	defer func() {
 		cancelRuntime()
 		<-runtimeDone
+		returnedErr = errors.Join(returnedErr, runtimeErr)
 	}()
 
 	select {
@@ -312,7 +320,7 @@ func runLauncher(
 	case <-runtimeDone:
 		launch.SetResult("", runtimeErr)
 		<-launch.Handled()
-		return runtimeErr
+		return nil
 	case <-ctx.Done():
 		launch.SetResult("", ctx.Err())
 		return nil
@@ -322,13 +330,13 @@ func runLauncher(
 	case <-launch.Handled():
 		_ = launch.Close()
 	case <-runtimeDone:
-		return runtimeErr
+		return nil
 	case <-ctx.Done():
 		return nil
 	}
 	select {
 	case <-runtimeDone:
-		return runtimeErr
+		return nil
 	case <-ctx.Done():
 		return nil
 	}
@@ -344,8 +352,6 @@ func applyMode(config appconfig.Config, options Options) (appconfig.Config, erro
 		if err != nil || config.Site == "" {
 			return appconfig.Config{}, errors.New("Piik Site must be an HTTP or HTTPS origin")
 		}
-	} else if options.Local {
-		config.Site = ""
 	}
 	return config, nil
 }
@@ -401,7 +407,7 @@ func runSite(site string, options Options, control *loopback.Server) error {
 		fmt.Printf("Piik Site: %s\n", site)
 	}
 	if !options.DisableBrowser {
-		options.console.send(openBrowser(targetURL))
+		options.console.openBrowser(targetURL)
 	} else if options.Ready != nil {
 		options.Ready(targetURL)
 	}
@@ -414,7 +420,7 @@ func runSite(site string, options Options, control *loopback.Server) error {
 
 func runLocal(ctx context.Context, options Options, config appconfig.Config,
 	control *loopback.Server,
-) error {
+) (returnedErr error) {
 	view := consoleView{mode: "local", state: "starting", protected: config.LocalAccessPassword != ""}
 	if options.Link {
 		view.mode = "link"
@@ -450,9 +456,14 @@ func runLocal(ctx context.Context, options Options, config appconfig.Config,
 			fmt.Sprintf("http://127.0.0.1:%d", options.Port),
 		)
 		if err != nil {
+			// Only the caller's clean cancellation is a normal stopped outcome.
+			// A startup or retirement failure racing cancellation remains an error.
+			if err == context.Canceled && ctx.Err() == context.Canceled {
+				return nil
+			}
 			return err
 		}
-		defer tunnel.Close()
+		defer func() { returnedErr = errors.Join(returnedErr, tunnel.Close()) }()
 		publicOrigin = tunnel.Origin()
 		slog.Debug("piik-client", "event", "public-link-ready")
 	}
@@ -484,7 +495,7 @@ func runLocal(ctx context.Context, options Options, config appconfig.Config,
 		return err
 	}
 	listener = nil // Ownership is now in the application's startup/shutdown path.
-	defer func() { _ = endLocalServer(localServer) }()
+	defer func() { returnedErr = errors.Join(returnedErr, endLocalServer(localServer)) }()
 	if _, err = localServer.Listen(ctx); err != nil {
 		return err
 	}
@@ -514,7 +525,7 @@ func runLocal(ctx context.Context, options Options, config appconfig.Config,
 	}
 	options.console.show(view)
 	if !options.DisableBrowser {
-		options.console.send(openBrowser(launchURL))
+		options.console.openBrowser(launchURL)
 	} else if options.Ready != nil {
 		options.Ready(launchURL)
 	}
@@ -525,14 +536,17 @@ func runLocal(ctx context.Context, options Options, config appconfig.Config,
 
 	select {
 	case <-ctx.Done():
-		return endLocalServer(localServer)
+		return nil
 	case err = <-control.Done():
 		if err != nil {
 			return fmt.Errorf("Piik App native control stopped unexpectedly: %w", err)
 		}
 		return nil
 	case <-tunnelDone:
-		return errors.Join(errors.New("public invitation link stopped; reopen Piik to create a new link"), tunnel.Err())
+		if ctx.Err() != nil {
+			return nil
+		}
+		return errors.New("public invitation link stopped; reopen Piik to create a new link")
 	}
 }
 

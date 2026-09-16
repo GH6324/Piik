@@ -3,8 +3,7 @@
 The homepage expands this optional, 76-second introduction in an iframe loaded
 only on request. Closing it unloads playback; the frame follows the homepage's
 language and theme. The player document also supports local recording and
-focused checks. From the repository root, run `npm run build:website` and
-`npm run preview:website`, then open
+focused checks. Install and build with the [website preview steps](../../docs/operations/website.md#preview), then open
 `http://127.0.0.1:18890/film/`. Publish the static `build/site/` output. A project
 prefix such as `/Piik/film/` also works; GitHub Pages needs no application server.
 
@@ -24,7 +23,7 @@ unpack the complete package and open the App, choose **Public invite**, select a
 source, then copy and send the invite through an external chat example before
 friends watch in a browser. Public invitations
 need Internet access and a temporary control tunnel. The public pages use the
-[copy guide's information layers](../../docs/reference/naming.md#voice-and-terminology).
+[copy guide's information layers](../../docs/standards/naming.md#voice-and-terminology).
 
 `ui/main.tsx` uses the product's actual launcher form, source picker, TV, sofa and
 control primitives with sample inputs. The build also supplies the current
@@ -63,6 +62,10 @@ samples during holds.
 After changing the artwork, run `node scripts/update-website-hero.mjs` from the
 repository root; `--check` detects an out-of-date hero. Its `#still` fragment
 and the system reduced-motion preference disable the loop.
+The homepage footer's **Display settings** disclosure can keep illustrations
+still and pause rotating captions, retaining the current line. This saved website
+preference supplements the system setting; neither setting is a film playback
+control. The film's own controls remain available for intentional playback.
 
 The poster waits for an explicit play action. System reduced-motion preferences
 keep a still preview, with manual playback available. System colour preference

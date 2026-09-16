@@ -37,7 +37,7 @@ function SourceWindow({ x, y, alternate = false }: { x: number; y: number; alter
 
 /* hint-share-start: [dark TV + pawn reaching toward it] → [TV bright, mint
    glow, rays + Star]. The after panel demonstrates one power-on beat
-   (CRT screen-on → rays → star → pawn hop), then rests lit ~60%. */
+   (screen brightens → rays → star → pawn hop), then rests lit. */
 const SceneShareStart: HintScene = ({ theme }) => (
   <>
     <style>{`
@@ -150,7 +150,7 @@ const ScenePause: HintScene = ({ theme }) => (
 @keyframes vlsPzFlick{0%{opacity:.5}10%{opacity:.9}20%{opacity:.2}32%{opacity:.85}44%,100%{opacity:.5}}
 @keyframes vlsPzHold{0%{opacity:0}12%,100%{opacity:1}}
 @keyframes vlsPzBars{0%,5%{opacity:0;transform:scale(1.45)}16%,100%{opacity:1;transform:scale(1)}}
-@keyframes vlsPzRest{0%,8%{transform:scale(1.15)}30%,100%{transform:none}}
+@keyframes vlsPzRest{0%,36%,100%{transform:none}14%{transform:scale(1.15)}}
 ${rmBlock(
   ["vls-pz-flick", "vls-pz-hold"],
   [[".vls-pz-flick", "opacity:.5"], [".vls-pz-hold", "opacity:1;transform:none"]],
@@ -191,7 +191,7 @@ const SceneResume: HintScene = ({ theme }) => (
 @keyframes vlsRsPlay{0%{transform:scale(.55);opacity:.5}14%{transform:scale(1.18);opacity:1}22%,100%{transform:scale(1);opacity:1}}
 @keyframes vlsRsLed{0%{opacity:.2}10%,100%{opacity:1}}
 @keyframes vlsRsFlick{0%,12%{opacity:0}20%{opacity:.9}30%{opacity:.25}40%{opacity:.85}54%,100%{opacity:.5}}
-@keyframes vlsRsRest{0%,8%{transform:translateX(-3px)}30%,100%{transform:none}}
+@keyframes vlsRsRest{0%,36%,100%{transform:none}14%{transform:translateX(-3px)}}
 ${rmBlock(
   ["vls-rs-led", "vls-rs-flick"],
   [[".vls-rs-led", "opacity:1;transform:none"], [".vls-rs-flick", "opacity:.5"]],
@@ -223,10 +223,10 @@ const SceneSwitchSource: HintScene = ({ theme }) => (
     <style>{`
 .vls-sw-d1{animation:vlsSwD1 var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
 .vls-sw-d2{animation:vlsSwD2 var(--comic-duration,3.2s) ease-in-out var(--comic-repeat,1) both}
-:where(svg[data-comic-motion="still"]) .vls-sw-selected{animation:vlsSwSelected var(--comic-duration,3.2s) ease-out 1 both}
+:where(svg[data-comic-motion="still"]) .vls-sw-selected{animation:vlsSwSelected var(--comic-duration,3.2s) ease-out var(--comic-repeat,1) both}
 @keyframes vlsSwD1{0%{transform:translate(0,0);opacity:0}8%{opacity:1}22%{transform:translate(11px,-6px)}36%{transform:translate(22px,0);opacity:1}46%,100%{transform:translate(22px,0);opacity:0}}
 @keyframes vlsSwD2{0%{transform:translate(0,0);opacity:0}8%{opacity:1}22%{transform:translate(-11px,6px)}36%{transform:translate(-22px,0);opacity:1}46%,100%{transform:translate(-22px,0);opacity:0}}
-@keyframes vlsSwSelected{0%,8%{transform:translateY(-4px)}30%,100%{transform:none}}
+@keyframes vlsSwSelected{0%,38%,100%{transform:none}14%{transform:translateY(-4px)}}
 ${rmBlock(["vls-sw-d1", "vls-sw-d2"], [[".vls-sw-d1,.vls-sw-d2", "opacity:0;transform:none"]])}
 ${rmBlock(["vls-sw-selected"], [[".vls-sw-selected", "transform:none"]], false)}
 `}</style>

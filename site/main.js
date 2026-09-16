@@ -1,19 +1,42 @@
 import { mountBrands } from './assets/brand.js';
 import { initialLanguage, rememberLanguage } from './assets/language.js';
+import { createTextCycle, startTextRotation } from '../src/client/ui/text-rotation.ts';
 mountBrands();
 // Content stays HTML; scripts only add preferences and replayable illustrations.
 const root = document.documentElement;
 const language = document.getElementById('language');
 const theme = document.getElementById('theme');
+const motion = matchMedia('(prefers-reduced-motion: reduce)');
+const motionControl = document.getElementById('reduce-motion');
+const motionStorageKey = 'piik:site-reduced-motion';
+let preferStill = false;
+try {
+  preferStill = localStorage.getItem(motionStorageKey) === 'true';
+} catch {
+  // Restricted storage still permits a preference for this visit.
+}
+const reducedMotion = () => motion.matches || preferStill;
 const description = document.querySelector('meta[name="description"]');
 const roomIllustration = document.querySelector('.living-room');
 const film = document.getElementById('film-preview');
 const filmFrame = document.getElementById('website-film');
 const filmLink = document.querySelector('[data-film-link]');
 const welcomeLines = document.getElementById('welcome-lines')?.content.children;
-if (welcomeLines?.length) {
-  const line = Math.floor(Math.random() * welcomeLines.length);
-  document.getElementById('welcome-line').replaceChildren(welcomeLines[line].cloneNode(true));
+let stopWelcome = () => {};
+let syncWelcomeMotion = () => {};
+function syncWelcome() {
+  if (!welcomeLines) return;
+  const element = document.getElementById('welcome-line');
+  const pool = Array.from(welcomeLines).filter(line => line.lang === root.lang);
+  const next = createTextCycle(pool);
+  const show = () => element.replaceChildren(...(pool.length ? [next().cloneNode(true)] : []));
+  element.hidden = pool.length === 0;
+  show();
+  syncWelcomeMotion = () => {
+    stopWelcome();
+    stopWelcome = pool.length > 1 && !reducedMotion() ? startTextRotation(show, element) : () => {};
+  };
+  syncWelcomeMotion();
 }
 function syncFilmPreferences() {
   const target = new URL(filmLink.href);
@@ -48,8 +71,12 @@ function setLanguage(lang) {
   roomIllustration.alt = current.image;
   document.querySelector('.site-header nav').setAttribute('aria-label', chinese ? '主导航' : 'Main');
   document.querySelector('.guide-links').setAttribute('aria-label', chinese ? '教程目录' : 'Guides');
+  for (const link of document.querySelectorAll('[data-doc-page]')) {
+    link.href = `./docs/${chinese ? 'zh/' : ''}${link.dataset.docPage}${chinese ? '' : '?lang=en'}`;
+  }
   filmFrame.title = chinese ? 'Piik 宣传片' : 'Piik introduction';
   for (const option of theme.options) option.textContent = current.themes[option.value];
+  syncWelcome();
   syncFilmPreferences();
 }
 language.addEventListener('click', () => {
@@ -111,7 +138,6 @@ document.querySelectorAll('a[href^="#"]').forEach((link) => {
 window.addEventListener('hashchange', () => revealGuide(location.hash));
 revealGuide(location.hash);
 
-const motion = matchMedia('(prefers-reduced-motion: reduce)');
 const illustrations = document.querySelectorAll('.step-art');
 document.querySelectorAll('.step-art').forEach((control) => {
   const replayScene = () =>
@@ -126,10 +152,28 @@ document.querySelectorAll('.step-art').forEach((control) => {
   });
 });
 function syncMotionPreference() {
+  const still = reducedMotion();
+  root.toggleAttribute('data-reduced-motion', still);
+  motionControl.checked = still;
+  motionControl.disabled = motion.matches;
+  motionControl.setAttribute('aria-describedby', motion.matches ? 'display-motion-help display-motion-system' : 'display-motion-help');
+  document.getElementById('display-motion-system').hidden = !motion.matches;
   illustrations.forEach((button) => {
-    button.disabled = motion.matches;
+    button.disabled = still;
   });
-  roomIllustration.src = './assets/living-room.svg' + (motion.matches ? '#still' : '');
+  roomIllustration.src = './assets/living-room.svg' + (still ? '#still' : '');
+  syncWelcomeMotion();
 }
+motionControl.addEventListener('change', () => {
+  preferStill = motionControl.checked;
+  try {
+    if (preferStill) localStorage.setItem(motionStorageKey, 'true');
+    else localStorage.removeItem(motionStorageKey);
+  } catch {
+    // The current page keeps its explicit choice without persistence.
+  }
+  syncMotionPreference();
+});
 motion.addEventListener('change', syncMotionPreference);
 syncMotionPreference();
+document.getElementById('display-settings').hidden = false;
