@@ -1,40 +1,30 @@
 # Current TODO Ledger
 
-Last reviewed: 2026-09-16
+Last reviewed: 2026-09-17
 
 Only **Now** is executable. Product modules own behavior; Git/PRs own completed
 history. A parked idea is not implementation authority.
 
 ## Now
 
-- [ ] **Windows capture border preference.** After the current release, investigate
-  [#401](https://github.com/TNTcraftHIM/Piik/issues/401) with the packaged Native
-  helper. Verify Windows' permission-based `GraphicsCaptureAccess` /
-  `IsBorderRequired` flow and the available or denied cases before choosing a
-  setting. Keep ordinary capture working; Browser capture indicators remain
-  browser-owned.
-- [ ] **App/Browser source discovery and feedback.** Investigate the report of
-  missing window sources; confirm the exact message, screen, OS/browser and App
-  version. The custom selector currently renders both App unavailability and a
-  successfully loaded empty list as "No sources available". Distinguish these
-  outcomes using facts from the existing discovery/capture owners. Check prior
-  site activation versus a fresh Browser profile, configured-origin matching,
-  local-network permission timing (including the 400 ms discovery deadline),
-  protocol mismatch, occupied control sessions, helper/encoder capabilities and
-  source-list failures. Compare startup-only probing with list refresh and App
-  restart recovery; keep Browser capture usable and local media-bridge failures
-  separate. A generic fetch
-  failure cannot prove a permission denial. Confirm the reporting machine's
-  cause before claiming resolution.
-- [ ] **Linux output failure boundary.** Run the wired `build.sh --check` on a
-  supported Linux runner, including encoder admission and primary error checks.
-  Then verify and isolate output-local encoder failures while retaining fatal
-  shared source/engine errors. Windows checks do not establish this boundary.
-- [ ] **Post-launch monitoring.** Collect App/Server feedback and verify the
-  public downloads, container pulls and deployed services after product releases.
-  Follow the [deployment runbook](./deployment.md) for the private service and keep public
-  demo deployment separate. Preserve the owner's
-  [device/network deferrals](./verification-status.md#candidate-evidence-boundary).
+No additional implementation is scheduled. Routine release and postflight
+follow the [deployment runbook](./deployment.md); public demo and private service
+deployments remain separate. Physical limits are owned by
+[verification status](./verification-status.md).
+
+## Awaiting Device Or Reporter Evidence
+
+- [ ] **App source-discovery field acceptance.** Retest the missing-window report
+  with the current App and page. Obtain OS/browser, version and paired Debug
+  reports to distinguish discovery, capture capability and enumeration failures.
+  Local permission and recovery checks do not establish the reporting machine's
+  cause.
+- [ ] **Windows 32-bit candidate acceptance.** Verify the isolated
+  `spike/windows-x86-capture` candidate's launch, capture/audio, memory pressure,
+  source replacement and update links on a 32-bit Windows device. WOW64
+  Host/media checks establish only that environment. Reconcile its scoped
+  SDK/toolchain and atomic-alignment changes with current main when accepted;
+  the experiment is not part of this maintenance release.
 - [ ] **Public invitation startup timeout.** The reporter in
   [#396](https://github.com/TNTcraftHIM/Piik/issues/396#issuecomment-5691465700)
   confirmed Local startup is fixed, but separately reported that the public
@@ -47,9 +37,6 @@ history. A parked idea is not implementation authority.
   Recheck on the reporting machine after the browser-handoff repair. The Windows
   URL-handler crash itself still needs the affected build and process/dump
   evidence; local checks cannot establish its underlying cause.
-
-Keep fixes on a maintenance branch until acceptance. The public release is the
-compatibility baseline; private service deployment stays independent.
 
 ## Next: P2P Connection And Feedback Evidence
 
@@ -114,16 +101,11 @@ not establish better connection success or speed; this note adds no retry policy
    documentation or App console translations as contributed; verify text
    direction and layout when a language requires it. Check contributed language
    names and rendered menu navigation when registering a new catalog.
-9. **32-bit App packages.** Deferred until suitable native capture dependencies
-    are available. Windows x86 core compilation alone does not establish App
-    support: the pinned capture SDK currently has no Windows x86 package.
-    Complete native packaging and real launch/capture acceptance before
-    advertising a 32-bit target.
-10. **Windows code signing.** Revisit after enrollment in a trusted signing
+9. **Windows code signing.** Revisit after enrollment in a trusted signing
     service. Sign Piik's executables before archive checksums are computed;
     signing improves publisher identity but does not guarantee that antivirus
     cloud scanning stops. Service selection and enrollment remain pending.
-11. **Gitee download-source warning.** Paused by the owner. Keep GitHub primary
+10. **Gitee download-source warning.** Paused by the owner. Keep GitHub primary
     and retain Gitee; do not add a self-hosted mirror. Chrome still blocks the
     Gitee attachment when Referer is removed. Reopen for new evidence or a
     provider review; the warning remains unresolved.

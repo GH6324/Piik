@@ -1,7 +1,7 @@
 # Native App Lifecycle
 
-- Reviewed: 2026-09-09
-- Scope: Windows capture idle semantics, native loopback input isolation, and
+- Reviewed: 2026-09-17
+- Scope: Windows capture idle/border semantics, native loopback input isolation, and
   Browser visibility of an unexpected App disconnect.
 - Status: quiet-source, preview-queue and App-crash checks pass. The owner
   confirmed Windows 10 monitor sharing resolved; game-specific window replacement
@@ -19,6 +19,23 @@ virtual-time reproduction with three three-second previews made the real
 at nine seconds. The picker now sends one preview at a time, cancels unsent
 work when its source view is retired, and waits for the remaining preview before
 starting native media. Refresh and App replacement fence old results.
+
+### Browser Local-Network Consent
+
+[Chromium local-network access](https://developer.chrome.com/blog/local-network-access)
+can hold a public site's loopback fetch until the user answers a browser prompt.
+Its [split-permission implementation](https://chromium.googlesource.com/chromium/src.git/+/f7eb223f51392d3eeb51a7d4b32db0762bf70d02%5E%21/)
+exposes `loopback-network`, with the older `local-network-access` name retained
+for browsers using a combined permission. An unsupported permission query is
+unknown, not denial. A loopback page can report `prompt` even though its
+loopback-to-loopback request needs no consent.
+
+Fresh-profile Windows/Chrome 152 checks confirmed a real prompt, successful
+discovery after granting access, and source-list recovery by refreshing after
+the discovery deadline. Optional Viewer discovery consults the permission before
+waiting; later grants can be used by later connections without replacing healthy
+Browser media. These checks do not identify the original missing-window
+reporter's cause or establish other browsers' permission behavior.
 
 ## Scope Decisions
 
@@ -228,6 +245,60 @@ Aspect references: [active display paths](https://learn.microsoft.com/en-us/wind
 [scaling modes](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ne-wingdi-displayconfig_scaling),
 [active signal size](https://learn.microsoft.com/en-us/windows/win32/api/wingdi/ns-wingdi-displayconfig_video_signal_info),
 and [independent panel fitting/MPO](https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/for-best-performance--use-dxgi-flip-model).
+
+## Windows Capture Borders
+
+The accepted scope keeps WGC for Windows capture and previews. Piik does not
+add DXGI or inject into system processes to hide the border. The reader-facing
+[troubleshooting guide](../guide/troubleshooting.md#yellow-capture-border-on-windows)
+owns the optional external-mod procedure; the evidence below records its limits
+and the alternative's integration cost.
+
+Consumer Windows 10 does not expose the WGC border-control API: Microsoft's
+[`IsBorderRequired`](https://learn.microsoft.com/en-us/uwp/api/windows.graphics.capture.graphicscapturesession.isborderrequired)
+starts at build 20348, beyond consumer Windows 10 build 19045. The current
+capture helper therefore retains the system border there. Browser capture
+indicators remain Browser-owned.
+
+An unofficial WGC-preserving option exists:
+[Windhawk's DWM Custom Projection Border](https://github.com/ramensoftware/windhawk-mods/blob/main/mods/dwm-custom-projection-border.wh.cpp)
+documents disabling the border on Windows 10 21H2. Source inspection confirms
+injection into `dwm.exe` and hooks of private `uDWM.dll`
+`CProjectionBorderVisual` drawing methods. Its disable flag has no per-app
+filter. This is a desktop-compositor modification, not a missing Piik session
+option; compatibility with private Windows methods is outside WGC's contract.
+It has not been locally verified on Windows 10 and is not a bundled dependency
+or automatic workaround. The official
+[border privacy policy](https://learn.microsoft.com/en-us/windows/client-management/mdm/policy-csp-privacy#letappsaccessgraphicscapturewithoutborder)
+applies to Windows 11 onward, so registry/policy recipes do not establish a
+supported Windows 10 solution.
+
+The official [Desktop Duplication API](https://learn.microsoft.com/en-us/windows/win32/direct3ddxgi/desktop-dup-api)
+is a borderless alternative for a selected display. It is not window-isolated
+capture: cropping the desktop can expose overlapping windows. Do not silently
+substitute it for a selected window. [OBS's display capture implementation](https://github.com/obsproject/obs-studio/blob/master/plugins/win-capture/duplicator-monitor-capture.c)
+also retains distinct DXGI/WGC paths and selects WGC for some multi-adapter
+laptops; a mature implementation does not establish universal DXGI availability.
+OBS is a design reference, not source to copy into Piik's MIT implementation.
+
+The pinned WebRTC SDK already contains `ScreenCapturerWinDirectx` and
+`DesktopAndCursorComposer`. A bounded standalone probe on Windows 11 build 26200
+on 2026-09-16 linked that existing SDK and returned six 2560x1440 frames with
+cursor composition, then exited. These frames expose CPU data and no GPU
+texture. Piik's current capture/encoder boundary consumes D3D11 textures, so
+this reuse would add a readback/upload path; the probe establishes neither
+encoding throughput nor Windows 10 support. SDK build defines must match:
+`RTC_ENABLE_WIN_WGC` changes `DesktopCaptureOptions` layout even when selecting
+DXGI; omitting it caused heap corruption in the isolated probe. No product
+capture path was changed by this experiment.
+
+If DXGI is reconsidered, compare this reuse against the current GPU path
+under game motion and quiet scenes on Windows 10. Cover selected-output/GPU
+identity, cursor and rotation, source previews, display/fullscreen changes,
+and bounded cancellation. [DXGI requires the output's own adapter](https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_2/nf-dxgi1_2-idxgioutput1-duplicateoutput);
+[access loss requires recreating the duplication object](https://learn.microsoft.com/en-us/windows/win32/api/dxgi1_2/nf-dxgi1_2-idxgioutputduplication-acquirenextframe).
+Preview capture must follow the same backend decision or it can still produce
+a WGC border. Retain window scope and the existing encoder/output/stop owners.
 
 ## Acceptance
 

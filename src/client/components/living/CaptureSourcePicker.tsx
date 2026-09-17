@@ -21,11 +21,14 @@ export type NativeSourceList =
   | { kind: "loading" }
   | { kind: "unavailable" }
   | { kind: "incompatible" }
+  | { kind: "unsupported" }
+  | { kind: "failed" }
   | {
       kind: "ready";
       sources: NativeCaptureTarget[];
       processAudio: boolean;
       systemAudio: boolean;
+      captureBorderControl?: boolean;
     };
 
 export function CaptureSourcePicker({
@@ -38,12 +41,13 @@ export function CaptureSourcePicker({
   browserAvailable = true,
   initialTab = "window",
   initialAudio = true,
+  initialShowCaptureBorder = false,
   audioLocked = false,
   selectionDisabled = false,
 }: {
   nativeSources: NativeSourceList;
   onBrowser: () => void;
-  onNative: (target: NativeCaptureTarget, audio: boolean) => void;
+  onNative: (target: NativeCaptureTarget, audio: boolean, showCaptureBorder: boolean) => void;
   onPreview: (
     target: NativeCaptureTarget,
     signal?: AbortSignal,
@@ -53,6 +57,7 @@ export function CaptureSourcePicker({
   browserAvailable?: boolean;
   initialTab?: SourceTab;
   initialAudio?: boolean;
+  initialShowCaptureBorder?: boolean;
   audioLocked?: boolean;
   selectionDisabled?: boolean;
 }) {
@@ -61,7 +66,14 @@ export function CaptureSourcePicker({
   const panelRef = useRef<HTMLDivElement>(null);
   const [tab, setTab] = useState<SourceTab>(initialTab);
   const [shareAudio, setShareAudio] = useState(initialAudio);
+  const [showCaptureBorder, setShowCaptureBorder] = useState(initialShowCaptureBorder);
   const activeTab = tab === "browser" && !browserAvailable ? "window" : tab;
+  const supportsCaptureBorder = nativeSources.kind === "ready" && nativeSources.captureBorderControl === true;
+  const issueKey = nativeSources.kind === "incompatible" ? "native.incompatible"
+    : activeTab !== "browser" && (nativeSources.kind === "unavailable" ||
+      nativeSources.kind === "unsupported" || nativeSources.kind === "failed")
+      ? `host.sourcePicker.${nativeSources.kind}` as const
+      : null;
 
   useEffect(() => {
     const cancelOnEscape = (event: KeyboardEvent) => {
@@ -265,7 +277,8 @@ export function CaptureSourcePicker({
                     }
                     onPreview={onPreview}
                     onSelect={() =>
-                      onNative(target, shareAudio && supportsAudio(target))
+                      onNative(target, shareAudio && supportsAudio(target),
+                        supportsCaptureBorder && showCaptureBorder)
                     }
                   />
                 ))
@@ -274,25 +287,48 @@ export function CaptureSourcePicker({
 
           {activeTab !== "browser" &&
           nativeSources.kind === "ready" &&
-          sources.length > 0 ? (
-            <div className="lr-source-picker-audio">
-              <span aria-hidden="true">
-                <Glyph name="speaker" size={19} />
-              </span>
-              {vis ? null : <span>{audioLabel}</span>}
-              <Tooltip
-                kind={!anyNativeAudio ? "no-audio" : audioLocked
-                  ? (shareAudio ? "hint-share-audio-fixed" : "hint-silent-share-fixed")
-                  : shareAudio ? "hint-stop-audio" : "hint-share-audio"}
-                text={vis ? undefined : `${audioAction} · ${t("host.sourcePicker.audioHint")}`}
-              >
-                {audioSwitch}
-              </Tooltip>
+          (supportsCaptureBorder || sources.length > 0) ? (
+            <div className="lr-source-picker-options">
+              {supportsCaptureBorder ? (
+                <div className="lr-source-picker-option">
+                  <span aria-hidden="true"><Glyph name="window" size={19} /></span>
+                  {vis ? null : <span>{t("host.sourcePicker.showCaptureBorder")}</span>}
+                  <Tooltip kind={showCaptureBorder ? "hint-hide-capture-border" : "hint-show-capture-border"}
+                    text={vis ? undefined : t("host.sourcePicker.showCaptureBorderHint")} place="below">
+                    <button
+                      type="button"
+                      className="lr-switch"
+                      role="switch"
+                      aria-checked={showCaptureBorder}
+                      aria-label={t("host.sourcePicker.showCaptureBorder")}
+                      aria-description={t("host.sourcePicker.showCaptureBorderHint")}
+                      onClick={() => setShowCaptureBorder((current) => !current)}
+                    />
+                  </Tooltip>
+                </div>
+              ) : null}
+              {sources.length > 0 ? (
+                <div className="lr-source-picker-option">
+                  <span aria-hidden="true">
+                    <Glyph name="speaker" size={19} />
+                  </span>
+                  {vis ? null : <span>{audioLabel}</span>}
+                  <Tooltip
+                    kind={!anyNativeAudio ? "no-audio" : audioLocked
+                      ? (shareAudio ? "hint-share-audio-fixed" : "hint-silent-share-fixed")
+                      : shareAudio ? "hint-stop-audio" : "hint-share-audio"}
+                    text={vis ? undefined : `${audioAction} · ${t("host.sourcePicker.audioHint")}`}
+                    place="below"
+                  >
+                    {audioSwitch}
+                  </Tooltip>
+                </div>
+              ) : null}
             </div>
           ) : null}
 
-          {nativeSources.kind === "incompatible" ? (
-            <Pill icon="alert" label={t("native.incompatible")} comic="warning" />
+          {issueKey ? (
+            <Pill icon="alert" label={t(issueKey)} comic="warning" />
           ) : activeTab === "browser" ? null : nativeSources.kind === "loading" ? (
             <span
               className="lr-source-picker-status"

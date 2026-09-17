@@ -621,7 +621,14 @@ body.lr-theater-open .lr-top { visibility: hidden; }
   gap: 8px;
   text-align: center;
 }
-.lr-source-picker-audio {
+.lr-source-picker-options {
+  display: flex;
+  flex: 0 0 auto;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 6px 24px;
+}
+.lr-source-picker-option {
   display: flex;
   min-height: 38px;
   flex: 0 0 auto;
@@ -632,18 +639,18 @@ body.lr-theater-open .lr-top { visibility: hidden; }
   font-size: 12px;
   font-weight: 650;
 }
-.lr-source-picker-audio .lr-switch {
+.lr-source-picker-option .lr-switch {
   width: 50px;
   height: 30px;
   border-color: rgba(223, 232, 242, .72);
   background: rgba(255, 255, 255, .06);
 }
-.lr-source-picker-audio .lr-switch::after {
+.lr-source-picker-option .lr-switch::after {
   width: 20px;
   height: 20px;
   background: #dfe8f2;
 }
-.lr-source-picker-audio .lr-switch[aria-checked="true"]::after {
+.lr-source-picker-option .lr-switch[aria-checked="true"]::after {
   transform: translateX(20px);
   background: #fff;
 }
@@ -1167,6 +1174,7 @@ html[data-theme="dark"] .lr-invite-url { background: #1a2634; border-color: #334
   font-weight: 600;
   animation: lr-slide-in 240ms var(--spring);
 }
+.lr-pill > .lr-glyph { flex-shrink: 0; }
 .lr-pill.is-bad { background: rgba(214, 69, 65, .1); border-color: var(--danger); color: #a1332f; }
 .lr-pill.is-good { background: #e2f3e9; border-color: var(--live); color: #1f7a4a; }
 html[data-theme="dark"] .lr-pill { background: #2e2410; }
@@ -1796,7 +1804,7 @@ html[data-theme="dark"] .lr-switch::after { background: var(--ink); }
 
 /* Stateful hover/focus panel carrying a paper Comic above its trigger. The
    trigger stays focusable; when it is natively disabled, the wrapper owns the
-   explanation focus instead. Enter is delayed ~120ms; hover exit gets a short
+   explanation focus instead. Tooltip delays hover until intent; exit gets a short
    crossing grace without placing invisible targets over nearby controls. Under
    prefers-reduced-motion the global block collapses the transition to instant
    and the comic's own RM block pins its final frame. */
@@ -1830,6 +1838,7 @@ svg[data-comic-motion="still"] .lr-person-eyes > ellipse {
   }
 }
 .lr-comic-tip-wrap { position: relative; display: inline-flex; }
+.lr-comic-tip-wrap.is-help-only > button:not(:disabled) { cursor: default; }
 .lr-slider-hint { flex: 1; min-width: 0; }
 .lr-comic-tip-wrap.is-disabled-trigger > :disabled { pointer-events: none; }
 .lr-comic-tip {
@@ -1861,7 +1870,7 @@ svg[data-comic-motion="still"] .lr-person-eyes > ellipse {
   overflow-wrap: anywhere;
   text-wrap: pretty;
 }
-.lr-comic-tip.has-comic.is-text { width: 272px; }
+.lr-comic-tip.has-comic.is-text { width: 252px; }
 .lr-comic-tip > svg {
   display: block;
   max-width: 100%;
@@ -1910,7 +1919,7 @@ svg[data-comic-motion="still"] .lr-person-eyes > ellipse {
 
 /* channel 1: fine-pointer hover */
 @media (hover: hover) and (pointer: fine) {
-  .lr-comic-tip-wrap.is-hover-open .lr-comic-tip { opacity: 1; transform: translate(var(--tooltip-offset-x, 0px), 0); transition-delay: .12s; }
+  .lr-comic-tip-wrap.is-hover-open .lr-comic-tip { opacity: 1; transform: translate(var(--tooltip-offset-x, 0px), 0); }
   .lr-comic-tip-wrap.is-hover-open .lr-comic-tip * { animation-play-state: running !important; }
 
   /* Panel mutex: keyboard focus (channel 2) can hold one wrap's panel open
@@ -1939,7 +1948,6 @@ svg[data-comic-motion="still"] .lr-person-eyes > ellipse {
 .lr-comic-tip-wrap.is-tip-open .lr-comic-tip {
   opacity: 1;
   transform: translate(var(--tooltip-offset-x, 0px), 0);
-  transition-delay: .12s;
 }
 .lr-comic-tip-wrap.is-focus-open .lr-comic-tip *,
 .lr-comic-tip-wrap.is-tip-open .lr-comic-tip * {
@@ -1966,7 +1974,6 @@ svg[data-comic-motion="still"] .lr-person-eyes > ellipse {
   .lr-group-actions .lr-comic-tip-wrap { flex: 1 1 0; min-width: 0; }
   .lr-group-actions .lr-comic-tip-wrap .lr-btn { width: 100%; }
   .lr-comic-tip { max-width: min(320px, 78vw); }
-  .lr-comic-tip svg { width: 100% !important; height: auto; }
 }
 
 .lr-comic-tip-caption {

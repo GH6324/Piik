@@ -41,8 +41,26 @@ import {
   type NativeVideoCodec,
 } from "./wire";
 
-const DISCOVERY_TIMEOUT_MS = 400;
 const REQUEST_TIMEOUT_MS = 8_000;
+
+interface NativeDiscoveryOptions {
+  waitForPermission?: boolean;
+}
+
+async function ungrantedLocalPermission(): Promise<PermissionState | null> {
+  // App Local already runs on loopback. Its permission can say "prompt" even
+  // though loopback-to-loopback requests do not need consent.
+  if (["localhost", "127.0.0.1", "[::1]"].includes(window.location.hostname)) return null;
+  for (const name of ["loopback-network", "local-network-access"]) {
+    try {
+      const { state } = await navigator.permissions.query({ name: name as PermissionName });
+      return state === "granted" ? null : state;
+    } catch {
+      // Older Chromium uses the combined name; other browsers may expose neither.
+    }
+  }
+  return null;
+}
 
 interface PendingRequest<T = unknown> {
   schema: z.ZodType<T>;
@@ -55,6 +73,7 @@ export interface NativeShareInput {
   shareId: string;
   source: NativeCaptureTarget;
   audio: boolean;
+  showCaptureBorder?: boolean;
   adapterIndex: number;
   encoderIndex: number;
   edgeCapacity: number;
@@ -69,49 +88,61 @@ export class NativeCompatibilityError extends Error {
   }
 }
 
-export async function discoverNativeHealth(): Promise<NativeHealth | null> {
-  let incompatible: NativeCompatibilityError | null = null;
-  for (
-    let port = NATIVE_CLIENT_PORT_START;
-    port <= NATIVE_CLIENT_PORT_END;
-    port += 1
-  ) {
-    const controller = new AbortController();
-    const timer = window.setTimeout(
-      () => controller.abort(),
-      DISCOVERY_TIMEOUT_MS,
-    );
-    try {
+export async function discoverNativeHealth(
+  { waitForPermission = true }: NativeDiscoveryOptions = {},
+): Promise<NativeHealth | null> {
+  if (!waitForPermission) {
+    const permission = await ungrantedLocalPermission();
+    if (permission) {
+      debugEvent("native", "unavailable", { stage: "permission", permission });
+      return null;
+    }
+  }
+  const controller = new AbortController();
+  // The first request may wait for browser permission. One shared deadline
+  // bounds the scan; a silent port must not hide an App on another port.
+  const timer = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    return await Promise.any(Array.from({
+      length: NATIVE_CLIENT_PORT_END - NATIVE_CLIENT_PORT_START + 1,
+    }, async (_, index) => {
+      const port = NATIVE_CLIENT_PORT_START + index;
       const response = await fetch(`http://127.0.0.1:${port}/health`, {
         cache: "no-store",
         signal: controller.signal,
         targetAddressSpace: "loopback",
       } as RequestInit);
-      if (!response.ok) continue;
+      if (!response.ok) throw new Error("Piik App discovery was not accepted");
       const body: unknown = await response.json();
       const identity = nativeDiscoveryIdentitySchema.safeParse(body);
-      if (!identity.success || identity.data.port !== port) continue;
-      if (identity.data.protocol !== NATIVE_CLIENT_PROTOCOL) {
-        incompatible ??= new NativeCompatibilityError(identity.data.protocol);
-        continue;
+      if (!identity.success || identity.data.port !== port) {
+        throw new Error("Not a Piik App discovery response");
       }
-      const health = nativeHealthSchema.safeParse(body);
-      if (health.success) return health.data;
-    } catch {
-      // An absent App and a denied local-network permission are both
-      // ordinary Browser-only operation.
-    } finally {
-      window.clearTimeout(timer);
+      if (identity.data.protocol !== NATIVE_CLIENT_PROTOCOL) {
+        throw new NativeCompatibilityError(identity.data.protocol);
+      }
+      const health = nativeHealthSchema.parse(body);
+      debugEvent("native", "discovered", { capabilities: health.nativeMedia });
+      return health;
+    }));
+  } catch (error) {
+    const incompatible = error instanceof AggregateError
+      ? error.errors.find((failure) => failure instanceof NativeCompatibilityError)
+      : undefined;
+    if (incompatible) {
+      debugEvent("native", "incompatible", {
+        expectedProtocol: NATIVE_CLIENT_PROTOCOL,
+        actualProtocol: incompatible.actualProtocol,
+      });
+      throw incompatible;
     }
+    // A failed fetch cannot distinguish an absent App from blocked local access.
+    debugEvent("native", "unavailable", { stage: "discovery", timedOut: controller.signal.aborted });
+    return null;
+  } finally {
+    window.clearTimeout(timer);
+    controller.abort();
   }
-  if (incompatible) {
-    debugEvent("native", "incompatible", {
-      expectedProtocol: NATIVE_CLIENT_PROTOCOL,
-      actualProtocol: incompatible.actualProtocol,
-    });
-    throw incompatible;
-  }
-  return null;
 }
 
 export async function notifyNativePresentation(
@@ -147,8 +178,8 @@ export class NativeClient {
     socket.addEventListener("error", () => this.handleClose());
   }
 
-  static async connect(): Promise<NativeClient | null> {
-    const health = await discoverNativeHealth();
+  static async connect(options?: NativeDiscoveryOptions): Promise<NativeClient | null> {
+    const health = await discoverNativeHealth(options);
     if (!health) return null;
     const socket = new WebSocket(`ws://127.0.0.1:${health.port}/control`, [
       `${NATIVE_CLIENT_SUBPROTOCOL}.${health.instanceToken}`,
@@ -179,6 +210,7 @@ export class NativeClient {
       );
     });
     if (!opened) {
+      debugEvent("native", "unavailable", { stage: "control" });
       socket.close();
       return null;
     }
@@ -246,9 +278,14 @@ export class NativeClient {
   async startShare(
     input: NativeShareInput,
   ): Promise<{ audio: boolean; codec: NativeVideoCodec }> {
+    // Older Apps reject unknown command fields.
+    const { showCaptureBorder = false, ...shareInput } = input;
     const response = await this.request(
       "start-share",
-      input,
+      {
+        ...shareInput,
+        ...(this.health.nativeMedia.captureBorderControl ? { showCaptureBorder } : {}),
+      },
       shareStartedResponseSchema,
       input.source.kind === "picker" ? null : REQUEST_TIMEOUT_MS,
     );
@@ -275,6 +312,7 @@ export class NativeClient {
     source: NativeCaptureTarget,
     audio: boolean,
     path: NativeCapturePath,
+    showCaptureBorder = false,
   ): Promise<void> {
     const response = await this.request(
       "replace-share-source",
@@ -284,6 +322,7 @@ export class NativeClient {
         audio,
         adapterIndex: path.adapterIndex,
         encoderIndex: path.encoderIndex,
+        ...(this.health.nativeMedia.captureBorderControl ? { showCaptureBorder } : {}),
       },
       shareSourceReplacedResponseSchema,
       source.kind === "picker" ? null : REQUEST_TIMEOUT_MS,

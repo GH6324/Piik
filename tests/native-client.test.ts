@@ -18,6 +18,7 @@ import {
 } from "../src/client/native/wire";
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
@@ -29,6 +30,62 @@ describe("native App private wire", () => {
     instanceToken: "a".repeat(43),
     nativeMedia: { video: true, hardwareH264: true },
   };
+
+  it.each(["prompt", "denied"] as const)("does not hold Viewer reception for %s permission and observes a later grant", async (state) => {
+    vi.stubGlobal("window", { setTimeout, clearTimeout, location: { hostname: "piik.example" } });
+    const query = vi.fn().mockResolvedValue({ state });
+    vi.stubGlobal("navigator", { permissions: { query } });
+    const fetcher = vi.fn(async () => new Response(JSON.stringify(health)));
+    vi.stubGlobal("fetch", fetcher);
+    const socket = vi.fn();
+    vi.stubGlobal("WebSocket", socket);
+
+    await expect(NativeClient.connect({ waitForPermission: false })).resolves.toBeNull();
+    expect(fetcher).not.toHaveBeenCalled();
+    expect(socket).not.toHaveBeenCalled();
+    query.mockResolvedValue({ state: "granted" });
+    await expect(discoverNativeHealth({ waitForPermission: false })).resolves.toMatchObject({ port: health.port });
+  });
+
+  it("still lets explicit source discovery ask for local permission", async () => {
+    vi.stubGlobal("window", { setTimeout, clearTimeout, location: { hostname: "piik.example" } });
+    const query = vi.fn().mockResolvedValue({ state: "prompt" });
+    vi.stubGlobal("navigator", { permissions: { query } });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(health))));
+    await expect(discoverNativeHealth()).resolves.toMatchObject({ port: health.port });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it.each(["localhost", "127.0.0.1", "[::1]"])("keeps App Local reception on %s available without cross-address-space consent", async (hostname) => {
+    vi.stubGlobal("window", { setTimeout, clearTimeout, location: { hostname } });
+    const query = vi.fn().mockResolvedValue({ state: "prompt" });
+    vi.stubGlobal("navigator", { permissions: { query } });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(health))));
+    await expect(discoverNativeHealth({ waitForPermission: false })).resolves.toMatchObject({ port: health.port });
+    expect(query).not.toHaveBeenCalled();
+  });
+
+  it("uses the older combined permission when split permission is unsupported", async () => {
+    vi.stubGlobal("window", { setTimeout, clearTimeout, location: { hostname: "piik.example" } });
+    const query = vi.fn().mockRejectedValueOnce(new TypeError("Unsupported permission"))
+      .mockResolvedValue({ state: "prompt" });
+    vi.stubGlobal("navigator", { permissions: { query } });
+    const fetcher = vi.fn();
+    vi.stubGlobal("fetch", fetcher);
+    await expect(discoverNativeHealth({ waitForPermission: false })).resolves.toBeNull();
+    expect(query).toHaveBeenLastCalledWith({ name: "local-network-access" });
+    expect(fetcher).not.toHaveBeenCalled();
+  });
+
+  it.each([undefined, { query: vi.fn().mockRejectedValue(new TypeError("Unsupported permission")) }])(
+    "retains ordinary discovery when local permissions cannot be queried",
+    async (permissions) => {
+      vi.stubGlobal("window", { setTimeout, clearTimeout, location: { hostname: "piik.example" } });
+      vi.stubGlobal("navigator", { permissions });
+      vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify(health))));
+      await expect(discoverNativeHealth({ waitForPermission: false })).resolves.toMatchObject({ port: health.port });
+    },
+  );
 
   it.each([NATIVE_CLIENT_PROTOCOL - 1, NATIVE_CLIENT_PROTOCOL + 1])(
     "reports observed Piik App protocol %s without opening control or presentation",
@@ -63,7 +120,63 @@ describe("native App private wire", () => {
     await expect(discoverNativeHealth()).resolves.toMatchObject({
       protocol: NATIVE_CLIENT_PROTOCOL, port: NATIVE_CLIENT_PORT_START + 1,
     });
-    expect(fetcher).toHaveBeenCalledTimes(2);
+    expect(fetcher).toHaveBeenCalledTimes(NATIVE_CLIENT_PORT_END - NATIVE_CLIENT_PORT_START + 1);
+  });
+
+  it("keeps discovery alive while local access takes longer than 400 ms", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("window", { setTimeout, clearTimeout });
+    vi.stubGlobal("fetch", vi.fn(async (url: string, options: RequestInit) => {
+      if (new URL(url).port !== String(health.port)) throw new TypeError("No listener");
+      await new Promise<void>((resolve, reject) => {
+        const timer = setTimeout(resolve, 1_500);
+        options.signal!.addEventListener("abort", () => {
+          clearTimeout(timer);
+          reject(new DOMException("Aborted", "AbortError"));
+        }, { once: true });
+      });
+      return new Response(JSON.stringify(health));
+    }));
+    const discovery = discoverNativeHealth();
+    await vi.advanceTimersByTimeAsync(1_500);
+    await expect(discovery).resolves.toMatchObject({ port: health.port });
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("finds a later App without waiting for a silent port and aborts the unused probe", async () => {
+    vi.stubGlobal("window", { setTimeout, clearTimeout });
+    let silentSignal: AbortSignal | undefined;
+    vi.stubGlobal("fetch", vi.fn(async (url: string, options: RequestInit) => {
+      const port = Number(new URL(url).port);
+      if (port === health.port) {
+        silentSignal = options.signal!;
+        return new Promise<Response>((_resolve, reject) => {
+          silentSignal!.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+        });
+      }
+      if (port !== health.port + 1) throw new TypeError("No listener");
+      return new Response(JSON.stringify({ ...health, port }));
+    }));
+    await expect(discoverNativeHealth()).resolves.toMatchObject({ port: health.port + 1 });
+    expect(silentSignal?.aborted).toBe(true);
+  });
+
+  it("bounds all silent discovery ports with one deadline", async () => {
+    vi.useFakeTimers();
+    vi.stubGlobal("window", { setTimeout, clearTimeout });
+    const signals: AbortSignal[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (_url: string, options: RequestInit) => {
+      signals.push(options.signal!);
+      return new Promise<Response>((_resolve, reject) => {
+        options.signal!.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+      });
+    }));
+    const discovery = discoverNativeHealth();
+    await vi.advanceTimersByTimeAsync(8_000);
+    await expect(discovery).resolves.toBeNull();
+    expect(signals).toHaveLength(NATIVE_CLIENT_PORT_END - NATIVE_CLIENT_PORT_START + 1);
+    expect(signals.every((signal) => signal.aborted)).toBe(true);
+    expect(vi.getTimerCount()).toBe(0);
   });
 
   it("identifies an incompatible App even when that protocol uses different token or media metadata", async () => {
@@ -113,7 +226,7 @@ describe("native App private wire", () => {
     const staleNotification = notifyNativePresentation("zh", stale.signal);
     stale.abort();
     await staleNotification;
-    expect(fetcher).toHaveBeenCalledOnce();
+    expect(fetcher).toHaveBeenCalledTimes(NATIVE_CLIENT_PORT_END - NATIVE_CLIENT_PORT_START + 1);
     expect(fetcher).toHaveBeenCalledWith("http://127.0.0.1:39721/health", expect.anything());
     const current = new AbortController();
     await notifyNativePresentation("vis", current.signal);
@@ -242,16 +355,72 @@ describe("native App private wire", () => {
       ...health, futureDescription: "ignored", nativeMedia: { video: true, futureFeature: true },
     })).toEqual({
       ...health, nativeMedia: {
-        video: true, processAudio: false, systemAudio: false, hardwareH264: false, softwareVP8: false,
+        video: true, processAudio: false, systemAudio: false, captureBorderControl: false, hardwareH264: false, softwareVP8: false,
       },
     });
     expect(nativeHealthSchema.parse({ ...health, nativeMedia: undefined }).nativeMedia)
-      .toEqual({ video: false, processAudio: false, systemAudio: false, hardwareH264: false, softwareVP8: false });
+      .toEqual({ video: false, processAudio: false, systemAudio: false, captureBorderControl: false, hardwareH264: false, softwareVP8: false });
     for (const invalid of [
       { protocol: 0 }, { protocol: 9.5 }, { protocol: Number.MAX_SAFE_INTEGER + 1 },
       { service: "other" }, { port: NATIVE_CLIENT_PORT_END + 1 }, { instanceToken: "short" },
-      { nativeMedia: { softwareVP8: "true" } }, { nativeMedia: null },
+      { nativeMedia: { softwareVP8: "true" } }, { nativeMedia: { captureBorderControl: "true" } }, { nativeMedia: null },
     ]) expect(nativeHealthSchema.safeParse({ ...health, ...invalid }).success).toBe(false);
+  });
+
+  it.each([undefined, false, true])("gates capture-border commands on advertised support: %s", async (supported) => {
+    const requests: Record<string, unknown>[] = [];
+    class CaptureSocket extends EventTarget {
+      static readonly OPEN = 1;
+      static readonly CLOSING = 2;
+      readyState = CaptureSocket.OPEN;
+      protocol = `piik-client-v9.${health.instanceToken}`;
+      constructor() {
+        super();
+        queueMicrotask(() => this.dispatchEvent(new Event("open")));
+      }
+      close() { this.readyState = CaptureSocket.CLOSING; }
+      send(payload: string) {
+        const request = JSON.parse(payload) as Record<string, unknown>;
+        requests.push(request);
+        queueMicrotask(() => this.dispatchEvent(new MessageEvent("message", {
+          data: JSON.stringify({
+            version: NATIVE_CLIENT_PROTOCOL, id: request.id,
+            ...(request.type === "hello" ? { type: "ready" } : {
+              type: request.type === "start-share" ? "share-started" : "share-source-replaced",
+              shareId: request.shareId,
+              ...(request.type === "start-share" ? { audio: true, codec: "h264" } : {}),
+            }),
+          }),
+        })));
+      }
+    }
+    vi.stubGlobal("WebSocket", CaptureSocket);
+    vi.stubGlobal("window", { setTimeout, clearTimeout });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response(JSON.stringify({
+      ...health, nativeMedia: { ...health.nativeMedia, captureBorderControl: supported },
+    }))));
+    const client = await NativeClient.connect();
+    expect(client).not.toBeNull();
+    expect(client!.health.nativeMedia.captureBorderControl).toBe(supported ?? false);
+    const input = {
+      shareId: "share_123456", source: { kind: "display" as const, sourceId: "2", title: "Display 1" },
+      audio: true, adapterIndex: 0, encoderIndex: 0, edgeCapacity: 2,
+      profile: DEFAULT_QUALITY_SETTINGS, codec: "auto" as const,
+    };
+    try {
+      for (const showCaptureBorder of [undefined, false, true]) {
+        await client!.startShare({ ...input, showCaptureBorder });
+        await client!.replaceShareSource(input.shareId, input.source, input.audio, input, showCaptureBorder);
+        const extension = supported ? { showCaptureBorder: showCaptureBorder ?? false } : {};
+        expect(requests.at(-2)).toEqual({
+          version: NATIVE_CLIENT_PROTOCOL, id: expect.any(String), type: "start-share", ...input, ...extension,
+        });
+        expect(requests.at(-1)).toEqual({
+          version: NATIVE_CLIENT_PROTOCOL, id: expect.any(String), type: "replace-share-source",
+          shareId: input.shareId, source: input.source, audio: true, adapterIndex: 0, encoderIndex: 0, ...extension,
+        });
+      }
+    } finally { client!.close(); }
   });
 
   it("keeps 64-bit Windows identities as exact decimal strings", () => {

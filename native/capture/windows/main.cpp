@@ -30,6 +30,7 @@
 #include <winrt/base.h>
 
 #include "capture_target.h"
+#include "capture_border.h"
 #include "capture_geometry.h"
 #include "process_audio.h"
 #include "h264_encoder.h"
@@ -930,6 +931,7 @@ struct ProductArguments final {
   std::string codec = "auto";
   VideoProfile profile;
   std::vector<VideoProfile> outputs;
+  bool show_capture_border = false;
 };
 
 DegradationPreference ParseDegradationPreference(const wchar_t* value) {
@@ -980,6 +982,11 @@ void ParseOutputProfiles(ProductArguments& arguments, int first, int count, wcha
 
 ProductArguments ParseProductArguments(int count, wchar_t** values) {
   ProductArguments arguments;
+  if (count > 2 && std::wstring(values[1]) == L"--capture-video" &&
+      std::wstring(values[count - 1]) == L"--show-capture-border") {
+    arguments.show_capture_border = true;
+    --count;
+  }
   if (count == 2 && std::wstring(values[1]) == L"--list") return arguments;
   if (count == 2 && std::wstring(values[1]) == L"--probe") {
     arguments.mode = ProductArguments::Mode::probe;
@@ -1150,6 +1157,8 @@ void WriteCapabilityProbe() {
   output << "{\"protocol\":7,\"platform\":\"windows\",\"platformBuild\":"
          << JSONString(std::to_string(build))
          << ",\"videoCapture\":" << (window_capture ? "true" : "false")
+         << ",\"captureBorderControl\":"
+         << (window_capture && piik::capture::CaptureBorder::Supported() ? "true" : "false")
          << ",\"softwareVP8\":true"
          << ",\"processAudio\":"
          << (process_audio ? "true" : "false")
@@ -1725,6 +1734,7 @@ void RunVideoCapture(const ProductArguments& arguments) {
       initial_size);
   GraphicsCaptureSession capture_session = pool.CreateCaptureSession(item);
   EnableFastCaptureUpdates(capture_session);
+  piik::capture::CaptureBorder border;
 
   UniqueHandle shutdown(CreateEventW(nullptr, TRUE, FALSE, nullptr));
   UniqueHandle frame_ready(CreateEventW(nullptr, FALSE, FALSE, nullptr));
@@ -1767,6 +1777,7 @@ void RunVideoCapture(const ProductArguments& arguments) {
       item.Closed(closed_token);
     } catch (...) {
     }
+    border.Close();
     try {
       capture_session.Close();
     } catch (...) {
@@ -1794,6 +1805,7 @@ void RunVideoCapture(const ProductArguments& arguments) {
         }
         if (FAILED(writer.WriteUnavailable(static_cast<UINT8>(layer), OutputFailureDetail(layer, error)))) fail_capture(error);
       });
+    if (!arguments.show_capture_border) border.Start(capture_session);
     capture_session.StartCapture();
 
     UINT64 previous_timestamp = 0;
@@ -1826,6 +1838,7 @@ void RunVideoCapture(const ProductArguments& arguments) {
         ApplyOutputControl(control, workers);
         refresh_input = true;
       }
+      border.Apply(capture_session);
       DWORD wait = window_target
                        ? WaitForMultipleObjects(3, window_waits, FALSE, control_wait_ms)
                        : WaitForMultipleObjects(2, display_waits, FALSE, control_wait_ms);

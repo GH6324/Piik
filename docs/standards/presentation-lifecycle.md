@@ -63,6 +63,15 @@ the mismatch; the source selector retains Browser operation and offers update/
 refresh guidance. Discovery metadata may grow, while known identity and capability
 types remain validated. Missing optional capabilities are unavailable; control
 commands and responses retain their strict protocol contract.
+An empty source list means enumeration succeeded for the selected category.
+Connection, capture-capability and enumeration failures keep their own feedback.
+Discovery has one bounded deadline that allows time for browser local-network
+consent; a failed fetch alone cannot establish that consent was denied.
+Optional Viewer reception uses Browser media immediately when the browser
+reports that local App access still needs consent or is denied. It rechecks
+permission on a later connection attempt; a later grant does not replace healthy
+Browser media. App Local needs no cross-address-space consent. Browsers without
+a permission query retain bounded discovery.
 
 ## Visual Language
 
