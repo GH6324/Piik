@@ -9,7 +9,8 @@ collect a diagnostic report if the problem persists.
 
 | What you see | Try this |
 | --- | --- |
-| Picture but no sound | Unmute the video. The host should choose a source with shareable audio; if sound was disabled, stop and start sharing with it enabled. App window/screen capture keeps that setting when switching sources. |
+| Picture but no source sound | Unmute the video. The host should choose a source with shareable audio and enable sound in the source picker. |
+| Cannot hear the host's voice | The host can enable **Microphone** below the picture, then check the selected input and its volume in **Sharing settings → Sound**. Check the device connection and microphone permission. If the control is unavailable, update the App and refresh the page. |
 | No screen picker | Allow the browser or App to record the screen when the OS asks. Browser capture needs HTTPS or `localhost`; try sharing from a desktop computer. |
 | No App windows or screens listed | Check the message in the source picker, then follow [App source troubleshooting](#app-windows-or-screens-are-missing). **Browser** → **Browser picker** also offers browser capture. |
 | Yellow outline around the shared window or screen | This is Windows' capture indicator. See [capture borders](#yellow-capture-border-on-windows) for Windows 11 controls and an optional Windows 10 workaround. |
@@ -50,6 +51,20 @@ Windows draws this outline to identify the window or display being captured.
 On supported Windows versions, the App source picker offers **Show capture border**,
 off by default. Windows permissions or another active capture can still require
 the border. Windows 10 does not provide this control for its capture API.
+
+### Windows 11: the border is still visible
+
+1. Select **Apps / Windows** or **Screens** in Piik and leave **Show capture border**
+   off. A Browser-selected source uses the browser's own capture indicator.
+2. Stop other apps or tabs capturing the same window/display, then restart sharing.
+3. If Windows denied borderless capture, review **Screenshot borders** in Windows
+   privacy settings. Its settings page can also be opened with
+   `ms-settings:privacy-graphicscapturewithoutborder` from **Win+R**, when available.
+
+Windows requires consent and can retain the border when another capture requests
+it ([Microsoft's API documentation](https://learn.microsoft.com/en-us/uwp/api/windows.graphics.capture.graphicscapturesession.isborderrequired)).
+If it persists, include the Windows version, selected source type and an
+[App diagnostic report](../../cmd/piik-app/README.md#diagnostics) with your feedback.
 
 ### Optional Windows 10 workaround
 

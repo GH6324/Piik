@@ -116,6 +116,37 @@ on hover or keyboard focus, then compress on press. Inputs and option tiles
 share softer corners. Keep a distinct focus ring and a persistent selected
 state; disabled controls must not pretend to activate. Reduced motion keeps
 the colour, outline and selected position without decorative displacement.
+The shared button uses the same pressed value for `aria-pressed` and its selected
+treatment; active state remains distinct from hover in both themes.
+Disclosure buttons keep a stable visible caption, while their expanded state and
+accessible action describe opening or closing. Neutral panel borders stay quieter
+than the controls inside them; nested diagnostic panels retain their softer fill.
+Keep room identity, invitation and admission controls ahead of expanded topology
+and connection details, so inspecting a route does not displace room actions.
+
+Sharing and local playback controls use the same quiet, compact button treatment.
+The Host's persistent dock stays below the picture; the Viewer's playback bar
+belongs to the video. Their similar appearance does not equate broadcast pause
+with local playback pause. Waiting overlays use the space above the actual
+playback bar, including when it wraps. Keep the primary status readable on
+narrow screens; optional waiting copy yields first. Microphone mute, sharing
+pause, source replacement and stop remain direct actions; stopping stays
+visually separated from frequent actions.
+One compact dock combines direct actions and the sharing-settings entry below
+the television, above the couch. Its disclosure groups quality presets and picture
+parameters with sound and microphone settings; presets remain available before
+sharing starts. Separate the less frequent connection/codec options in a nested
+disclosure. Expand in page flow, pushing later content down instead of covering
+the picture or participants. Use two content groups on wide screens and stack
+them on narrow screens; avoid another permanent row of settings cards. Keep
+shared presentation separate from the existing setting/resource owners.
+The microphone comic depicts Host commentary gain;
+the Viewer's listening-volume comic remains a different action.
+
+Visual source choices (windows, screens and cameras) share named thumbnail cards,
+including their focus, hover and refresh treatment. Microphone selection uses
+device names in a compact selector. Shared enumeration does not make these two
+selection tasks visually interchangeable.
 
 ## Cast And Objects
 
@@ -130,6 +161,7 @@ Participant characters should leave room for that distinctive presence.
 | Shared or watched media | Small television, including antenna, body and feet |
 | Browser application | Browser chrome around content; not a second design of television |
 | A captured window or display | Window title bar or display stand, with the shared media metaphor kept distinct |
+| A camera source or Host commentary | `camera` identifies the alternative picture source; `microphone` identifies the enabled Host voice input and `microphoneOff` its muted state. Neither replaces the speaker metaphor for source/playback sound. |
 | Server forwarding media | A server on the media path; opening a Site alone does not imply SFU |
 
 These are **identity/object colours**, not status. A green pawn remains green

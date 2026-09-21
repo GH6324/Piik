@@ -71,24 +71,32 @@ describe("native capture source selection", () => {
         onPreview: async () => null, onRefresh: () => {}, onCancel: () => {},
       };
       const nativeTab = renderToStaticMarkup(createElement(CaptureSourcePicker, props));
+      if (kind === "unavailable") {
+        expect(nativeTab).not.toContain('data-source-tab="window"');
+        expect(nativeTab).not.toContain('data-source-tab="display"');
+        expect(nativeTab).toMatch(/data-source-tab="browser"[^>]*aria-selected="true"/);
+      }
       expect(nativeTab.replaceAll("&#x27;", "'")).toContain(t(lang, `host.sourcePicker.${kind}`));
       expect(nativeTab).not.toContain(t(lang, "host.sourcePicker.empty"));
       expect(nativeTab).not.toMatch(/class="lr-source-picker-refresh"[^>]*disabled=""/);
       const browserTab = renderToStaticMarkup(createElement(CaptureSourcePicker, { ...props, initialTab: "browser" }));
       expect(browserTab).toContain(`aria-label="${t(lang, "host.sourcePicker.browser")}"`);
-      expect(browserTab).not.toContain(t(lang, `host.sourcePicker.${kind}`));
+      const browserCopy = browserTab.replaceAll("&#x27;", "'");
+      if (kind === "unavailable") expect(browserCopy).toContain(t(lang, "host.sourcePicker.unavailable"));
+      else expect(browserCopy).not.toContain(t(lang, `host.sourcePicker.${kind}`));
       expect(browserTab).not.toMatch(/class="lr-source-option is-browser"[^>]*disabled=""/);
     }
   });
 
-  it.each(["browser", "window"] as const)("only adds waiting copy to the pending %s source list", initialTab => {
+  it.each(["browser", "window"] as const)("keeps Browser and Camera reachable during discovery with initial %s preference", initialTab => {
     setCopy({ lang: "en", vis: false });
     const html = renderToStaticMarkup(createElement(CaptureSourcePicker, {
       nativeSources: { kind: "loading" }, initialTab,
       onBrowser: () => {}, onNative: () => {}, onPreview: async () => null,
       onRefresh: () => {}, onCancel: () => {},
     }));
-    expect(html.includes('class="lr-waiting-caption"')).toBe(initialTab === "window");
+    expect(html).toMatch(/data-source-tab="browser"[^>]*aria-selected="true"/);
+    expect(html).not.toContain('data-source-tab="window"');
     expect(html).not.toContain("lr-brand-loader");
     expect(html).not.toMatch(/class="lr-source-picker-close"[^>]*disabled=""/);
   });
@@ -113,7 +121,33 @@ describe("native capture source selection", () => {
     expect(html).toMatch(/data-source-tab="browser"[^>]*disabled=""/);
     expect(html).toMatch(/data-native-source="window:1:10:123456"[^>]*disabled=""/);
     expect(html).not.toContain('data-native-source="display:2"');
-    expect(html.match(/role="tab"/g)).toHaveLength(3);
+    expect(html.match(/role="tab"/g)).toHaveLength(4);
+    expect([...html.matchAll(/data-source-tab="([^"]+)"/g)].map((match) => match[1]))
+      .toEqual(["browser", "camera", "window", "display"]);
+    expect(html).toMatch(/data-source-tab="window"[^>]*aria-selected="true"/);
+  });
+
+  it("offers only Browser and Camera without an App, defaulting to Browser", () => {
+    setCopy({ lang: "en", vis: false });
+    const html = renderToStaticMarkup(createElement(CaptureSourcePicker, {
+      nativeSources: { kind: "browser" }, onBrowser: () => {}, onCamera: () => {},
+      onNative: () => {}, onPreview: async () => null, onRefresh: () => {}, onCancel: () => {},
+    }));
+    expect([...html.matchAll(/data-source-tab="([^"]+)"/g)].map((match) => match[1]))
+      .toEqual(["browser", "camera"]);
+    expect(html).toMatch(/data-source-tab="browser"[^>]*aria-selected="true"/);
+    expect(html).not.toMatch(/data-source-tab="camera"[^>]*disabled=""/);
+    expect(html).not.toContain(t("en", "host.sourcePicker.unavailable"));
+  });
+
+  it("selects a focusable Camera tab when Browser sharing is unavailable", () => {
+    const html = renderToStaticMarkup(createElement(CaptureSourcePicker, {
+      nativeSources: { kind: "browser" }, browserAvailable: false,
+      onBrowser: () => {}, onCamera: () => {}, onNative: () => {},
+      onPreview: async () => null, onRefresh: () => {}, onCancel: () => {},
+    }));
+    expect(html).toMatch(/data-source-tab="camera"[^>]*aria-selected="true"[^>]*tabindex="0"/);
+    expect(html).toMatch(/data-source-tab="browser"[^>]*tabindex="-1"[^>]*disabled=""/);
   });
 
   it("retains the platform-owned combined source picker", () => {

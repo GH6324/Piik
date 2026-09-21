@@ -45,6 +45,7 @@ export function Btn({
   pressed,
   expanded,
   controls,
+  popoverTarget,
   onClick,
   type = "button",
   hint,
@@ -62,6 +63,7 @@ export function Btn({
   pressed?: boolean;
   expanded?: boolean;
   controls?: string;
+  popoverTarget?: string;
   onClick?: () => void;
   type?: "button" | "submit";
   /** Shared hint comic; text modes add the localized caption. */
@@ -75,11 +77,12 @@ export function Btn({
   const label = t(title);
   const wrapped = Boolean(hint);
   const softDisabled = Boolean(wrapped && disabled);
+  const activeTone = tone ?? (pressed ? "on" : undefined);
   const button = (
     <button
       id={id}
       type={type}
-      className={`lr-btn${tone ? ` is-${tone}` : ""}`}
+      className={`lr-btn${activeTone ? ` is-${activeTone}` : ""}`}
       aria-label={label}
       disabled={disabled && !softDisabled}
       aria-disabled={softDisabled || undefined}
@@ -87,6 +90,7 @@ export function Btn({
       aria-pressed={pressed}
       aria-expanded={expanded}
       aria-controls={controls}
+      popoverTarget={popoverTarget}
       style={softDisabled ? SOFT_DISABLED_STYLE : undefined}
       onClick={
         softDisabled

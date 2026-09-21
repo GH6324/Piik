@@ -1,4 +1,5 @@
 import {
+  useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -21,9 +22,13 @@ import {
   type CodeEntryPolicy,
   type RoutePolicy,
 } from "../../shared/protocol";
+import { browserCaptureDevices } from "../media/capture-devices";
 import { AppHeader, LedStrip } from "../components/living/Header";
 import { WelcomeLine } from "../components/living/WelcomeLine";
 import { Couch, type CouchEntry } from "../components/living/Couch";
+import { SharingSettings } from "../components/living/SharingSettings";
+import { HostMicrophone, HostMicrophoneSettings } from "../components/living/HostMicrophone";
+import { HostAudio } from "../media/host-audio";
 import {
   CaptureSourcePicker,
   type NativeSourceList,
@@ -110,7 +115,8 @@ import {
 import { labelParticipantSnapshot } from "../lib/viewer-presence";
 import {
   applyCaptureProfile,
-  captureDisplay,
+  captureBrowserSource,
+  type BrowserCaptureSource,
   matchingQualityProfileId,
   QUALITY_PROFILES,
   DEGRADATION_PREFERENCE_KEYS,
@@ -235,10 +241,10 @@ interface CaptureDetails {
    *  mode never see a baked-in string from capture time. */
   resolution: string | null;
   frameRate: number | null;
-  hasAudio: boolean;
+  hasSourceAudio: boolean;
 }
 
-function captureDetails(stream: MediaStream, native = false): CaptureDetails {
+function captureDetails(stream: MediaStream, native = false, sourceAudio?: boolean): CaptureDetails {
   // A Native preview is a received track, not an observation of raw capture.
   const settings = native ? undefined : stream.getVideoTracks()[0]?.getSettings();
   return {
@@ -247,7 +253,7 @@ function captureDetails(stream: MediaStream, native = false): CaptureDetails {
         ? `${settings.width}x${settings.height}`
         : null,
     frameRate: settings?.frameRate ?? null,
-    hasAudio: stream.getAudioTracks().length > 0,
+    hasSourceAudio: sourceAudio ?? stream.getAudioTracks().length > 0,
   };
 }
 
@@ -331,7 +337,7 @@ interface HostPageProps {
 }
 
 type ShareSourceSelection =
-  | { kind: "browser" }
+  | { kind: "browser"; source?: BrowserCaptureSource; deviceId?: string }
   | {
       kind: "native";
       client: NativeClient;
@@ -371,6 +377,16 @@ export function HostPage({
   const [signalStatus, setSignalStatus] =
     useState<SignalConnectionState>("offline");
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const hostAudioRef = useRef<HostAudio | null>(null);
+  const [microphoneEnabled, setMicrophoneEnabled] = useState(false);
+  const [microphoneVolume, setMicrophoneVolume] = useState(1);
+  const [microphonePending, setMicrophonePending] = useState(false);
+  const [microphoneDevices, setMicrophoneDevices] = useState({ browser: "", native: "" });
+  const [cameraDevice, setCameraDevice] = useState("");
+  const loadMicrophones = useCallback(() => {
+    const client = nativeModeRef.current ? nativeClientRef.current : null;
+    return client ? client.microphones() : browserCaptureDevices("audioinput");
+  }, []);
   const [nativeActive, setNativeActive] = useState(false);
   const [showCaptureBorder, setShowCaptureBorder] = useState(false);
   const [nativeSources, setNativeSources] =
@@ -487,10 +503,13 @@ export function HostPage({
   ): void {
     setNoticeKey(key, comic, tone, vars);
   }
-  const [copiedInviteUrl, setCopiedInviteUrl] = useState<string | null>(null);
-  const copied = copiedInviteUrl !== null && copiedInviteUrl === room?.inviteUrl;
+  const [includeInviteCredential, setIncludeInviteCredential] = useState(true);
+  const roomLink = includeInviteCredential ? room?.inviteUrl : room?.canonicalUrl;
+  const roomLinkBlocked = !includeInviteCredential && room?.codeEntryPolicy === "private" && !viewerPasswordEnabled;
+  const [copiedRoomLink, setCopiedRoomLink] = useState<string | null>(null);
+  const copied = copiedRoomLink !== null && copiedRoomLink === roomLink;
   const copiedResetTimerRef = useRef<number | null>(null);
-  const copyInviteRequestRef = useRef<object | null>(null);
+  const copyRoomLinkRequestRef = useRef<object | null>(null);
   const [switchingSource, setSwitchingSource] = useState(false);
   const [changingQuality, setChangingQuality] = useState(false);
   const [sharingPaused, setSharingPaused] = useState(false);
@@ -540,7 +559,7 @@ export function HostPage({
   const activeRouteRevisionRef = useRef(0);
   const generationRef = useRef(0);
   const activeGenerationRef = useRef<number | null>(null);
-  const sourceSwitchRef = useRef<object | null>(null);
+  const sourceSwitchRef = useRef<{ replacingVideo?: MediaStreamTrack } | null>(null);
   const qualityChangeRef = useRef<object | null>(null);
   const pendingQualityChangeRef = useRef<QualitySettings | null>(null);
   const qualitySettingsRef = useRef<QualitySettings>(DEFAULT_QUALITY_SETTINGS);
@@ -563,6 +582,7 @@ export function HostPage({
   const nativeEventCleanupRef = useRef<(() => void) | null>(null);
   const nativeClientCloseCleanupRef = useRef<(() => void) | null>(null);
   const nativeModeRef = useRef(false);
+  const nativeSourceAudioRef = useRef<boolean | undefined>(undefined);
   const nativeSourceRequestRef = useRef<object | null>(null);
   const nativePreviewTailRef = useRef<Promise<void>>(Promise.resolve());
   const nativeSourcePathRef = useRef<NativeCapturePath | null>(null);
@@ -670,7 +690,7 @@ export function HostPage({
         window.clearTimeout(copiedResetTimerRef.current);
         copiedResetTimerRef.current = null;
       }
-      copyInviteRequestRef.current = null;
+      copyRoomLinkRequestRef.current = null;
       viewerQualityEvidenceStore.clear();
       cancelViewerQualityEvidenceRender();
       activeRouteRevisionRef.current = 0;
@@ -684,6 +704,8 @@ export function HostPage({
       nativeClientConnectRef.current = null;
       nativeClientRef.current?.close();
       nativeClientRef.current = null;
+      hostAudioRef.current?.dispose();
+      hostAudioRef.current = null;
       streamRef.current?.getTracks().forEach((track) => track.stop());
       retiringStreamRef.current?.getTracks().forEach((track) => track.stop());
       streamRef.current = null;
@@ -847,6 +869,10 @@ export function HostPage({
     hostPeerIdRef.current = null;
     void hostSfuRouteRef.current?.disconnect();
     hostSfuRouteRef.current = null;
+    hostAudioRef.current?.dispose();
+    hostAudioRef.current = null;
+    setMicrophoneEnabled(false);
+    setMicrophonePending(false);
     streamRef.current?.getTracks().forEach((track) => track.stop());
     retiringStreamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
@@ -882,7 +908,7 @@ export function HostPage({
     clearHostRoom(keepResumeHint);
     roomRef.current = null;
     setRoom(null);
-    setCopiedInviteUrl(null);
+    setCopiedRoomLink(null);
     setViewerPasswordDraft(creationProfileRef.current.roomPassword ?? "");
     setViewerPasswordVisible(false);
     return true;
@@ -970,7 +996,7 @@ export function HostPage({
       writePreferredRoom(replacement.roomId);
       roomRef.current = replacement;
       setRoom(replacement);
-      setCopiedInviteUrl(null);
+      setCopiedRoomLink(null);
       setViewerPasswordEnabled(profile.roomPassword !== null);
       setViewerPasswordDraft(profile.roomPassword ?? "");
       setViewerPasswordVisible(false);
@@ -1010,7 +1036,7 @@ export function HostPage({
             writePreferredRoom(replacement.roomId);
             roomRef.current = replacement;
             setRoom(replacement);
-            setCopiedInviteUrl(null);
+            setCopiedRoomLink(null);
             setViewerPasswordEnabled(profile.roomPassword !== null);
             setViewerPasswordDraft(profile.roomPassword ?? "");
             setViewerPasswordVisible(false);
@@ -1106,12 +1132,14 @@ export function HostPage({
     captured: MediaStream,
     generation: number,
   ): void {
-    captured.getVideoTracks()[0]?.addEventListener(
+    const track = captured.getVideoTracks()[0];
+    track?.addEventListener(
       "ended",
       () => {
         if (
           isCurrentGeneration(generation) &&
-          streamRef.current === captured
+          streamRef.current?.getVideoTracks()[0] === track &&
+          sourceSwitchRef.current?.replacingVideo !== track
         ) {
           endSharing({ key: "host.stopNotice" });
         }
@@ -1128,11 +1156,31 @@ export function HostPage({
     const { client, target, audio, showCaptureBorder, path } = selection;
     let bridge: NativeMediaBridge | null = null;
     let shareStarted = false;
+    let nativeEventCleanup: (() => void) | null = null;
     try {
       await nativeShareCleanupRef.current;
       await nativePreviewTailRef.current;
       if (!isCurrentShare(generation, shareGeneration)) return null;
       if (nativeClientRef.current !== client) throw new Error("Piik App is unavailable");
+      nativeSourceAudioRef.current = undefined;
+      nativeEventCleanup = client.onEvent((event) => {
+        if (event.shareId !== shareGeneration || !isCurrentShare(generation, shareGeneration) || nativeClientRef.current !== client) return;
+        if (event.type === "audio-state") {
+          nativeSourceAudioRef.current = event.sourceAudio;
+          setMicrophoneEnabled(event.microphone);
+          setDetails(previous => previous ? { ...previous, hasSourceAudio: event.sourceAudio } : previous);
+          if (event.failed) setNoticeValue({ kind: "key", key: "host.microphone.unavailable", target: "operation", comic: "warning", tone: "warn" });
+        }
+        if (event.type === "share-ended") {
+          endSharing(
+            { key: event.failed ? "host.shareEnded" : "host.stopNotice" },
+            true,
+            event.failed ? "source-failed" : "share-ended",
+            event.failed ? "bad" : "off",
+          );
+        }
+      });
+      nativeEventCleanupRef.current = nativeEventCleanup;
       const started = await client.startShare({
         shareId: shareGeneration,
         source: target,
@@ -1150,6 +1198,7 @@ export function HostPage({
         return null;
       }
       if (nativeClientRef.current !== client) throw new Error("Piik App is unavailable");
+      nativeSourceAudioRef.current ??= started.sourceAudio ?? started.audio;
       videoCodecRef.current = manualVideoCodecPreference(started.codec);
       bridge = new NativeMediaBridge(
         shareGeneration,
@@ -1171,22 +1220,6 @@ export function HostPage({
       nativeMediaBridgeRef.current = bridge;
       nativeModeRef.current = true;
       setNativeActive(true);
-      const nativeEventCleanup = client.onEvent((event) => {
-        if (
-          event.type === "share-ended" &&
-          event.shareId === shareGeneration &&
-          isCurrentShare(generation, shareGeneration) &&
-          nativeClientRef.current === client
-        ) {
-          endSharing(
-            { key: event.failed ? "host.shareEnded" : "host.stopNotice" },
-            true,
-            event.failed ? "source-failed" : "share-ended",
-            event.failed ? "bad" : "off",
-          );
-        }
-      });
-      nativeEventCleanupRef.current = nativeEventCleanup;
       const stream = await bridge.start();
       if (!isCurrentShare(generation, shareGeneration)) {
         if (nativeMediaBridgeRef.current === bridge) disposeNativeShare();
@@ -1195,6 +1228,8 @@ export function HostPage({
       }
       return stream;
     } catch (error) {
+      nativeEventCleanup?.();
+      if (nativeEventCleanupRef.current === nativeEventCleanup) nativeEventCleanupRef.current = null;
       if (
         nativeClientRef.current === client &&
         nativeShareGenerationRef.current === shareGeneration
@@ -1295,6 +1330,10 @@ export function HostPage({
     const request = {};
     nativeSourceRequestRef.current = request;
     nativeSourcePathRef.current = null;
+    if (!launchedByClient || (phase === "live" && !nativeModeRef.current)) {
+      setNativeSources({ kind: "browser" });
+      return;
+    }
     setNativeSources({ kind: "loading" });
 
     let client: NativeClient | null;
@@ -1402,15 +1441,12 @@ export function HostPage({
 
   function requestSharing(): void {
     setJoiningRoom(false);
-    if (!launchedByClient) {
-      void startSharing({ kind: "browser" });
-      return;
-    }
     void openCaptureSourcePicker();
   }
 
-  function startBrowserShareFromPicker(): void {
-    void startSharing({ kind: "browser" });
+  function startBrowserShareFromPicker(source: BrowserCaptureSource, deviceId = ""): void {
+    if (phase === "live") void switchSource(source, deviceId);
+    else void startSharing({ kind: "browser", source, deviceId });
   }
 
   async function loadNativeSourcePreview(
@@ -1467,6 +1503,7 @@ export function HostPage({
     nativeEventCleanupRef.current = null;
     nativeShareGenerationRef.current = null;
     nativeModeRef.current = false;
+    nativeSourceAudioRef.current = undefined;
     setNativeActive(false);
     if (!client || !shareGeneration) {
       releaseUnusedNativeClient();
@@ -1614,9 +1651,9 @@ export function HostPage({
       debugEvent("quality", "committed", { generation, applied: appliedProfile });
       outcome = "applied";
       if (nativeUpdate) {
-        setDetails(captureDetails(activeStream, true));
+        setDetails(captureDetails(activeStream, true, nativeSourceAudioRef.current));
       } else if (captureChanged) {
-        setDetails(captureDetails(activeStream));
+        setDetails(captureDetails(hostAudioRef.current?.sourceStream ?? activeStream));
       }
       signalRef.current?.setHostQualitySettings(appliedProfile);
       const ingress = nativeMediaIngressRef.current;
@@ -1787,6 +1824,9 @@ export function HostPage({
         return;
       }
       sharingPausedRef.current = false;
+      // Before the mixer existed, source audio itself was the paused output.
+      // Restore it only on an accepted resume, never during permission handoff.
+      if (hostAudioRef.current) setMediaPaused(hostAudioRef.current.sourceStream, false);
       setSharingPaused(false);
       setNoticeValue(null);
       return;
@@ -2395,7 +2435,7 @@ export function HostPage({
     shareGenerationRef.current = shareGeneration;
     closeCaptureSourcePicker();
     setNoticeValue(null);
-    setCopiedInviteUrl(null);
+    setCopiedRoomLink(null);
     setPhase("starting");
 
     let captured: MediaStream | null = null;
@@ -2410,7 +2450,7 @@ export function HostPage({
         nativeStarted = true;
       } else {
         // This must remain the first awaited operation in the button gesture.
-        captured = await captureDisplay(qualitySettingsRef.current);
+        captured = await captureBrowserSource(qualitySettingsRef.current, selection.source ?? "browser", selection.deviceId);
       }
     } catch (error) {
       if (!isCurrentShare(generation, shareGeneration)) {
@@ -2419,7 +2459,7 @@ export function HostPage({
       }
       activeGenerationRef.current = null;
       shareGenerationRef.current = null;
-      setNoticeError(error, "capture", "television");
+      setCaptureError(error, selection.kind === "browser" ? selection.source : undefined, "capture");
       setPhase(isCapturePermissionFailure(error, "capture") ? "idle" : "error");
       return;
     }
@@ -2430,12 +2470,16 @@ export function HostPage({
       return;
     }
     if (captured) {
+      if (selection.kind === "browser") {
+        hostAudioRef.current = new HostAudio(captured, setMicrophoneEnabled, selection.source ?? "browser");
+        if (selection.source === "camera") setCameraDevice(selection.deviceId ?? "");
+      }
       streamRef.current = captured;
       setStream(captured);
       watchCaptureEnd(captured, generation);
       if (selection.kind === "native") {
         setDetails(
-          captureDetails(captured, true),
+          captureDetails(captured, true, nativeSourceAudioRef.current),
         );
       } else {
         setDetails(captureDetails(captured));
@@ -2718,7 +2762,7 @@ export function HostPage({
       const activeStream = streamRef.current;
       if (activeStream) {
         setDetails(
-          captureDetails(activeStream, true),
+          captureDetails(activeStream, true, nativeSourceAudioRef.current),
         );
       }
       const sfuUpdated = await hostSfuRouteRef.current?.updateProfile(qualitySettingsRef.current) ?? true;
@@ -2745,7 +2789,7 @@ export function HostPage({
     }
   }
 
-  async function switchSource(): Promise<void> {
+  async function switchSource(source?: BrowserCaptureSource, deviceId = ""): Promise<void> {
     const generation = activeGenerationRef.current;
     if (
       phase !== "live" ||
@@ -2756,26 +2800,35 @@ export function HostPage({
     ) {
       return;
     }
-    if (nativeModeRef.current) {
+    if (!source) {
       await openCaptureSourcePicker();
       return;
     }
+    if (nativeModeRef.current) return;
 
-    const token = {};
+    // Some browsers retire the old camera while opening the new one. That
+    // transition belongs to this replacement, not the share-ended observer.
+    const token = { replacingVideo: source === "camera" && hostAudioRef.current?.sourceKind === "camera"
+      ? streamRef.current?.getVideoTracks()[0] : undefined };
     sourceSwitchRef.current = token;
+    closeCaptureSourcePicker();
     setSwitchingSource(true);
     setNoticeValue(null);
 
     let captured: MediaStream;
     try {
       // Like initial capture, changing source must begin in this button gesture.
-      captured = await captureDisplay(qualitySettingsRef.current);
+      captured = await captureBrowserSource(qualitySettingsRef.current, source, deviceId);
     } catch (error) {
       if (
         isCurrentGeneration(generation) &&
         sourceSwitchRef.current === token
       ) {
-        setNoticeError(error, "source");
+        if (token.replacingVideo?.readyState === "ended") {
+          endSharing({ key: "host.shareEnded" }, true, "source-failed", "bad");
+        } else {
+          setCaptureError(error, source, "source");
+        }
       }
       finishSourceSwitch(token);
       return;
@@ -2789,24 +2842,90 @@ export function HostPage({
       return;
     }
 
+    try {
+      if (source === "camera") setCameraDevice(deviceId);
+      captured = hostAudioRef.current?.attach(captured, source) ?? captured;
+      await replaceBrowserStream(captured, generation, token);
+    } catch (error) {
+      if (isCurrentGeneration(generation)) setNoticeError(error, "source");
+    } finally {
+      finishSourceSwitch(token);
+    }
+  }
+
+  function setCaptureError(error: unknown, source: BrowserCaptureSource | undefined, action: "source" | "capture") {
+    const target = action === "source" ? "operation" : "television";
+    if (source !== "camera") {
+      setNoticeError(error, action, target);
+      return;
+    }
+    setNoticeValue({ kind: "key", key: error instanceof DOMException && error.name === "NotAllowedError"
+      ? "host.camera.denied" : "host.camera.unavailable", target, comic: "source-failed", tone: "warn" });
+  }
+
+  async function changeMicrophone(enabled: boolean, deviceId: string): Promise<void> {
+    const audio = hostAudioRef.current;
+    const generation = activeGenerationRef.current;
+    const client = nativeModeRef.current ? nativeClientRef.current : null;
+    const shareId = nativeShareGenerationRef.current;
+    if ((!audio && !(client?.health.nativeMedia.microphone && shareId)) || generation === null || sourceSwitchRef.current || qualityChangeRef.current || sharingPausedRef.current) return;
+    const token = {};
+    sourceSwitchRef.current = token;
+    setMicrophonePending(true);
+    setNoticeValue(null);
+    try {
+      if (client && shareId) {
+        await client.setMicrophone(shareId, enabled, microphoneVolume, deviceId);
+        if (isCurrentGeneration(generation) && nativeClientRef.current === client && sourceSwitchRef.current === token) {
+          setMicrophoneDevices(previous => ({ ...previous, native: deviceId }));
+        }
+        return;
+      }
+      if (!audio) return;
+      audio.setMicrophoneVolume(microphoneVolume);
+      const mixed = await audio.setMicrophone(enabled, deviceId);
+      if (!isCurrentGeneration(generation) || hostAudioRef.current !== audio) return;
+      setMicrophoneDevices(previous => ({ ...previous, browser: deviceId }));
+      if (mixed) await replaceBrowserStream(mixed, generation, token);
+    } catch (error) {
+      if (isCurrentGeneration(generation) && sourceSwitchRef.current === token) {
+        debugError("capture", "microphone-failed", error);
+        setNoticeValue({ kind: "key", key: error instanceof DOMException && error.name === "NotAllowedError"
+          ? "host.microphone.denied" : "host.microphone.unavailable", target: "operation", comic: "warning", tone: "warn" });
+      }
+    } finally {
+      if (sourceSwitchRef.current === token) {
+        setMicrophonePending(false);
+        finishSourceSwitch(token);
+      }
+    }
+  }
+
+  async function replaceBrowserStream(captured: MediaStream, generation: number, token: object): Promise<void> {
+    // The caller retires its operation; this function owns only stream resources.
     const previousStream = streamRef.current;
     if (!previousStream) {
       captured.getTracks().forEach((track) => track.stop());
       setNoticeKey("host.shareEnded", "share-ended", "off");
-      finishSourceSwitch(token);
       return;
     }
 
     retiringStreamRef.current = previousStream;
-    invalidateSenderQualityEvidence();
-    if (routePolicyRef.current.topologyOptimization) {
+    const videoChanged = captured.getVideoTracks()[0] !== previousStream.getVideoTracks()[0];
+    // HostAudio owns raw inputs and mixed output. Adding a mixer must not stop
+    // the old stream's audio: that track is still feeding the new output.
+    const retirePrevious = () => previousStream.getVideoTracks().forEach((track) => {
+      if (!captured.getTracks().includes(track)) track.stop();
+    });
+    if (videoChanged) invalidateSenderQualityEvidence();
+    if (videoChanged && routePolicyRef.current.topologyOptimization) {
       signalRef.current?.send({ type: "reset-sender-quality" });
     }
     setMediaPaused(captured, sharingPausedRef.current);
     streamRef.current = captured;
     setStream(captured);
-    setDetails(captureDetails(captured));
-    watchCaptureEnd(captured, generation);
+    setDetails(captureDetails(hostAudioRef.current?.sourceStream ?? captured));
+    if (videoChanged) watchCaptureEnd(captured, generation);
 
     try {
       const ingress = nativeMediaIngressRef.current;
@@ -2884,7 +3003,7 @@ export function HostPage({
         activeSfuRoute && hostSfuRouteRef.current === activeSfuRoute
           ? syncHostSfuQualityWarning(activeSfuRoute, generation)
           : null;
-      previousStream.getTracks().forEach((track) => track.stop());
+      retirePrevious();
       if (retiringStreamRef.current === previousStream) {
         retiringStreamRef.current = null;
       }
@@ -2912,7 +3031,7 @@ export function HostPage({
       );
 
       if (
-        isCurrentGeneration(generation) &&
+        videoChanged && isCurrentGeneration(generation) &&
         sourceSwitchRef.current === token
       ) {
         const sourceNotice =
@@ -2932,28 +3051,28 @@ export function HostPage({
         );
       }
     } finally {
-      previousStream.getTracks().forEach((track) => track.stop());
+      retirePrevious();
       if (retiringStreamRef.current === previousStream) {
         retiringStreamRef.current = null;
       }
-      finishSourceSwitch(token);
     }
   }
 
-  async function copyInvite(): Promise<void> {
+  async function copyRoomLink(): Promise<void> {
     const activeRoom = roomRef.current;
-    const inviteUrl = activeRoom?.inviteUrl;
-    if (!inviteUrl) {
+    const link = includeInviteCredential ? activeRoom?.inviteUrl : activeRoom?.canonicalUrl;
+    if (!activeRoom || !link || roomLinkBlocked || roomMutating) {
       return;
     }
     const request = {};
-    copyInviteRequestRef.current = request;
-    const current = () => copyInviteRequestRef.current === request &&
-      isCurrentRoomAuthority(activeRoom) && roomRef.current?.inviteUrl === inviteUrl;
+    copyRoomLinkRequestRef.current = request;
+    const current = () => copyRoomLinkRequestRef.current === request &&
+      isCurrentRoomAuthority(activeRoom) &&
+      (includeInviteCredential ? roomRef.current?.inviteUrl : roomRef.current?.canonicalUrl) === link;
     try {
-      await navigator.clipboard.writeText(inviteUrl);
+      await navigator.clipboard.writeText(link);
       if (!current()) return;
-      setCopiedInviteUrl(inviteUrl);
+      setCopiedRoomLink(link);
       setNoticeValue((current) => current?.kind === "key" && current.key === "host.invite.copyFailed" ? null : current);
       // One owner for the confirmation window: a second copy restarts it
       // instead of inheriting the first click's expiry.
@@ -2962,11 +3081,11 @@ export function HostPage({
       }
       copiedResetTimerRef.current = window.setTimeout(() => {
         copiedResetTimerRef.current = null;
-        setCopiedInviteUrl(null);
+        setCopiedRoomLink(null);
       }, 1_500);
     } catch {
       if (!current()) return;
-      setCopiedInviteUrl(null);
+      setCopiedRoomLink(null);
       setNoticeErrorKey("host.invite.copyFailed", "copy-failed");
     }
   }
@@ -3318,20 +3437,23 @@ export function HostPage({
             {nativeSources ? (
               <CaptureSourcePicker
                 nativeSources={nativeSources}
-                initialTab={nativeClientRef.current ? "window" : "browser"}
-                onBrowser={startBrowserShareFromPicker}
+                onBrowser={() => startBrowserShareFromPicker("browser")}
+                onCamera={deviceId => startBrowserShareFromPicker("camera", deviceId)}
+                initialCamera={cameraDevice}
+                activeCameraVideo={hostAudioRef.current?.sourceKind === "camera" ? videoRef.current : null}
                 onNative={startNativeShareFromPicker}
                 onPreview={loadNativeSourcePreview}
                 onRefresh={openCaptureSourcePicker}
                 onCancel={closeCaptureSourcePicker}
-                browserAvailable={!nativeActive}
+                browserAvailable={!nativeActive && !!navigator.mediaDevices?.getDisplayMedia}
+                cameraAvailable={!nativeActive && !!navigator.mediaDevices?.getUserMedia}
                 selectionDisabled={roomMutating || switchingSource || changingQuality}
                 initialAudio={
                   nativeActive
-                    ? (streamRef.current?.getAudioTracks().length ?? 0) > 0
+                    ? nativeSourceAudioRef.current ?? false
                     : true
                 }
-                audioLocked={nativeActive}
+                audioLocked={nativeActive && !nativeClientRef.current?.health.nativeMedia.microphone}
                 initialShowCaptureBorder={showCaptureBorder}
               />
             ) : !stream &&
@@ -3381,6 +3503,7 @@ export function HostPage({
                     style={{ gap: 12 }}
                     onSubmit={joinRoomFromStage}
                   >
+                    {!vis && <span className="lr-cap lr-join-site">{t("join.hint", { site: window.location.host })}</span>}
                     <RoomCodeInput value={joinRoomCode} rejectedAttempt={joinRejectedAttempt} autoFocus
                       onChange={value => { setJoinRoomCode(value); setJoinRejectedAttempt(0); }} />
                     <RoomCodeError attempt={joinRejectedAttempt} theme="stage" />
@@ -3426,9 +3549,67 @@ export function HostPage({
               />
             ) : null}
           </StageTv>
+          <div className="lr-host-share-controls lr-media-controls" role="group" aria-label={t("host.shareControls")}>
+            {phase === "live" ? <>
+              <HostMicrophone enabled={microphoneEnabled} pending={microphonePending}
+                unavailable={nativeActive && !nativeClientRef.current?.health.nativeMedia.microphone} paused={sharingPaused} disabled={switchingSource || changingQuality}
+                volume={microphoneVolume}
+                onToggle={() => void changeMicrophone(!microphoneEnabled, microphoneDevices[nativeActive ? "native" : "browser"])} />
+              <Btn
+                icon={sharingPaused ? "play" : "pause"}
+                cap={sharingPaused ? "host.resume" : "host.pause"}
+                title={sharingPaused ? "host.resume" : "host.pause"}
+                hint={sharingPaused ? "hint-resume" : "hint-pause"}
+                draw="host-share-toggle"
+                disabled={switchingSource || changingQuality || microphonePending}
+                onClick={toggleSharingPause}
+              />
+              <Btn
+                id="host-switch-source"
+                icon="switchSource"
+                cap={switchingSource ? "host.switching" : "host.switchSource"}
+                title="host.switchSource"
+                hint="hint-switch-source"
+                disabled={switchingSource || changingQuality || microphonePending}
+                onClick={() => void switchSource()}
+              />
+            </> : null}
+            <Btn
+              icon="sliders"
+              busy={changingQuality}
+              cap="host.settings.button"
+              title={showAdvanced ? "host.advanced.hide" : "host.advanced"}
+              hint={showAdvanced ? "hint-collapse" : "hint-advanced"}
+              tone={showAdvanced ? "on" : undefined}
+              expanded={showAdvanced}
+              controls="host-advanced-door"
+              onClick={() => setShowAdvanced((current) => !current)}
+            />
+            {phase === "live" ? (
+              <Btn
+                id="host-stop-share"
+                icon="stop"
+                tone="danger"
+                cap="host.stop"
+                title="host.stop"
+                hint="hint-share-stop"
+                onClick={() => endSharing({ key: "host.stopNotice" })}
+              />
+            ) : phase === "starting" ? (
+              <Btn
+                id="host-cancel-share"
+                icon="x"
+                tone="danger"
+                cap="host.cancelStart"
+                title="host.cancelStart"
+                hint="hint-close"
+                onClick={() => endSharing({ key: "host.startCancelled" })}
+              />
+            ) : null}
+          </div>
           <div className="lr-stage-notices" role="status" aria-live="polite">
-            {!details?.hasAudio && stream ? (
-              <Pill icon="speakerOff" label={t("host.noAudio")} comic="no-audio" />
+            {!details?.hasSourceAudio && stream ? (
+              <Pill icon="speakerOff" label={t("host.noAudio")} comic="no-audio" tone="off" />
             ) : null}
             {hostSfuWarningText ? (
               <Pill icon="alert" label={hostSfuWarningText} comic="warning" />
@@ -3439,6 +3620,308 @@ export function HostPage({
                 motion={noticeValue.comic === "signal-recovering" || noticeValue.comic === "recovering" || noticeValue.comic === "connecting-sfu" ? "progress" : "still"} />
             ) : null}
           </div>
+          <SharingSettings id="host-advanced-door" open={showAdvanced} busy={changingQuality}
+            presets={
+              <QualityPresets selected={selectedQualityProfileId} busy={changingQuality}
+                disabled={phase === "starting" || switchingSource}
+                onSelect={id => void changeQuality({ ...QUALITY_PROFILES[id],
+                  screenAudioQuality: resolveScreenAudioQuality(advancedQualityRef.current.screenAudioQuality),
+                })} />
+            }
+            picture={<>
+              <div className="lr-door-group">
+                <span
+                  className="lr-door-glyph"
+                >
+                  <Glyph name="expand" size={19} />
+                  <Cap k="host.advanced.resolution" />
+                </span>
+                <div
+                  className="lr-row-group"
+                  role="group"
+                  aria-label={t("host.advanced.resolution")}
+                >
+                  {(
+                    Object.keys(QUALITY_RESOLUTIONS) as QualityResolution[]
+                  ).map((resolution) => (
+                    <Chip
+                      key={resolution}
+                      selected={advancedQuality.resolution === resolution}
+                      disabled={phase === "starting" || switchingSource}
+                      title={QUALITY_RESOLUTIONS[resolution].label}
+                      hint="hint-quality"
+                      onClick={() =>
+                        changeAdvancedQuality({ resolution })
+                      }
+                    >
+                      {QUALITY_RESOLUTIONS[resolution].label}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+              <div className="lr-sharing-limits">
+                <div className="lr-door-group">
+                  <span
+                    className="lr-door-glyph"
+                  >
+                    <Glyph name="frames" size={19} />
+                    <Cap k="host.advanced.framerate" />
+                  </span>
+                  <Tooltip kind="hint-metric-fps" text={vis ? undefined : t("host.advanced.framerate")} className="lr-slider-hint">
+                    <span className="lr-slider">
+                      <input
+                        type="range"
+                        min={15}
+                        max={60}
+                        step={5}
+                        value={advancedQuality.maxFramerate}
+                        disabled={phase === "starting" || switchingSource}
+                        aria-label={t("host.advanced.framerate")}
+                        onChange={(event) =>
+                          changeAdvancedQuality({
+                            maxFramerate: Number(event.target.value),
+                          })
+                        }
+                      />
+                      <output>{advancedQuality.maxFramerate} fps</output>
+                    </span>
+                    </Tooltip>
+                </div>
+                <div className="lr-door-group">
+                  <span
+                    className="lr-door-glyph"
+                  >
+                    <Glyph name="gauge" size={19} />
+                    <Cap k="host.advanced.bitrate" />
+                  </span>
+                  <Tooltip kind="hint-metric-bitrate" text={vis ? undefined : t("host.advanced.bitrate")} className="lr-slider-hint">
+                    <span className="lr-slider">
+                      <input
+                        type="range"
+                        min={2000000}
+                        max={12000000}
+                        step={500000}
+                        value={advancedQuality.maxBitrate}
+                        disabled={phase === "starting" || switchingSource}
+                        aria-label={t("host.advanced.bitrate")}
+                        onChange={(event) =>
+                          changeAdvancedQuality({
+                            maxBitrate: Number(event.target.value),
+                          })
+                        }
+                      />
+                      <output>
+                        {(advancedQuality.maxBitrate / 1_000_000).toFixed(1)}{" "}
+                        Mbps
+                      </output>
+                    </span>
+                    </Tooltip>
+                </div>
+              </div>
+              <div className="lr-door-group">
+                <span
+                  className="lr-door-glyph"
+                >
+                  <Glyph name="mountain" size={19} />
+                  <Cap k="host.advanced.preference" />
+                </span>
+                <div
+                  className="lr-row-group"
+                  role="group"
+                  aria-label={t("host.advanced.preference")}
+                >
+                  {(
+                    Object.keys(
+                      PREFERENCE_PRESENTATION,
+                    ) as DegradationPreference[]
+                  ).map((preference) => (
+                    <Chip
+                      key={preference}
+                      name="degradationPreference"
+                      value={preference}
+                      selected={
+                        advancedQuality.degradationPreference === preference
+                      }
+                      disabled={phase === "starting" || switchingSource}
+                      title={`${t(DEGRADATION_PREFERENCE_KEYS[preference])} · ${t(PREFERENCE_PRESENTATION[preference].hint)}`}
+                      hint={preference === "maintain-resolution" ? "hint-prefer-resolution" : preference === "maintain-framerate" ? "hint-prefer-framerate" : "hint-degrade-pref"}
+                      onClick={() =>
+                        changeAdvancedQuality({
+                          degradationPreference: preference,
+                        })
+                      }
+                    >
+                      <Glyph
+                        name={PREFERENCE_PRESENTATION[preference].icon}
+                        size={18}
+                      />
+                      <Cap k={DEGRADATION_PREFERENCE_KEYS[preference]} />
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+            </>}
+            audio={<>
+              {phase === "live" && (!nativeActive || nativeClientRef.current?.health.nativeMedia.microphone) ? (
+                <HostMicrophoneSettings enabled={microphoneEnabled}
+                disabled={microphonePending || switchingSource || changingQuality || sharingPaused}
+                  volume={microphoneVolume} onVolume={volume => {
+                    setMicrophoneVolume(volume);
+                    hostAudioRef.current?.setMicrophoneVolume(volume);
+                    const client = nativeClientRef.current;
+                    const shareId = nativeShareGenerationRef.current;
+                    if (nativeModeRef.current && client && shareId) {
+                      void client.setMicrophoneVolume(shareId, volume).catch(error => {
+                        if (nativeClientRef.current === client && nativeShareGenerationRef.current === shareId) {
+                          debugError("capture", "microphone-volume-failed", error);
+                          setNoticeValue({ kind: "key", key: "host.microphone.unavailable", target: "operation", comic: "warning", tone: "warn" });
+                        }
+                      });
+                    }
+                  }}
+                  native={nativeActive} loadDevices={loadMicrophones}
+                  deviceId={microphoneDevices[nativeActive ? "native" : "browser"]}
+                  onDevice={deviceId => void changeMicrophone(microphoneEnabled, deviceId)}
+                />
+              ) : null}
+              <div className="lr-door-group">
+                <span
+                  className="lr-door-glyph"
+                >
+                  <Glyph name="speaker" size={19} />
+                  <Cap k="host.advanced.audio" />
+                </span>
+                <div
+                  className="lr-row-group"
+                  role="group"
+                  aria-label={t("host.advanced.audio")}
+                >
+                  {(
+                    Object.keys(
+                      AUDIO_QUALITY_CAPTIONS,
+                    ) as ScreenAudioQuality[]
+                  ).map((audioQuality) => (
+                    <Chip
+                      key={audioQuality}
+                      selected={
+                        resolveScreenAudioQuality(
+                          advancedQuality.screenAudioQuality,
+                        ) === audioQuality
+                      }
+                      disabled={phase === "starting" || switchingSource}
+                      title={t("host.audio.title", {
+                        label: t(AUDIO_QUALITY_CAPTIONS[audioQuality]),
+                        kbps: String(
+                          SCREEN_AUDIO_BITRATES[audioQuality] / 1_000,
+                        ),
+                      })}
+                      hint="hint-audio-quality"
+                      onClick={() => changeScreenAudioQuality(audioQuality)}
+                    >
+                      <Cap k={AUDIO_QUALITY_CAPTIONS[audioQuality]} />
+                      <small className="lr-audio-rate">
+                        {SCREEN_AUDIO_BITRATES[audioQuality] / 1_000}
+                      </small>
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+            </>}
+            technical={<>
+              <div className="lr-door-group">
+                <span
+                  className="lr-door-glyph"
+                >
+                  <Glyph name="branch" size={19} />
+                  <Cap k="host.advanced.route" />
+                </span>
+                <div className="lr-row-group">
+                  <SwitchItem
+                    checked={routePolicy.topologyOptimization}
+                    disabled={phase === "starting" || phase === "live"}
+                    onChange={(checked) =>
+                      changeRoutePolicy({ topologyOptimization: checked })
+                    }
+                    label={t("host.advanced.route.topo")}
+                    note={t("host.advanced.route.topoHint")}
+                    hint="hint-topology"
+                  />
+                  <SwitchItem
+                    checked={routePolicy.natPrediction}
+                    disabled={
+                      !natPredictionAvailable || phase === "starting" || phase === "live"
+                    }
+                    locked={!natPredictionAvailable}
+                    onChange={(checked) =>
+                      changeRoutePolicy({ natPrediction: checked })
+                    }
+                    label={t("host.advanced.route.natPrediction")}
+                    note={t(
+                      natPredictionAvailable
+                        ? "host.advanced.route.natPredictionHint"
+                        : "host.advanced.route.natPredictionUnavailable",
+                    )}
+                    hint={
+                      natPredictionAvailable ? "hint-nat-prediction" : "hint-nat-unavailable"
+                    }
+                  />
+                  <SwitchItem
+                    checked={routePolicy.peerOnly}
+                    disabled={
+                      !sfuAvailable || phase === "starting" || phase === "live"
+                    }
+                    locked={!sfuAvailable}
+                    onChange={(checked) =>
+                      changeRoutePolicy({ peerOnly: checked })
+                    }
+                    label={t("host.advanced.route.peerOnly")}
+                    note={t(
+                      sfuAvailable
+                        ? "host.advanced.route.peerOnlyHint"
+                        : "host.advanced.route.peerOnlyRequired",
+                    )}
+                    hint={sfuAvailable ? "hint-route-p2p" : "hint-route-p2p-required"}
+                  />
+                </div>
+              </div>
+              <div className="lr-door-group">
+                <span
+                  className="lr-door-glyph"
+                >
+                  <Glyph name="puzzle" size={19} />
+                  <Cap k="host.advanced.codec" />
+                </span>
+                <div
+                  className="lr-row-group"
+                  role="group"
+                  aria-label={t("host.advanced.codec")}
+                >
+                  {(["vp8", "auto", "h264"] as const).map((mode) => (
+                    <Chip
+                      key={mode}
+                      selected={displayedVideoCodecMode === mode}
+                      disabled={phase === "starting" || phase === "live"}
+                      title={
+                        mode === "auto"
+                          ? resolvedVideoCodec
+                            ? `${t("host.advanced.codec.auto")} · ${resolvedVideoCodec.toUpperCase()}`
+                            : `${t("host.advanced.codec.auto")} · ${t("host.advanced.codec.autoHint")}`
+                          : `${mode.toUpperCase()} · ${t(
+                              mode === "vp8"
+                                ? "host.advanced.codec.vp8Hint"
+                                : "host.advanced.codec.h264Hint",
+                            )}`
+                      }
+                      hint="hint-codec"
+                      onClick={() => changeVideoCodecMode(mode)}
+                    >
+                      {mode.toUpperCase()}
+                    </Chip>
+                  ))}
+                </div>
+              </div>
+            </>}
+          />
           <Couch
             view="host"
             host={{
@@ -3566,11 +4049,7 @@ export function HostPage({
               <div className="lr-row-group lr-group-actions lr-host-diagnostics-slot">
                 <Btn
                   icon="gauge"
-                  cap={
-                    showConnectionDetails
-                      ? "host.details.hide"
-                      : "host.details"
-                  }
+                  cap="host.details"
                   title={
                     showConnectionDetails
                       ? "host.details.hide"
@@ -3600,127 +4079,9 @@ export function HostPage({
                   onClick={() => setShowTopology((current) => !current)}
                 />
               </div>
-              {phase === "live" || phase === "starting" ? (
-                <div className="lr-row-group lr-group-actions lr-host-share-slot">
-                  {phase === "live" ? (
-                    <>
-                      <Btn
-                        icon={sharingPaused ? "play" : "pause"}
-                        cap={sharingPaused ? "host.resume" : "host.pause"}
-                        title={sharingPaused ? "host.resume" : "host.pause"}
-                        hint={sharingPaused ? "hint-resume" : "hint-pause"}
-                        draw="host-share-toggle"
-                        disabled={switchingSource || changingQuality}
-                        onClick={toggleSharingPause}
-                      />
-                      <Btn
-                        id="host-switch-source"
-                        icon="switchSource"
-                        cap={switchingSource ? "host.switching" : "host.switchSource"}
-                        title="host.switchSource"
-                        hint="hint-switch-source"
-                        disabled={switchingSource || changingQuality}
-                        onClick={() => void switchSource()}
-                      />
-                      <Btn
-                        icon="stop"
-                        tone="danger"
-                        cap="host.stop"
-                        title="host.stop"
-                        hint="hint-share-stop"
-                        onClick={() => endSharing({ key: "host.stopNotice" })}
-                      />
-                    </>
-                  ) : (
-                    <Btn
-                      id="host-cancel-share"
-                      icon="x"
-                      tone="danger"
-                      cap="host.cancelStart"
-                      title="host.cancelStart"
-                      hint="hint-close"
-                      onClick={() => endSharing({ key: "host.startCancelled" })}
-                    />
-                  )}
-                </div>
-              ) : null}
+
             </div>
           </Row>
-
-          {showConnectionDetails && details && (stream || nativeActive) ? (
-            <Row sub>
-              <div id="host-details-panel" style={{ display: "contents" }}>
-                <span
-                  className="lr-meter-tag"
-                >
-                  <Glyph name="share" size={17} />
-                  {vis ? null : (
-                    <span className="lr-cap">{t("stats.capture")}</span>
-                  )}
-                </span>
-                <div
-                  className="lr-meter"
-                  role="group"
-                  aria-label={t("host.captureAria")}
-                >
-                  <MetricCell label="stats.resolution" value={details.resolution ?? t("stats.unknown")} />
-                  <MetricCell label="stats.fps" value={details.frameRate ? `${details.frameRate.toFixed(0)} fps` : vis ? "—" : t("host.capture.fpsUnknown")} />
-                  <MetricCell label="stats.codec" value={resolvedVideoCodec?.toUpperCase() ?? (vis ? "—" : t("host.capture.codecPending"))} />
-                  <Tooltip toggleOnClick kind={details.hasAudio ? "hint-source-audio" : "no-audio"}
-                    text={vis ? undefined : t(details.hasAudio ? "host.capture.hasAudio" : "host.capture.noAudio")}
-                    tone={details.hasAudio ? "off" : "warn"}>
-                    <button type="button" className="lr-meter-cell"
-                      style={{ border: 0, color: "inherit", font: "inherit", textAlign: "start" }}
-                      aria-label={t(details.hasAudio ? "host.capture.hasAudio" : "host.capture.noAudio")}>
-                      <Glyph name={details.hasAudio ? "speaker" : "speakerOff"} size={16} />
-                      {!vis && <b>{t(details.hasAudio ? "host.capture.hasAudio" : "host.capture.noAudio")}</b>}
-                    </button>
-                  </Tooltip>
-                </div>
-              </div>
-            </Row>
-          ) : null}
-          {showConnectionDetails && viewerOverviewEntries.length > 0 ? (
-            <ViewerOverview
-              entries={viewerOverviewEntries}
-              selectedKey={selectedPawn}
-              onSelect={(peerId) =>
-                setSelectedPawn((current) =>
-                  current === peerId ? null : peerId,
-                )
-              }
-            />
-          ) : null}
-          {selectedViewer && selectedDetail ? (
-            <PawnDetail
-              pawnKey={selectedViewer.peerId}
-              name={selectedViewer.label}
-              route={selectedDetail.route}
-              metrics={selectedDetail.metrics}
-              direction={selectedDetail.direction}
-              tag={selectedDetail.tag}
-              error={selectedDetail.error}
-              expanded={metricsExpanded}
-              onToggleMetrics={setMetricsExpanded}
-              onClose={() => setSelectedPawn(null)}
-            />
-          ) : null}
-          {showTopology ? (
-            <Row sub>
-              <RouteTree
-                hostPeerId={hostPeerId}
-                hostIdentity={hostIdentity}
-                hostLabel={labeledHostPresence?.label ?? displayName}
-                viewers={viewers}
-                selectedPeerId={selectedPawn}
-                onSelectPeer={(peerId) =>
-                  setSelectedPawn((current) =>
-                    current === peerId ? null : peerId,
-                  )
-                }
-              />
-            </Row>
-          ) : null}
 
           {room ? (
             <Row label={t("host.policy")}>
@@ -3728,12 +4089,13 @@ export function HostPage({
                 <Btn
                   icon={copied ? "check" : "link"}
                   cap="common.copy"
-                  title={copied ? "common.copied" : "host.invite.copy"}
-                  hint="hint-copy-invite"
-                  hintTone={copied ? "live" : undefined}
+                  title={copied ? "common.copied" : roomLinkBlocked ? "host.invite.credentialRequired"
+                    : includeInviteCredential ? "host.invite.copy" : "host.invite.copyAddress"}
+                  hint={roomLinkBlocked ? "hint-policy-private" : "hint-copy-invite"}
+                  hintTone={copied ? "live" : roomLinkBlocked ? "warn" : undefined}
                   hintMotion={copied ? "still" : undefined}
-                  disabled={!room.inviteUrl || roomMutating}
-                  onClick={() => void copyInvite()}
+                  disabled={!roomLink || roomMutating || roomLinkBlocked}
+                  onClick={() => void copyRoomLink()}
                 />
                 <Btn
                   icon="refresh"
@@ -3753,20 +4115,35 @@ export function HostPage({
                   onClick={() => void changeViewerGrant("revoke")}
                 />
               </RowGroup>
-              {room.inviteUrl ? (
-                <Tooltip kind="hint-invite-link" text={room.inviteUrl} className="lr-invite-hint">
-                  <input
-                    className="lr-invite-url"
-                    type="text"
-                    dir="ltr"
-                    value={room.inviteUrl}
-                    readOnly
-                    spellCheck={false}
-                    aria-label={t("host.invite")}
-                    onFocus={(event) => event.currentTarget.select()}
-                  />
-                </Tooltip>
-              ) : null}
+              <div className="lr-invite-field">
+                {roomLink ? (
+                  <Tooltip kind="hint-invite-link" text={roomLink} className="lr-invite-hint">
+                    <input
+                      className="lr-invite-url"
+                      type="text"
+                      dir="ltr"
+                      value={roomLink}
+                      readOnly
+                      spellCheck={false}
+                      aria-label={t(includeInviteCredential ? "host.invite" : "host.invite.address")}
+                      onFocus={(event) => event.currentTarget.select()}
+                    />
+                  </Tooltip>
+                ) : null}
+                <span className="lr-row-group">
+                  <Glyph name="key" size={17} />
+                  <SwitchItem checked={includeInviteCredential} disabled={roomMutating}
+                    label={t("host.invite.includeCredential")} hint="hint-invite-link"
+                    note={t("host.invite.credentialHint")}
+                    onChange={checked => {
+                      copyRoomLinkRequestRef.current = null;
+                      setCopiedRoomLink(null);
+                      setIncludeInviteCredential(checked);
+                    }} />
+                </span>
+              </div>
+              {roomLinkBlocked ? <Pill icon="lock" tone="warn" comic="hint-policy-private"
+                label={t("host.invite.credentialRequired")} /> : null}
               <span className="lr-divider" aria-hidden="true" />
               <RowGroup>
                 <span
@@ -3929,310 +4306,80 @@ export function HostPage({
             </Row>
           ) : null}
 
-          <Row label={t("host.quality")}>
-            <RowGroup>
-              <QualityPresets selected={selectedQualityProfileId} busy={changingQuality}
-                disabled={phase === "starting" || switchingSource}
-                onSelect={id => void changeQuality({ ...QUALITY_PROFILES[id],
-                  screenAudioQuality: resolveScreenAudioQuality(advancedQualityRef.current.screenAudioQuality),
-                })} />
-            </RowGroup>
-            <span className="lr-spacer" />
-            {/* Keep the tooltip trigger compact when mobile rows stretch. */}
-            <span style={{ display: "flex", justifyContent: "flex-end" }}>
-              <Btn
-                icon="sliders"
-                busy={changingQuality}
-                cap="host.advanced"
-                title={showAdvanced ? "host.advanced.hide" : "host.advanced"}
-                hint={showAdvanced ? "hint-collapse" : "hint-advanced"}
-                tone={showAdvanced ? "on" : undefined}
-                expanded={showAdvanced}
-                controls="host-advanced-door"
-                onClick={() => setShowAdvanced((current) => !current)}
-              />
-            </span>
-          </Row>
-          <div
-            id="host-advanced-door"
-            className={`lr-door-reveal${showAdvanced ? " is-open" : ""}`}
-          >
-            <div>
-              {showAdvanced ? (
-                <div
-                  className="lr-door-body"
-                  role="group"
-                  aria-label={t("host.advanced")}
-                  aria-busy={changingQuality}
+          {showConnectionDetails && details && (stream || nativeActive) ? (
+            <Row sub>
+              <div id="host-details-panel" style={{ display: "contents" }}>
+                <span
+                  className="lr-meter-tag"
                 >
-                  <div className="lr-door-group">
-                    <span
-                      className="lr-door-glyph"
-                    >
-                      <Glyph name="expand" size={19} />
-                      <Cap k="host.advanced.resolution" />
-                    </span>
-                    <div
-                      className="lr-row-group"
-                      role="group"
-                      aria-label={t("host.advanced.resolution")}
-                    >
-                      {(
-                        Object.keys(QUALITY_RESOLUTIONS) as QualityResolution[]
-                      ).map((resolution) => (
-                        <Chip
-                          key={resolution}
-                          selected={advancedQuality.resolution === resolution}
-                          disabled={phase === "starting" || switchingSource}
-                          title={QUALITY_RESOLUTIONS[resolution].label}
-                          hint="hint-quality"
-                          onClick={() =>
-                            changeAdvancedQuality({ resolution })
-                          }
-                        >
-                          {QUALITY_RESOLUTIONS[resolution].label}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="lr-door-group">
-                    <span
-                      className="lr-door-glyph"
-                    >
-                      <Glyph name="frames" size={19} />
-                      <Cap k="host.advanced.framerate" />
-                    </span>
-                    <Tooltip kind="hint-metric-fps" text={vis ? undefined : t("host.advanced.framerate")} className="lr-slider-hint">
-                      <span className="lr-slider">
-                        <input
-                          type="range"
-                          min={15}
-                          max={60}
-                          step={5}
-                          value={advancedQuality.maxFramerate}
-                          disabled={phase === "starting" || switchingSource}
-                          aria-label={t("host.advanced.framerate")}
-                          onChange={(event) =>
-                            changeAdvancedQuality({
-                              maxFramerate: Number(event.target.value),
-                            })
-                          }
-                        />
-                        <output>{advancedQuality.maxFramerate} fps</output>
-                      </span>
-                      </Tooltip>
-                  </div>
-                  <div className="lr-door-group">
-                    <span
-                      className="lr-door-glyph"
-                    >
-                      <Glyph name="gauge" size={19} />
-                      <Cap k="host.advanced.bitrate" />
-                    </span>
-                    <Tooltip kind="hint-metric-bitrate" text={vis ? undefined : t("host.advanced.bitrate")} className="lr-slider-hint">
-                      <span className="lr-slider">
-                        <input
-                          type="range"
-                          min={2000000}
-                          max={12000000}
-                          step={500000}
-                          value={advancedQuality.maxBitrate}
-                          disabled={phase === "starting" || switchingSource}
-                          aria-label={t("host.advanced.bitrate")}
-                          onChange={(event) =>
-                            changeAdvancedQuality({
-                              maxBitrate: Number(event.target.value),
-                            })
-                          }
-                        />
-                        <output>
-                          {(advancedQuality.maxBitrate / 1_000_000).toFixed(1)}{" "}
-                          Mbps
-                        </output>
-                      </span>
-                      </Tooltip>
-                  </div>
-                  <div className="lr-door-group">
-                    <span
-                      className="lr-door-glyph"
-                    >
-                      <Glyph name="mountain" size={19} />
-                      <Cap k="host.advanced.preference" />
-                    </span>
-                    <div
-                      className="lr-row-group"
-                      role="group"
-                      aria-label={t("host.advanced.preference")}
-                    >
-                      {(
-                        Object.keys(
-                          PREFERENCE_PRESENTATION,
-                        ) as DegradationPreference[]
-                      ).map((preference) => (
-                        <Chip
-                          key={preference}
-                          name="degradationPreference"
-                          value={preference}
-                          selected={
-                            advancedQuality.degradationPreference === preference
-                          }
-                          disabled={phase === "starting" || switchingSource}
-                          title={`${t(DEGRADATION_PREFERENCE_KEYS[preference])} · ${t(PREFERENCE_PRESENTATION[preference].hint)}`}
-                          hint={preference === "maintain-resolution" ? "hint-prefer-resolution" : preference === "maintain-framerate" ? "hint-prefer-framerate" : "hint-degrade-pref"}
-                          onClick={() =>
-                            changeAdvancedQuality({
-                              degradationPreference: preference,
-                            })
-                          }
-                        >
-                          <Glyph
-                            name={PREFERENCE_PRESENTATION[preference].icon}
-                            size={18}
-                          />
-                          <Cap k={DEGRADATION_PREFERENCE_KEYS[preference]} />
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="lr-door-group">
-                    <span
-                      className="lr-door-glyph"
-                    >
-                      <Glyph name="speaker" size={19} />
-                      <Cap k="host.advanced.audio" />
-                    </span>
-                    <div
-                      className="lr-row-group"
-                      role="group"
-                      aria-label={t("host.advanced.audio")}
-                    >
-                      {(
-                        Object.keys(
-                          AUDIO_QUALITY_CAPTIONS,
-                        ) as ScreenAudioQuality[]
-                      ).map((audioQuality) => (
-                        <Chip
-                          key={audioQuality}
-                          selected={
-                            resolveScreenAudioQuality(
-                              advancedQuality.screenAudioQuality,
-                            ) === audioQuality
-                          }
-                          disabled={phase === "starting" || switchingSource}
-                          title={t("host.audio.title", {
-                            label: t(AUDIO_QUALITY_CAPTIONS[audioQuality]),
-                            kbps: String(
-                              SCREEN_AUDIO_BITRATES[audioQuality] / 1_000,
-                            ),
-                          })}
-                          hint="hint-audio-quality"
-                          onClick={() => changeScreenAudioQuality(audioQuality)}
-                        >
-                          <Cap k={AUDIO_QUALITY_CAPTIONS[audioQuality]} />
-                          <small className="lr-audio-rate">
-                            {SCREEN_AUDIO_BITRATES[audioQuality] / 1_000}
-                          </small>
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
-                  <div className="lr-door-group">
-                    <span
-                      className="lr-door-glyph"
-                    >
-                      <Glyph name="branch" size={19} />
-                      <Cap k="host.advanced.route" />
-                    </span>
-                    <div className="lr-row-group">
-                      <SwitchItem
-                        checked={routePolicy.topologyOptimization}
-                        disabled={phase === "starting" || phase === "live"}
-                        onChange={(checked) =>
-                          changeRoutePolicy({ topologyOptimization: checked })
-                        }
-                        label={t("host.advanced.route.topo")}
-                        note={t("host.advanced.route.topoHint")}
-                        hint="hint-topology"
-                      />
-                      <SwitchItem
-                        checked={routePolicy.natPrediction}
-                        disabled={
-                          !natPredictionAvailable || phase === "starting" || phase === "live"
-                        }
-                        locked={!natPredictionAvailable}
-                        onChange={(checked) =>
-                          changeRoutePolicy({ natPrediction: checked })
-                        }
-                        label={t("host.advanced.route.natPrediction")}
-                        note={t(
-                          natPredictionAvailable
-                            ? "host.advanced.route.natPredictionHint"
-                            : "host.advanced.route.natPredictionUnavailable",
-                        )}
-                        hint={
-                          natPredictionAvailable ? "hint-nat-prediction" : "hint-nat-unavailable"
-                        }
-                      />
-                      <SwitchItem
-                        checked={routePolicy.peerOnly}
-                        disabled={
-                          !sfuAvailable || phase === "starting" || phase === "live"
-                        }
-                        locked={!sfuAvailable}
-                        onChange={(checked) =>
-                          changeRoutePolicy({ peerOnly: checked })
-                        }
-                        label={t("host.advanced.route.peerOnly")}
-                        note={t(
-                          sfuAvailable
-                            ? "host.advanced.route.peerOnlyHint"
-                            : "host.advanced.route.peerOnlyRequired",
-                        )}
-                        hint={sfuAvailable ? "hint-route-p2p" : "hint-route-p2p-required"}
-                      />
-                    </div>
-                  </div>
-                  <div className="lr-door-group">
-                    <span
-                      className="lr-door-glyph"
-                    >
-                      <Glyph name="puzzle" size={19} />
-                      <Cap k="host.advanced.codec" />
-                    </span>
-                    <div
-                      className="lr-row-group"
-                      role="group"
-                      aria-label={t("host.advanced.codec")}
-                    >
-                      {(["vp8", "auto", "h264"] as const).map((mode) => (
-                        <Chip
-                          key={mode}
-                          selected={displayedVideoCodecMode === mode}
-                          disabled={phase === "starting" || phase === "live"}
-                          title={
-                            mode === "auto"
-                              ? resolvedVideoCodec
-                                ? `${t("host.advanced.codec.auto")} · ${resolvedVideoCodec.toUpperCase()}`
-                                : `${t("host.advanced.codec.auto")} · ${t("host.advanced.codec.autoHint")}`
-                              : `${mode.toUpperCase()} · ${t(
-                                  mode === "vp8"
-                                    ? "host.advanced.codec.vp8Hint"
-                                    : "host.advanced.codec.h264Hint",
-                                )}`
-                          }
-                          hint="hint-codec"
-                          onClick={() => changeVideoCodecMode(mode)}
-                        >
-                          {mode.toUpperCase()}
-                        </Chip>
-                      ))}
-                    </div>
-                  </div>
+                  <Glyph name="share" size={17} />
+                  {vis ? null : (
+                    <span className="lr-cap">{t("stats.capture")}</span>
+                  )}
+                </span>
+                <div
+                  className="lr-meter"
+                  role="group"
+                  aria-label={t("host.captureAria")}
+                >
+                  <MetricCell label="stats.resolution" value={details.resolution ?? t("stats.unknown")} />
+                  <MetricCell label="stats.fps" value={details.frameRate ? `${details.frameRate.toFixed(0)} fps` : vis ? "—" : t("host.capture.fpsUnknown")} />
+                  <MetricCell label="stats.codec" value={resolvedVideoCodec?.toUpperCase() ?? (vis ? "—" : t("host.capture.codecPending"))} />
+                  <Tooltip toggleOnClick kind={details.hasSourceAudio ? "hint-source-audio" : "no-audio"}
+                    text={vis ? undefined : t(details.hasSourceAudio ? "host.capture.hasAudio" : "host.capture.noAudio")}
+                    tone="off">
+                    <button type="button" className="lr-meter-cell"
+                      style={{ border: 0, color: "inherit", font: "inherit", textAlign: "start" }}
+                      aria-label={t(details.hasSourceAudio ? "host.capture.hasAudio" : "host.capture.noAudio")}>
+                      <Glyph name={details.hasSourceAudio ? "speaker" : "speakerOff"} size={16} />
+                      {!vis && <b>{t(details.hasSourceAudio ? "host.capture.hasAudio" : "host.capture.noAudio")}</b>}
+                    </button>
+                  </Tooltip>
                 </div>
-              ) : null}
-            </div>
-          </div>
-
+              </div>
+            </Row>
+          ) : null}
+          {showConnectionDetails && viewerOverviewEntries.length > 0 ? (
+            <ViewerOverview
+              entries={viewerOverviewEntries}
+              selectedKey={selectedPawn}
+              onSelect={(peerId) =>
+                setSelectedPawn((current) =>
+                  current === peerId ? null : peerId,
+                )
+              }
+            />
+          ) : null}
+          {selectedViewer && selectedDetail ? (
+            <PawnDetail
+              pawnKey={selectedViewer.peerId}
+              name={selectedViewer.label}
+              route={selectedDetail.route}
+              metrics={selectedDetail.metrics}
+              direction={selectedDetail.direction}
+              tag={selectedDetail.tag}
+              error={selectedDetail.error}
+              expanded={metricsExpanded}
+              onToggleMetrics={setMetricsExpanded}
+              onClose={() => setSelectedPawn(null)}
+            />
+          ) : null}
+          {showTopology ? (
+            <Row sub>
+              <RouteTree
+                hostPeerId={hostPeerId}
+                hostIdentity={hostIdentity}
+                hostLabel={labeledHostPresence?.label ?? displayName}
+                viewers={viewers}
+                selectedPeerId={selectedPawn}
+                onSelectPeer={(peerId) =>
+                  setSelectedPawn((current) =>
+                    current === peerId ? null : peerId,
+                  )
+                }
+              />
+            </Row>
+          ) : null}
         </div>
       </main>
     </div>

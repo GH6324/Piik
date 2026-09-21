@@ -23,6 +23,9 @@ export type { HintKind, HintScene };
 export const HINT_KINDS: readonly HintKind[] = [
   "hint-share-start",
   "hint-share-stop",
+  "hint-microphone-on",
+  "hint-microphone-off",
+  "hint-microphone-volume",
   "hint-pause",
   "hint-resume",
   "hint-switch-source",
@@ -79,6 +82,7 @@ export const HINT_KINDS: readonly HintKind[] = [
   "hint-client-local",
   "hint-client-site",
   "hint-capture-browser",
+  "hint-capture-camera",
   "hint-capture-window",
   "hint-capture-display",
   "hint-local-play",

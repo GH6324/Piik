@@ -1,24 +1,46 @@
 # Current TODO Ledger
 
-Last reviewed: 2026-09-20
+Last reviewed: 2026-09-21
 
 Only **Now** is executable. Product modules own behavior; Git/PRs own completed
 history. A parked idea is not implementation authority.
 
 ## Now
 
-- [ ] **Review camera and Host microphone in the separate capture candidate.**
-  Keep device selection in the existing source/settings surfaces. Finish control
-  grouping, dark-theme feedback and microphone volume presentation; verify native
-  mixing, device replacement and mobile camera behavior before acceptance.
-  These features are excluded from the bug-fix release.
+- [ ] **Complete manual accessible-name review.** Verify the empty video's
+  screen-reader output: Chromium exposes an unavailable-media
+  description despite the literal shared-picture label and no media error. Also
+  review accessible naming on disabled tooltip wrappers and the UI catalogue's
+  paired-character example; automated checks leave those for manual review.
 - [ ] **Refine the isolated room-interaction prototype.** Review chat, optional
   danmaku and participant-targeted reactions for usability, placement and intended
   cross-view synchronization. Preserve room authorization and media-route owners.
+  Accept its combined layout: sharing settings with the picture, wide-screen chat
+  beside participants, stacked chat on narrow screens and room actions before
+  diagnostics. Check its theater chat entry and participant menu on real devices;
+  keep chat available independently of sharing.
+  Retain current room creation: the first share creates a room, an existing room
+  can resume, and stopping media keeps the opted-in interaction session. Do not
+  add visit-triggered creation or a separate pre-share room-creation entry.
   This experiment does not authorize integration or publication.
 
 ## Awaiting Device Or Reporter Evidence
 
+- [ ] **Camera and Host microphone device coverage.** The owner accepted the
+  sharing layout and authorized release with these physical limits recorded.
+  Verify real audio levels/echo, multiple-device replacement and native mixing on
+  target systems, plus phone camera permission, orientation and background use.
+  Keep the existing capture and route owners. The
+  [capture assessment](./research/camera-and-microphone.md) owns behavior and
+  separates bounded Windows/browser checks from untested device combinations.
+- [ ] **App public-invitation startup field acceptance.** Retest the frequent
+  creation-failure report and the earlier
+  [#396 timeout](https://github.com/TNTcraftHIM/Piik/issues/396#issuecomment-5691465700)
+  with the updated App. A controlled UDP-blocked/TCP-available reproduction confirms
+  a dependency configuration defect; the existing tunnel now uses cloudflared's
+  bounded protocol fallback. [Runtime evidence](./research/cross-platform-client-runtime.md#public-invitation-startup)
+  separates this fix from DNS, provider and remote access failures. The reporting
+  environments still need version and diagnostic evidence before assigning a cause.
 - [ ] **Interruption during established viewing.** A Viewer reportedly returns
   to P2P connecting after watching for a while. Native receiver renegotiation,
   retired event delivery and SFU replacement have locally reproduced defects
@@ -27,9 +49,11 @@ history. A parked idea is not implementation authority.
   report when present. The existing five-second Viewer membership grace during
   signaling loss is unchanged. This is distinct from the first-frame report below.
 - [ ] **Windows 11 capture border remains visible.** Identify the App/Browser
-  capture path, Windows build and capture-border permission result. A local
-  Windows 11 request succeeded; the reported failure remains unconfirmed. Check
-  system consent and other active captures before changing the WGC path.
+  capture path, Windows build and capture-border permission result. Local checks
+  reproduced a border surviving forced process termination; parent cancellation
+  now uses bounded graceful retirement. [Capture evidence](./research/native-client-lifecycle.md#windows-capture-borders)
+  verifies the repair and concurrent-capture behavior on Windows 11. The
+  reporter's cause remains unconfirmed; check consent and other active captures.
 - [ ] **Brief connection followed by repeated Viewer loss on v1.5.0.** One
   Viewer reportedly drops just after connection details appear, while other
   Viewers work; App public-link mode is suspected. Check signaling, first-frame
@@ -37,23 +61,18 @@ history. A parked idea is not implementation authority.
   reproduction establishes one premature candidate replacement; the affected
   environment and paired diagnostics are still unavailable, so the reporting
   machine's cause remains unconfirmed.
-- [ ] **App source-discovery field acceptance.** Retest the missing-window report
-  with the current App and page. Obtain OS/browser, version and paired Debug
-  reports to distinguish discovery, capture capability and enumeration failures.
-  Local permission and recovery checks do not establish the reporting machine's
-  cause.
+- [ ] **App discovery and share-start field acceptance.** Retest the missing-window
+  report, an unreachable App despite its process running, and generic share-start
+  failure with the current App and page. OS/browser, version, selected source and
+  paired Debug reports are still unavailable. Distinguish site authorization,
+  browser permission, control capacity, enumeration and capture-start failures;
+  local permission and recovery checks do not establish the reporters' causes.
 - [ ] **Windows 32-bit candidate acceptance.** Verify the isolated
   `spike/windows-x86-capture` candidate's launch, capture/audio, memory pressure,
   source replacement and update links on a 32-bit Windows device. WOW64
   Host/media checks establish only that environment. Reconcile its scoped
   SDK/toolchain and atomic-alignment changes with current main when accepted;
   the experiment is not part of this maintenance release.
-- [ ] **Public invitation startup timeout.** The reporter in
-  [#396](https://github.com/TNTcraftHIM/Piik/issues/396#issuecomment-5691465700)
-  confirmed Local startup is fixed, but separately reported that the public
-  invitation service did not connect within 30 seconds. Trace tunnel startup,
-  network reachability and the existing timeout/error feedback using a current
-  Debug report; the Local fix does not establish this separate failure's cause.
 - [ ] **Windows launcher exit after opening the page.** A user reports that the
   mode-selection page opens, then the App console reports
   `Piik App could not open its launcher: exit status 0xc0000005`.
@@ -129,3 +148,10 @@ not establish better connection success or speed; this note adds no retry policy
     and retain Gitee; do not add a self-hosted mirror. Chrome still blocks the
     Gitee attachment when Referer is removed. Reopen for new evidence or a
     provider review; the warning remains unresolved.
+10. **4K in advanced sharing settings.** Deferred until after the current capture
+    maintenance phase. Add 3840x2160 without changing the default or recommended
+    presets. Extend the existing capture, decode and relay bounds together; verify
+    H.264 level negotiation for 4K at 60 fps. Current strict quality messages reject
+    `2160p`, so preserve published Browser/App/Server compatibility through explicit
+    receiving-end support before exposing or sending the new setting. Include
+    source replacement, lower outputs and resource limits in acceptance.

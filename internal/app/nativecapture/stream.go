@@ -298,7 +298,22 @@ func StartSystemAudio(parent context.Context, executable string) (*Stream, error
 	})
 }
 
+func StartMicrophone(parent context.Context, executable, deviceID string) (*Stream, error) {
+	if !ValidDeviceID(deviceID) {
+		return nil, errors.New("microphone device is invalid")
+	}
+	arguments := []string{"--capture-microphone"}
+	if deviceID != "" {
+		arguments = append(arguments, "--device", deviceID)
+	}
+	return startAudioStreamWithTimeout(parent, executable, arguments, time.Minute)
+}
+
 func startAudioStream(parent context.Context, executable string, arguments []string) (*Stream, error) {
+	return startAudioStreamWithTimeout(parent, executable, arguments, probeTimeout)
+}
+
+func startAudioStreamWithTimeout(parent context.Context, executable string, arguments []string, timeout time.Duration) (*Stream, error) {
 	if parent == nil {
 		parent = context.Background()
 	}
@@ -315,7 +330,7 @@ func startAudioStream(parent context.Context, executable string, arguments []str
 		}
 		ready <- validateAudioReadyFrame(frame)
 	}()
-	timer := time.NewTimer(probeTimeout)
+	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 	select {
 	case readyErr := <-ready:
@@ -395,7 +410,12 @@ func startStreamWithEnvironment(
 	if executable == "" {
 		return nil, errors.New("native capture process is unavailable")
 	}
-	ctx, cancel := context.WithCancel(parent)
+	if err := parent.Err(); err != nil {
+		return nil, err
+	}
+	// Parent cancellation requests the same bounded Q/Close sequence as an
+	// explicit stop. Killing first can leave platform capture state behind.
+	ctx, cancel := context.WithCancel(context.WithoutCancel(parent))
 	started := time.Now()
 	// A diagnostic-only process label correlates stderr while old/new captures overlap.
 	captureID := strconv.FormatInt(started.UnixNano(), 36)
@@ -444,8 +464,10 @@ func startStreamWithEnvironment(
 		logger: logger,
 		ctx:    ctx,
 	}
+	stopParent := context.AfterFunc(parent, func() { _ = stream.Close() })
 	go func() {
 		waitErr := command.Wait()
+		stopParent()
 		_ = trace.Close()
 		logCaptureFailure(ctx, waitErr, command.ProcessState.ExitCode(), stderr.Bytes())
 		logger.DebugContext(ctx, "piik-client", "event", "capture-process-ended", "mode", mode,

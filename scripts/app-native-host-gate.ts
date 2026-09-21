@@ -126,12 +126,16 @@ function run(
   args: string[],
   cwd = ROOT,
   environment: NodeJS.ProcessEnv = process.env,
+  timeoutMs = 120_000,
 ): string {
   const result = spawnSync(command, args, {
     cwd,
     encoding: "utf8",
     stdio: ["ignore", "pipe", "pipe"],
     env: environment,
+    timeout: timeoutMs,
+    killSignal: "SIGKILL",
+    windowsHide: true,
   });
   if (result.error) throw result.error;
   if (result.status !== 0) {
@@ -163,6 +167,8 @@ async function stopChild(child: ChildProcessWithoutNullStreams | ChildProcess | 
     if (process.platform === "win32" && child.pid !== undefined) {
       spawnSync("taskkill.exe", ["/PID", String(child.pid), "/T", "/F"], {
         stdio: "ignore",
+        timeout: 5_000,
+        windowsHide: true,
       });
       try {
         await waitForChild(child, 2_000);
@@ -299,8 +305,8 @@ async function runRemotePeerGate(
   const remotePath = `/tmp/piik-peer-gate-${randomBytes(8).toString("hex")}`;
   const transportOptions = remoteTransportOptions(options);
   try {
-    run(scp, [...transportOptions, binary, `${destination}:${remotePath}`]);
-    run(ssh, [...transportOptions, destination, "chmod", "700", remotePath]);
+    run(scp, [...transportOptions, binary, `${destination}:${remotePath}`], ROOT, process.env, 30_000);
+    run(ssh, [...transportOptions, destination, "chmod", "700", remotePath], ROOT, process.env, 15_000);
     const remote = spawn(
       ssh,
       [
@@ -367,7 +373,7 @@ async function runRemotePeerGate(
     };
   } finally {
     try {
-      run(ssh, [...transportOptions, destination, "rm", "-f", remotePath]);
+      run(ssh, [...transportOptions, destination, "rm", "-f", remotePath], ROOT, process.env, 10_000);
     } catch {
       // The temporary binary is harmless if an already-closed SSH session
       // prevents cleanup; the gate never places it in the repository.
@@ -425,7 +431,7 @@ export async function startSourceBrowser(
   child: ChildProcessWithoutNullStreams;
   cdp: CdpConnection;
 }> {
-  const child = launchChrome(chromePath, debugPort, profile, [
+  const child = await launchChrome(chromePath, debugPort, profile, [
     "--no-first-run", "--no-default-browser-check",
     "--disable-extensions", "--disable-logging",
     "--disable-background-timer-throttling",
@@ -435,12 +441,17 @@ export async function startSourceBrowser(
   ]);
   child.stdout.resume();
   child.stderr.resume();
-  const version = await waitForVersion(debugPort, child);
-  const cdp = await CdpConnection.connect(
-    version.webSocketDebuggerUrl,
-    Date.now() + 10_000,
-  );
-  return { child, cdp };
+  try {
+    const version = await waitForVersion(debugPort, child);
+    const cdp = await CdpConnection.connect(
+      version.webSocketDebuggerUrl,
+      Date.now() + 10_000,
+    );
+    return { child, cdp };
+  } catch (error) {
+    await cleanupRun({ chrome: child, cdp: null, native: null, server: null, profile: null, ports: [debugPort] });
+    throw error;
+  }
 }
 
 export async function closeSourceBrowser(
@@ -461,7 +472,7 @@ export async function closeSourceBrowser(
 
 export async function waitForCaptureWindow(captureBinary: string): Promise<void> {
   await waitForValue(
-    async () => JSON.parse(run(captureBinary, ["--list"])) as Array<{
+    async () => JSON.parse(run(captureBinary, ["--list"], ROOT, process.env, 5_000)) as Array<{
       title?: unknown;
     }>,
     (targets) => targets.some((target) =>
@@ -746,7 +757,7 @@ async function main(): Promise<void> {
       15_000,
     );
     stage = "host-browser";
-    chrome = launchChrome(chromePath, debugPort, profile, [
+    chrome = await launchChrome(chromePath, debugPort, profile, [
       "--no-first-run", "--no-default-browser-check",
       "--disable-extensions", "--disable-logging",
       "--disable-background-timer-throttling",
@@ -801,6 +812,7 @@ async function main(): Promise<void> {
       5_000,
     );
     stage = "pre-share-codec";
+    await clickHostControl(cdp, host, `document.querySelector('.lr-sharing-technical > summary')`);
     await clickHostControl(cdp, host,
       `([...document.querySelectorAll('button.lr-chip')].find((button) =>
         button.textContent?.trim() === ${JSON.stringify(requestedCodec.toUpperCase())}))`,
@@ -956,6 +968,9 @@ async function main(): Promise<void> {
         Date.now() + 5_000,
       );
       stage = "native-quality-presets";
+      await clickHostControl(cdp, host,
+        `document.querySelector('button[aria-controls="host-advanced-door"]')`,
+      );
       for (const [index, width, height] of [[0, 1280, 720], [1, 1920, 1080]] as const) {
         await clickHostControl(cdp, host, `document.querySelectorAll('button.lr-tile')[${index}]`);
         await waitForValue(
@@ -974,12 +989,6 @@ async function main(): Promise<void> {
         result.livePresetChanges += 1;
       }
       stage = "native-quality-controls";
-      await evaluate<void>(
-        cdp,
-        host,
-        `document.querySelector('button[aria-controls="host-advanced-door"]')?.click()`,
-        Date.now() + 5_000,
-      );
       await waitForValue(
         (deadline) => evaluate<boolean>(
           cdp!,
@@ -1190,7 +1199,7 @@ async function main(): Promise<void> {
             Date.now() + 5_000,
           );
           await waitForValue((deadline) => evaluate<boolean>(cdp!, host,
-            `Boolean(document.querySelector('#host-advanced-door .lr-door-body[aria-busy="true"]'))`,
+            `Boolean(document.querySelector('#host-advanced-door .lr-sharing-panel[aria-busy="true"]'))`,
             deadline,
           ), Boolean, 5_000);
         } finally {
@@ -1219,7 +1228,7 @@ async function main(): Promise<void> {
             })()`, deadline,
           ), Boolean, 20_000);
           await waitForValue((deadline) => evaluate<boolean>(cdp!, host,
-            `Boolean(document.querySelector('#host-advanced-door .lr-door-body[aria-busy="false"]'))`,
+            `Boolean(document.querySelector('#host-advanced-door .lr-sharing-panel[aria-busy="false"]'))`,
             deadline,
           ), Boolean, 5_000);
         }
@@ -1261,11 +1270,8 @@ async function main(): Promise<void> {
         10_000,
       );
       const framesBeforeSourceChange = resumed.frames;
-      await evaluate<void>(
-        cdp,
-        host,
-        `document.querySelector('[role="dialog"] button[data-native-source]')?.click()`,
-        Date.now() + 5_000,
+      await selectNativeSource(cdp, host, sourceKind,
+        sourceKind === "window" ? SOURCE_TITLE : undefined,
       );
       stage = "native-source-replaced";
       result.nativeSourceChanged = await waitForValue(
