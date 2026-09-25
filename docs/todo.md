@@ -60,6 +60,12 @@ history. A parked idea is not implementation authority.
   candidate-queue rejection defect is repaired and regression-tested; current
   STUN reachability and route-lifecycle checks do not establish these reporters'
   causes. HTTP 1033 belongs to the public-link item below, before media routing.
+  A complete v1.6.3 App report confirms four candidate timeouts without Native
+  share-start or any SDP/ICE signaling. Browser diagnostics are needed to
+  locate prepare delivery, peer initialization or the first offer send; these
+  attempts do not establish an ICE/NAT failure. Locally reproduced Browser
+  construction failures now release owned tracks and reach the existing
+  preparation/recovery owner, but are not proved to be this reporter's cause.
 - [ ] **Camera and Host microphone device coverage.** The owner accepted the
   sharing layout and authorized release with these physical limits recorded.
   Verify real audio levels/echo, multiple-device replacement and native mixing on
@@ -101,20 +107,18 @@ history. A parked idea is not implementation authority.
   machine's cause remains unconfirmed.
 - [ ] **App discovery and share-start field acceptance.** Retest the missing-window
   report, an unreachable App despite its process running, and generic share-start
-  failure with the current App and page. OS/browser, version, selected source and
-  paired Debug reports are still unavailable. Distinguish site authorization,
-  browser permission, control capacity, enumeration and capture-start failures;
-  local permission and recovery checks do not establish the reporters' causes.
-  Manual H264 returning immediately to idle also needs reporter diagnostics;
-  bounded selection past an unusable hardware encoder is locally verified.
-  Startup failure is reported again on the latest release without a known codec.
-  Auto selection now retains proved H264 if the optional VP8 comparison times
-  out; this confirmed selection defect does not establish the reporter's cause.
-  A separate v1.6.1 App/Chrome report lists Window/Screen sources, then waits
-  and returns to idle with a share-start error after selection. Its codec is
-  unknown; similarity to the H264 symptom does not establish the same cause.
-  Candidate rejection no longer aborts the local media bridge; validate on the
-  affected machine before attributing its startup failure to that defect.
+  failure. Distinguish site authorization, browser permission, control capacity,
+  enumeration and capture startup. A complete v1.6.3 Windows report confirms
+  Auto/Window/1080p30 balanced startup: hardware MFT event timeout, then software
+  probing, then cancellation because capture readiness did not arrive. The stall
+  within probing, teardown or WGC initialization remains unknown; one initial
+  VP8 statistics sample cannot establish its complete output history. Auto now
+  skips the redundant comparison when only VP8 remains. Injected unavailable
+  hardware and exhausted-probe-budget cases both capture and decode locally;
+  the affected machine still needs same-source Auto versus explicit VP8
+  acceptance. Do not extend deadlines without identifying the blocked stage.
+  Existing H264-retention/ICE-candidate repairs do not establish this cause; other
+  discovery/manual-H264 reports still need paired App/Browser diagnostics.
 - [ ] **Share ends after entering a game.** Screen sharing reportedly works
   until entering a game freezes the picture, followed seconds later by share
   termination. Version, capture path, codec and matched diagnostics are unknown.
