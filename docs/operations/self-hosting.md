@@ -76,6 +76,11 @@ working directory. A blank `SITE_ACCESS_PASSWORD` allows
 entry without a site passphrase; enter a passphrase to require one.
 Room invitations and access settings still apply.
 
+`PUBLIC_BASE_URL` must match the address opened in the browser, including HTTPS
+and any non-default port. Leave `ALLOWED_ORIGINS` unset or empty for this single
+address. An existing non-empty value overrides that default; a stale value can
+cause [403 when creating a room](../guide/troubleshooting.md#room-creation-returns-403).
+
 `MAX_VIEWERS_PER_ROOM` sets the room's Viewer limit, excluding the Host. Choose
 `1..20` and restart to apply it. More Viewers can require more network and relay
 resources. See [room capacity](../standards/configuration.md#room-capacity)
@@ -95,6 +100,12 @@ share.example.com {
 
 Reload Caddy. It obtains and renews the certificate automatically when DNS points
 to the server and TCP 80/443 are reachable. See [Caddy's HTTPS proxy guide](https://caddyserver.com/docs/quick-starts/reverse-proxy#https).
+
+For nginx, see the [configuration example](../../deploy/nginx/piik.conf.example).
+If you copied an older example, change its `Permissions-Policy` to
+`camera=(self), microphone=(self), geolocation=()` and reload nginx. Empty
+camera/microphone allowlists prevent Browser capture even when the user grants
+permission; `self` allows this site to request access.
 
 ### 3. Open the ports and verify
 

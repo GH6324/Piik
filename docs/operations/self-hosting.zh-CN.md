@@ -71,6 +71,10 @@ SITE_ACCESS_PASSWORD=
 `SITE_ACCESS_PASSWORD` 留空时，进入站点无须口令；
 如需设置口令，填写你想使用的口令即可。房间邀请与加入权限仍由房主管理。
 
+`PUBLIC_BASE_URL` 应与浏览器访问的网址一致，包括 HTTPS 和非默认端口。
+只使用这个地址时，`ALLOWED_ORIGINS` 不设置或留空即可；已有的非空值会覆盖此默认值，
+旧地址未更新可能导致[创建房间返回 403](../guide/troubleshooting.zh-CN.md#创建房间返回-403)。
+
 `MAX_VIEWERS_PER_ROOM` 可设置每房观众上限，不含房主，支持 `1..20`，修改后重启生效。
 人数越多，对网络和转发资源的需求也可能增加。默认值及 App 房间的区别见
 [人数限制](../standards/configuration.md#room-capacity)。
@@ -88,6 +92,10 @@ share.example.com {
 
 重新加载 Caddy。域名解析正确且 TCP 80/443 可访问时，它会自动申请和续期证书。
 具体操作见 [Caddy 的 HTTPS 代理说明](https://caddyserver.com/docs/quick-starts/reverse-proxy#https)。
+
+nginx 可参考[配置示例](../../deploy/nginx/piik.conf.example)。如果沿用了旧示例，请将
+`Permissions-Policy` 改为 `camera=(self), microphone=(self), geolocation=()`，然后重新加载 nginx。
+摄像头和麦克风的空白允许列表会阻止浏览器采集，即使用户已授权；`self` 允许本站请求访问。
 
 ### 3. 放行端口并检查
 

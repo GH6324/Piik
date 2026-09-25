@@ -217,6 +217,7 @@ export class BrowserEncodingPool {
             member.encoded.select(pending.group.producer.id, () => pending.group.producer.requestKey(), () => {
               if (member.disposed || member.pending !== pending) return;
               member.current = pending.group;
+              pending.group.producer.beginOutput();
               member.pending = undefined;
               member.encoderStats = createStatsAccumulator(); member.previousOutput = undefined;
               member.carrier = true;
@@ -247,9 +248,10 @@ export class BrowserEncodingPool {
         }
         continue;
       }
-      // An unshared pipeline already has the right owner: let its native
-      // encoder adapt to the updated budget instead of recreating it.
-      if (current && this.compatible(member, current) && !this.references(current).some((other) => other !== member)) continue;
+      // A short output-rate spike is not new demand. Keep the rate owner and
+      // let its native encoder adapt unless another child needs a higher rate.
+      if (current && this.compatible(member, current) && !this.references(current).some((other) =>
+        this.compatible(other, current) && other.budget !== undefined && other.budget > member.budget!)) continue;
       const candidates = [...this.groups].filter((group) => this.compatible(member, group));
       let target = candidates.find((group) => group !== current && fits(group.output, member.budget) &&
         (!current || group.budget === member.budget));

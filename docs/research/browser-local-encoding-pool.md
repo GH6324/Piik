@@ -93,6 +93,64 @@ maximum queued service; reverse feedback is unshaped. They are not a model of
 public NAT, geographic RTT or every congestion/loss pattern. Reduced quality
 and temporary stalls under real constraints remain possible.
 
+### Balanced Startup And Recovery
+
+Serial Chrome 152 checks on 2026-09-25 reproduced two composition defects in
+VP8, 1080p30, motion + balanced, with a 5 Mbps ceiling. A forward-only UDP
+shaper limited A to 400 kbps; B remained unshaped. These synthetic-source runs
+establish delivered dimensions and recovery, not game perceptual quality or the
+cause of reports without diagnostics.
+
+- A group's local warmup spent its five-frame startup protection before any
+  child published its frames. Restoring balanced then allowed native initial
+  downscaling against an untrained allocation. Protection now begins at the
+  first committed outgoing frame; paused/empty frames cannot spend it and later
+  children cannot reset it. The frame threshold and polling cadence are unchanged.
+- The synthetic carrier used motion content intent. Chromium classifies that
+  as realtime video, without the default screen-content ALR probing. After a
+  producer adapted downward, low real output could leave the outgoing native
+  bandwidth estimate slow to recover. The carrier now uses detail once at
+  construction, selecting the framework's screen-content behavior. The real
+  producer retains motion and the Host's degradation preference.
+
+Pinned WebRTC explains both boundaries: starting the quality scaler
+[restarts initial frame dropping](https://webrtc.googlesource.com/src/+/6f37672d358475cd17544121a12494da454d85fb/video/adaptation/video_stream_encoder_resource_manager.cc#230);
+[content hints select the screencast option](https://webrtc.googlesource.com/src/+/6f37672d358475cd17544121a12494da454d85fb/pc/rtp_sender.cc#1423),
+which selects [ALR probing configuration](https://webrtc.googlesource.com/src/+/6f37672d358475cd17544121a12494da454d85fb/video/video_send_stream_impl.cc#183).
+The [screen probing default is enabled](https://webrtc.googlesource.com/src/+/6f37672d358475cd17544121a12494da454d85fb/rtc_base/experiments/alr_experiment.cc#51).
+Detail also changes the tiny encoder's content type; it is not an independent
+public probing switch or a request to change the real picture's quality.
+
+| VP8, 14-second constraint / 40-second recovery | Initial A / B | Constrained A / B | Recovered A / B |
+| --- | --- | --- | --- |
+| Ordinary | 1080p / 1080p | 540p / 1080p | 1080p / 1080p |
+| Previous pool | 270p / 270p | 270p / 540p | 720p / 1080p |
+| Publication-start correction alone | 1080p / 1080p | 270p / 1080p | 540p / 1080p |
+| Publication start + screen-content carrier | 1080p / 1080p | 270p / 1080p | 1080p / 1080p |
+
+The combined VP8 run returned to 1080p about 17 seconds after shaping ended.
+H264 with played audio also returned to 1080p; its unconstrained child retained
+1080p throughout. A separate one-second pulse after 45 healthy seconds still
+caused native downscaling: the repaired VP8/audio path briefly reached 180p,
+then regained 1080p about 13 seconds after pulse start. The previous pool's
+no-audio pulse ended the 40-second recovery at 360p. Audio changes the bandwidth
+composition, so these pulse runs do not establish an exact speedup. Normal
+WebRTC can also temporarily reduce resolution after a pulse; this repair does
+not promise blur-free delivery under changing network or device load.
+
+A single-consumer control, retaining its mature producer, recovered without
+the deeper dual-consumer drop. Together with the publication-start control,
+this distinguishes cold producer adaptation from repeated producer churn.
+The rate-owner repair separately retains existing encoders through output-rate
+spikes and shared budget changes; a genuinely weaker child can still need its
+own producer. No delayed-budget policy, bitrate floor or manual recovery probe
+was added. Probe padding remains framework-owned traffic under native limits.
+
+Budget attribution remains unchanged: targetBitrate is the encoder's allocated
+target, not raw link bandwidth ([upstream stats correction](https://webrtc.googlesource.com/src/+/fe25b0e928ea4e64aa134f5dc8012343320deec5%5E%21/)).
+Replacing it with availableOutgoingBitrate would bypass native allocation and
+protection. Keep producer, carrier, egress and decoded observations separate.
+
 ## Cost And Accounting
 
 Before the CPU-carrier refinement, a matched actual-product VP8 1080p30 comparison's ordinary pair made
@@ -133,6 +191,8 @@ npx tsx scripts/browser-local-pool-probe.ts carrier --1080 --background
 ```
 
 Add `--h264`, `--single` or `--late` for the corresponding case. Set
+`--network --auto --short-pulse` for a 45-second warmup, one-second constraint
+and 40-second recovery instead of the ordinary 14-second constraint. Set
 `CHROME_PATH` for another installed Chromium binary. `--auto` extends the
 recovery observation; product code owns all adaptation. Results go to ignored
 `build/browser-local-pool`; summarize with
